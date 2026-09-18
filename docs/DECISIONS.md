@@ -132,11 +132,23 @@ Made by me, per the owner's instruction to decide and revise later.
 the names, and the price is asked for on each line. Filling in the price list
 only makes it faster and stops two people quoting the same jersey differently.
 
-## Needed for Phase 7 — DabzTech
+## Decided for Phase 7 — DabzTech repair tickets
 
-| # | Question |
-|---|---|
-| 17.11 | **DabzTech prices:** checking fee; common repair prices; do laptop and desktop cost the same for the same service? Warranty period (default 30 days); and what to do with units left unclaimed |
+Made by me, per the owner's instruction to decide and revise later.
+
+| # | Question | What I decided | How to change it |
+|---|---|---|---|
+| 9.3 | Laptop passwords | **Never stored.** There is no box for one anywhere in the system, and a database test fails the build if a password-shaped column ever appears. A ticket records only how to get in: the customer unlocks it, it arrived unlocked, or it needs no unlocking. The claim stub tells the customer this too | Not changeable — it is a rule from the specification |
+| 17.11 | Does a laptop cost the same as a desktop? | **Left open, in the shape of the data.** A service can be priced for one machine or for "any machine", and *Cleaning & repaste* and *Operating system install* are listed once per machine so you can price them apart — or give them the same number | **Repairs → Set the repair prices** |
+| 17.11 | The checking fee and repair prices | **Twelve services seeded from your own list, all with no price.** A ticket works anyway: the price is asked for on each charge | Same screen. The checking fee is worth setting first, because it is charged even when the customer says no |
+| — | The steps a ticket moves through | **Received → Being checked → Quoted → Being repaired → Ready for pickup → Released**, plus two refusals: "customer said no" and "cannot be repaired" | It is a fixed list in the code |
+| 17.11 | What to do with unclaimed units | **Counted and warned about**, never disposed of by the system. A unit is flagged once it has sat for the number of days in Settings (30 today), counting from the day it was ready — not from the day it arrived | **Settings → DabzTech repairs**. What you then DO with them is your call; the system only makes sure you know they are there |
+| 17.11 | Warranty period | **30 days**, the spec's own default, **copied onto each ticket at release** | **Settings**. Changing it never shortens a warranty already given |
+
+**What this means in practice:** a repair ticket works today. Take the unit in,
+write what is wrong in the customer's words, and the price is asked for on each
+charge. The claim stub prints with what came in, what came with it and what it
+looked like on arrival — the three things an argument later turns on.
 
 ---
 
@@ -201,4 +213,10 @@ to ask:
   the screen says so when the list is pasted in. That is not the same as free —
   it is unknown, and the order still has to total something.
 - An apparel **order number is `A-YYMMDD-NNN`**, counting orders within the day,
-  the same shape as a receipt number.
+  the same shape as a receipt number. A repair ticket is `T-YYMMDD-NNN`.
+- A **declined or unrepairable unit is still in the shop**, so it counts toward
+  the unclaimed warning. The work ended; the unit did not leave.
+- The **unclaimed count runs from the day a unit was ready**, not from the day
+  it arrived. A repair that took three weeks is not an abandoned unit.
+- Removing a part from a repair charge **does not put it back on the shelf**.
+  The part did leave; putting it back is a delivery somebody records on Stocks.

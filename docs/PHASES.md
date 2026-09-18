@@ -14,8 +14,8 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 4 | Customers + Dabz Printshoppe POS | ✅ **Done — waiting on owner to confirm** |
 | 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — waiting on owner to confirm** |
 | 6 | Dabz Apparel job orders | ✅ **Done — waiting on owner to confirm** |
-| 7 | DabzTech Solutions job tickets | Next |
-| 8 | Reports | Not started |
+| 7 | DabzTech Solutions job tickets | ✅ **Done — waiting on owner to confirm** |
+| 8 | Reports | Next |
 | 9 | Later: public website, Messenger, Meta Ads, chatbot, notifications | Not in first build |
 
 ---
@@ -777,12 +777,134 @@ first. Then:
 
 ---
 
-## Phase 7 — DabzTech Solutions job tickets (next)
+## Phase 7 — DabzTech Solutions repair tickets ✅
 
-Needs, when convenient: DabzTech prices (17.11) — the checking fee, common
-repair prices, whether a laptop and a desktop cost the same for the same
-service, the warranty period (30 days is the current default) and what to do
-with units left unclaimed. As always, I will build the machinery and the prices
-stay empty until you give them.
+**Built**
 
-**Not stored, ever:** laptop passwords (spec 9.3).
+*The thing that is not there*
+
+There is **no password field anywhere in this system**. Spec 9.3 says the shop
+does not keep laptop passwords, so there is no box for one — not encrypted, not
+"temporarily", not in a note field called something else. A box that exists
+gets filled in, and a customer's password written down in a shop database is a
+liability you cannot insure against.
+
+A database test reads the schema and **fails if any column with a
+password-shaped name ever appears**. What a ticket records instead is how the
+technician gets in: the customer unlocks it, it arrived unlocked, or it needs
+no unlocking. The claim stub tells the customer the same thing, in writing.
+
+*Taking a unit in (spec 9.1)*
+- Epson printers, laptops and desktop PCs — the database refuses anything else.
+- Brand, model and serial number; **what came with it** (charger, bag, cable)
+  and **what it looked like on arrival**. Those two are the ones an argument
+  later turns on, and they are only useful if written down on the day.
+- The problem in **the customer's own words**, kept separate from what you
+  found when you opened it.
+- A promised date that may be left empty, because not every repair gets one
+  promised on the spot.
+
+*Where a ticket has got to (spec 9.2)*
+- Received → Being checked → Quoted → Being repaired → Ready for pickup →
+  Released, and back a step when a "fixed" unit comes off the bench again.
+- Two refusals: **customer said no** and **cannot be repaired**, each needing a
+  reason. Both leave the unit **in the shop** — that is exactly the pile that
+  grows in the corner — so they count toward the unclaimed warning.
+- A quoted ticket says out loud that it is **waiting on the customer**. It is
+  the state a job sits in longest and the one nobody chases.
+
+*What is charged (spec 9.2)*
+- The checking fee, the work and the parts, added up from the rows. Never
+  stored, so the total cannot disagree with the ticket.
+- The **checking fee is kept separate** in the totals, because it is the one
+  charge that applies even when the customer says no to the repair.
+- **Fitting a part takes it off the shelf in the same transaction.** Phase 5's
+  stock and Phase 7's repairs are the same shelf, and the charge and the stock
+  movement point at each other. Removing the charge later does *not* put the
+  part back — it did leave; a return is a delivery somebody records on Stocks.
+
+*Money*
+- Payments split across the checking fee, the labour and the parts, so each
+  keeps its own books, and the parts add back up to the payment exactly.
+- The split is worked out on the **server** from the ticket's own lines, and
+  the database refuses one that does not add up.
+- Voided, never deleted, with the takings voided alongside. Technicians take
+  payments; only Owner/Admin void them.
+
+*The warranty — "The Fix That Lasts" (spec 9.3)*
+- Copied onto the ticket **at the moment of release**, from Settings as it
+  stands that day. Shortening the shop warranty next year does not quietly
+  cancel a promise already made; a database test proves it.
+- The screen and the claim stub both say whether the promise still holds, and
+  until when.
+
+*Units left behind (spec 9.4)*
+- Counted from the day the unit was **ready**, not the day it arrived — a
+  repair that took three weeks is not an abandoned unit.
+- Flagged on the repairs screen and the Overview once it passes the number of
+  days in Settings. What you then do about them is your call; the system only
+  makes sure you know they are there.
+
+*The claim stub*
+- The customer walks out with it and comes back holding it, so it carries what
+  was brought in, what came with it, what it looked like, the charges, the
+  balance, the warranty — and the line saying the shop does not keep passwords.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Totals, payment splits, warranty dates, unclaimed counts | `npm test` | 408 tests |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 218 checks |
+| That every table and column the app asks for exists | `npm run check:schema` | 41 tables, 613 columns |
+| Every screen at 390 / 768 / 1024 / 1440, every pop-up on screen | headless browser | 32 screens × 4 sizes |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The database tests worth knowing about prove, against a real PostgreSQL:
+
+- **no repair table has a column that could hold a password**, and the unlock
+  method is one of three fixed answers rather than free text;
+- DabzTech accepts Epson printers, laptops and desktops and refuses the rest;
+- fitting two of a part takes exactly two off the shelf, and the charge points
+  at the stock movement;
+- a refused part leaves behind neither a charge nor a stock movement;
+- a released unit must record when it went, and **shortening the shop warranty
+  afterwards does not change a ticket already released**;
+- a payment cannot be written straight to the table, and a split that does not
+  add up is refused;
+- a ticket cannot be deleted — the customer holds the stub.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 408 passed
+npm run dev
+```
+
+Run `supabase/migrations/0008_phase7_repairs.sql` in the Supabase SQL editor
+first. Then:
+
+1. Open **Repairs** and press **Take a unit in**. Note there is nowhere to type
+   a password — the question is *how do we get into it*, and the answers are
+   fixed.
+2. Add the checking fee and a service. It will ask for the price, because
+   nothing is priced yet.
+3. Press **Fit a part**, choose something from stock, and check **Stocks**: the
+   shelf went down by what you fitted.
+4. Take a payment, then look at **Money in/out**: it is split across the fee,
+   the work and the part, all tagged to DabzTech.
+5. Move it to **Ready**, then **Release** it. The warranty is written onto the
+   ticket.
+6. Change the warranty in **Settings** to 7 days and go back: the released
+   ticket **still says 30**. Release another one and it gets 7.
+7. Press **Print the claim stub** and read the last box on it.
+
+---
+
+## Phase 8 — Reports (next)
+
+Everything the shop records now has somewhere to be summed: daily and monthly
+sales per division, income by category, expenses, profit, payroll cost, stock
+value and what is owed. Nothing new needs deciding — reports read what the
+earlier phases already write, which is why they come last.

@@ -376,6 +376,13 @@ describe("orderWarnings", () => {
     });
   });
 
+  it("says one day, not 1 days", () => {
+    expect(
+      orderWarnings({ status: "ready", promisedOn: "2026-09-19", today, totals })[0]
+        .label,
+    ).toBe("Promised in 1 day");
+  });
+
   it("warns as the promised date approaches", () => {
     expect(
       orderWarnings({ status: "ready", promisedOn: "2026-09-20", today, totals })[0]

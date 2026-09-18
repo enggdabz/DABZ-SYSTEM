@@ -19,6 +19,7 @@ import { getAllProducts } from "@/lib/data/pos";
 import { getStaff } from "@/lib/data/staff";
 import { getStockItems } from "@/lib/data/stocks";
 import { getApparelProducts, getSizePrices } from "@/lib/data/apparel";
+import { getRepairServices } from "@/lib/data/repairs";
 import { getSettings } from "@/lib/auth/dal";
 
 export interface ChecklistItem {
@@ -41,7 +42,17 @@ export interface Checklist {
 }
 
 export const getChecklist = cache(async (): Promise<Checklist> => {
-  const [bills, loans, staff, products, stockItems, apparelItems, sizes, settings] =
+  const [
+    bills,
+    loans,
+    staff,
+    products,
+    stockItems,
+    apparelItems,
+    sizes,
+    settings,
+    repairServices,
+  ] =
     await Promise.all([
       getBills(),
       getLoans(),
@@ -51,6 +62,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       getApparelProducts(),
       getSizePrices(),
       getSettings(),
+      getRepairServices(),
     ]);
 
   const items: ChecklistItem[] = [];
@@ -208,6 +220,36 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       names: sizesWithoutPrice.map((size) => size.size),
       href: "/apparel/prices",
       linkLabel: "Open apparel prices",
+      important: false,
+    });
+  }
+
+  const checkingFee = repairServices.find((service) => service.isCheckingFee);
+  if (checkingFee && checkingFee.priceCentavos === null) {
+    items.push({
+      id: "repair-checking-fee",
+      title: "No checking fee set",
+      why: "It is the one charge that applies even when the customer says no to the repair, so it is the one worth setting first.",
+      names: [],
+      href: "/repairs/prices",
+      linkLabel: "Open repair prices",
+      important: true,
+    });
+  }
+
+  const repairsWithoutPrice = repairServices.filter(
+    (service) => service.active && !service.isCheckingFee && service.priceCentavos === null,
+  );
+  if (repairsWithoutPrice.length > 0) {
+    items.push({
+      id: "repair-prices",
+      title: `${repairsWithoutPrice.length} repair service${
+        repairsWithoutPrice.length === 1 ? "" : "s"
+      } with no price`,
+      why: "A ticket still works - whoever writes one is asked for the price - but two technicians will charge differently for the same job.",
+      names: repairsWithoutPrice.map((service) => service.name),
+      href: "/repairs/prices",
+      linkLabel: "Open repair prices",
       important: false,
     });
   }

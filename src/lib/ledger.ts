@@ -264,6 +264,63 @@ export function totalsFor(entries: readonly LedgerEntry[]): LedgerTotals {
   };
 }
 
+/**
+ * Shares one payment out across the income categories it pays for.
+ *
+ * A job order can hold jerseys and jackets at once; a repair ticket holds a
+ * checking fee, labour and parts. The books are kept per category, so a part
+ * payment has to be split - each category carrying the same proportion of the
+ * payment as it does of the job.
+ *
+ * THE LAST CATEGORY ABSORBS THE ROUNDING, so the parts always add back up to
+ * the payment exactly. Rounding each share on its own leaves a centavo hole in
+ * the day's figures, and a hole that appears once per payment is a hole that
+ * grows. Same rule as splitting a discount across divisions in src/lib/pos.ts.
+ */
+export function splitAmountByCategory(options: {
+  /** What each category is owed for. Zero and negative weights are ignored. */
+  weights: readonly { category: string; weightCentavos: Centavos }[];
+  amountCentavos: Centavos;
+  /** Where the money goes when nothing has been priced yet. */
+  fallbackCategory: string;
+}): { category: string; amountCentavos: Centavos }[] {
+  const byCategory = new Map<string, Centavos>();
+
+  for (const entry of options.weights) {
+    if (entry.weightCentavos <= 0) continue;
+    byCategory.set(
+      entry.category,
+      (byCategory.get(entry.category) ?? 0) + entry.weightCentavos,
+    );
+  }
+
+  const categories = [...byCategory.entries()];
+
+  // Nothing priced yet: the money is real, so it still has to land somewhere.
+  if (categories.length === 0) {
+    return options.amountCentavos > 0
+      ? [
+          {
+            category: options.fallbackCategory,
+            amountCentavos: options.amountCentavos,
+          },
+        ]
+      : [];
+  }
+
+  const total = sumCentavos(categories.map(([, weight]) => weight));
+  let remaining = options.amountCentavos;
+
+  return categories.map(([category, weight], index) => {
+    const isLast = index === categories.length - 1;
+    const amountCentavos = isLast
+      ? remaining
+      : Math.round((weight * options.amountCentavos) / total);
+    remaining -= amountCentavos;
+    return { category, amountCentavos };
+  });
+}
+
 /** Income per division, for the Overview and reports (spec 15.1, 15.3). */
 export function incomeByTag(
   entries: readonly LedgerEntry[],

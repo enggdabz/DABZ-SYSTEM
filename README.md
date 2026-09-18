@@ -7,11 +7,11 @@ point of sale, job orders, repairs and stock.
 Owner: Eddie boy Garcia · Founded 18 June 2017 · Philippines · Philippine peso
 (₱) · Asia/Manila
 
-> **Status: Phase 6 complete.** Logins, bills, loans, the ledger, staff, the
-> time clock, payroll, the counter, expenses and stocks all work — and now
-> **Dabz Apparel job orders**: team name lists, size add-ons, down payments and
-> a printable job order sheet. DabzTech repair tickets are Phase 7.
-> See [docs/PHASES.md](docs/PHASES.md).
+> **Status: Phase 7 complete.** All three divisions now work: the printing
+> counter, Dabz Apparel job orders, and **DabzTech repair tickets** — claim
+> stubs, parts taken straight off the shelf, warranties that cannot be
+> shortened after the fact, and no password stored anywhere. Reports are
+> Phase 8. See [docs/PHASES.md](docs/PHASES.md).
 
 ## Two things worth knowing up front
 

@@ -258,3 +258,35 @@ round trip is the one thing that must be tried against a real project.
   offers "e.g. 50%", which is an example, not the owner saying so - a made-up
   policy would have staff turning away a customer who paid what the owner
   actually wanted.
+
+## Repair rules (built in Phase 7)
+
+- **There is no password field, anywhere.** Spec 9.3 says the shop does not
+  keep laptop passwords, so nothing in this system has a box for one - not
+  encrypted, not "temporarily", not in a note field called something else. A
+  box that exists gets filled in. `09_phase7_rls.test.sql` checks the schema
+  for any column whose name looks like a password and fails if one appears.
+  What IS recorded is `unlock_method`: the customer unlocks it, it arrived
+  unlocked, or it does not need unlocking.
+- **The warranty period is COPIED onto the ticket when the unit is released**,
+  never read live from Settings. Shortening the shop warranty next year must
+  not quietly cancel a promise already made - the same rule as the daily rate
+  on a payroll week and the size surcharge on a jersey.
+- **"Declined" and "cannot be repaired" leave the unit IN THE SHOP.** They are
+  end states for the work, not for the unit, so `isAwaitingCollection()` counts
+  them and the unclaimed warning applies to them - that is exactly the pile
+  that grows in the corner (spec 9.4).
+- **The unclaimed count runs from `ready_on`, not from `received_on`.** A
+  repair that took three weeks is not an abandoned unit.
+- **A ticket's total is never stored.** It is added up from `repair_lines`, and
+  the checking fee is kept separate in the totals because it is charged even
+  when the customer says no.
+- **`fit_repair_part` charges the part and takes it off the shelf in one
+  transaction.** Removing the charge afterwards does NOT put it back - the part
+  did leave, and a return is a delivery somebody has to record on Stocks.
+- **`record_repair_payment` is the only way money reaches the ledger**, and it
+  refuses a split that does not add back up to the payment. The split is worked
+  out on the SERVER from the ticket's own lines.
+- The same service can be priced **per machine or for any machine**
+  (`unit_kind`). That is how open decision 17.11 - "does a laptop cost the same
+  as a desktop?" - is left open in the shape of the data rather than answered.

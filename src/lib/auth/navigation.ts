@@ -36,6 +36,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/expenses", label: "Expenses", permission: "record_expenses", phase: 5 },
   { href: "/stocks", label: "Stocks", permission: "stock_in_out", phase: 5 },
   { href: "/apparel", label: "Apparel", permission: "apparel_job_orders", phase: 6 },
+  { href: "/repairs", label: "Repairs", permission: "dabztech_tickets", phase: 7 },
   { href: "/customers", label: "Customers", phase: 4 },
 
   { href: "/bills", label: "Bills", ownerOrAdminOnly: true, phase: 2 },

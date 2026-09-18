@@ -12,6 +12,8 @@ import { getExpenses, getPayables } from "@/lib/data/expenses";
 import { getStockOverview } from "@/lib/data/stocks";
 import { getApparelOrders } from "@/lib/data/apparel";
 import { isOpenOrder } from "@/lib/apparel";
+import { getRepairTickets } from "@/lib/data/repairs";
+import { isAwaitingCollection, isOpenTicket } from "@/lib/repairs";
 import { expenseTotals, payableTotals } from "@/lib/expenses";
 import { formatQuantity } from "@/lib/quantity";
 import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom } from "@/lib/data/money";
@@ -120,6 +122,7 @@ async function OwnerOverview() {
     expenses,
     payables,
     apparelOrders,
+    repairTickets,
   ] = await Promise.all([
     getOverviewMoney(),
     getBills(),
@@ -133,6 +136,7 @@ async function OwnerOverview() {
     getExpenses({ limit: 200 }),
     getPayables(),
     getApparelOrders(),
+    getRepairTickets({ unclaimedAfterDays: settings.unclaimedUnitDays }),
   ]);
 
   // Job orders that need a person: overdue, promised within days, or released
@@ -142,6 +146,17 @@ async function OwnerOverview() {
   );
   const apparelOpen = apparelOrders.filter((entry) =>
     isOpenOrder(entry.order.status),
+  );
+
+  // Repairs that need a person: overdue, unpriced, waiting on a customer, or
+  // a finished unit nobody has collected (spec 9.4).
+  const repairsNeedingAttention = repairTickets.filter(
+    (entry) => entry.warnings.length > 0,
+  );
+  const repairsOnTheBench = repairTickets.filter(
+    (entry) =>
+      isOpenTicket(entry.ticket.status) &&
+      !isAwaitingCollection(entry.ticket.status),
   );
 
   const expenseSummary = expenseTotals(expenses);
@@ -455,6 +470,39 @@ async function OwnerOverview() {
           </p>
           <Link href="/apparel" className="mt-2 inline-block text-sm underline">
             Open Dabz Apparel
+          </Link>
+        </Card>
+      ) : null}
+
+      {repairsNeedingAttention.length > 0 ? (
+        <Card
+          title={`Repairs needing attention (${repairsNeedingAttention.length})`}
+        >
+          <ul className="space-y-2">
+            {repairsNeedingAttention.slice(0, 5).map(({ ticket, warnings }) => (
+              <li
+                key={ticket.id}
+                className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+              >
+                <Link
+                  href={`/repairs/${ticket.id}`}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  {ticket.customerName}
+                </Link>
+                <span className="text-attention">
+                  <span aria-hidden="true">{"⚠"} </span>
+                  {warnings[0].label}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm text-muted">
+            {repairsOnTheBench.length} unit
+            {repairsOnTheBench.length === 1 ? "" : "s"} on the bench.
+          </p>
+          <Link href="/repairs" className="mt-2 inline-block text-sm underline">
+            Open DabzTech
           </Link>
         </Card>
       ) : null}

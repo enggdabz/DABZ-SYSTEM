@@ -17,6 +17,7 @@
  *    released with money still owed; the system says so rather than refusing,
  *    because a shop does let a regular customer take the jerseys.
  */
+import { splitAmountByCategory } from "./ledger";
 import { sumCentavos, type Centavos } from "./money";
 
 // ---------------------------------------------------------------------------
@@ -292,35 +293,13 @@ export function splitPaymentByCategory(options: {
   lines: readonly LineTotal[];
   amountCentavos: Centavos;
 }): { category: string; amountCentavos: Centavos }[] {
-  const byCategory = new Map<string, Centavos>();
-
-  for (const entry of options.lines) {
-    if (entry.totalCentavos <= 0) continue;
-    byCategory.set(
-      entry.line.incomeCategory,
-      (byCategory.get(entry.line.incomeCategory) ?? 0) + entry.totalCentavos,
-    );
-  }
-
-  const categories = [...byCategory.entries()];
-
-  // Nothing priced yet: the money is real, so it still has to land somewhere.
-  if (categories.length === 0) {
-    return options.amountCentavos > 0
-      ? [{ category: "sublimation_jerseys", amountCentavos: options.amountCentavos }]
-      : [];
-  }
-
-  const orderTotal = sumCentavos(categories.map(([, total]) => total));
-  let remaining = options.amountCentavos;
-
-  return categories.map(([category, total], index) => {
-    const isLast = index === categories.length - 1;
-    const amountCentavos = isLast
-      ? remaining
-      : Math.round((total * options.amountCentavos) / orderTotal);
-    remaining -= amountCentavos;
-    return { category, amountCentavos };
+  return splitAmountByCategory({
+    weights: options.lines.map((entry) => ({
+      category: entry.line.incomeCategory,
+      weightCentavos: entry.totalCentavos,
+    })),
+    amountCentavos: options.amountCentavos,
+    fallbackCategory: "sublimation_jerseys",
   });
 }
 
@@ -409,7 +388,10 @@ export function orderWarnings(options: {
   } else if (days <= PROMISE_REMINDER_DAYS) {
     warnings.push({
       kind: "due_soon",
-      label: days === 0 ? "Promised today" : `Promised in ${days} days`,
+      label:
+        days === 0
+          ? "Promised today"
+          : `Promised in ${days} day${days === 1 ? "" : "s"}`,
     });
   }
 
