@@ -41,12 +41,25 @@ table rather than reading one.
 > may. Every table in this system will have it on, so a mistake in the app can
 > never leak staff salaries or customer records.
 
-### 3. Copy the two settings into the project
+### 3. Create the Phase 1 tables
+
+Repeat step 2 with `supabase/migrations/0001_phase1_foundation.sql`: open it,
+copy everything, paste it into a **New query**, and click **Run**.
+
+This creates the accounts, permissions, settings, audit log and sign-in history
+tables — all with Row Level Security switched on.
+
+> **Run the migration files in number order, and only once each.** They are the
+> written history of the database. Never edit one that you have already run;
+> later changes arrive as new numbered files.
+
+### 4. Copy the three settings into the project
 
 1. In Supabase, go to **Project Settings** (the gear) → **API**.
-2. You need two values:
+2. You need three values:
    - **Project URL** — looks like `https://abcdefgh.supabase.co`
    - The **public** key, labelled **anon public** or **publishable**
+   - The **secret** key, labelled **service_role** (see the warning below)
 3. On your computer, in the project folder:
    ```bash
    cp .env.example .env.local
@@ -55,26 +68,44 @@ table rather than reading one.
    ```
    NEXT_PUBLIC_SUPABASE_URL=https://abcdefgh.supabase.co
    NEXT_PUBLIC_SUPABASE_ANON_KEY=paste-the-public-key-here
+   SUPABASE_SERVICE_ROLE_KEY=paste-the-secret-key-here
    ```
 5. Save the file, then restart the app:
    ```bash
    npm run dev
    ```
 
-Open http://localhost:3000. The database card should now read
-**Connected ✓ — Dabz database is connected**.
+### 5. Create your owner account
 
-### ⚠ About the two keys
+Open **http://localhost:3000/setup**.
 
-Supabase shows you more than one key. The difference matters:
+Fill in your name, pick a username (for example `eddie`) and choose a password.
+That creates the owner account and **closes the setup page forever** — from then
+on, every account is created from the Staff screen.
 
-| Key | Safe in the browser? | Use it |
+You can now sign in at http://localhost:3000/login.
+
+> **Why there is no sign-up page:** spec 4.1 says only the Owner or an Admin may
+> create accounts. The setup page exists purely to solve the first-account
+> problem, and it refuses to work the moment any account exists.
+
+### ⚠ About the keys
+
+Supabase gives you more than one key, and the difference matters a great deal:
+
+| Key | Safe in a browser? | What it is for |
 |---|---|---|
-| **anon** / **publishable** | Yes | This is the one that goes in `.env.local` |
-| **service_role** / **secret** | **No, never** | Skips all security. Server-side only, and we do not need it yet |
+| **anon** / **publishable** | Yes | Normal use. Row Level Security still decides what each person may see |
+| **service_role** / **secret** | **No, never** | Skips *all* security. Used only by the server, for signing in and creating accounts |
 
-If the secret key ever ends up in a browser or a screenshot, go to
-**Project Settings → API → Reset** and generate a new one.
+The system keeps them apart by their names: anything starting with
+`NEXT_PUBLIC_` is sent to the browser, and the secret key deliberately does not
+start with it. The code that uses the secret key is also marked server-only, so
+the build fails rather than shipping it by accident.
+
+**Never** paste the secret key into a chat, a screenshot, or a file you commit.
+If it leaks, go to **Project Settings → API** and reset it immediately — that
+invalidates the old one.
 
 ---
 
@@ -86,10 +117,11 @@ from the counter computer and from your phone.
 1. Go to **https://vercel.com** and sign up **with GitHub**.
 2. Click **Add New → Project**.
 3. Find the `dabz-system` repository and click **Import**.
-4. Before clicking Deploy, open **Environment Variables** and add the same two
-   values from your `.env.local`:
+4. Before clicking Deploy, open **Environment Variables** and add the same
+   three values from your `.env.local`:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
 
    This step is the one people forget. Vercel cannot see your `.env.local` file
    — that file never leaves your computer — so the settings must be entered
@@ -146,6 +178,18 @@ Supabase dashboard shows the project as paused, resume it.
 
 **It works on my computer but not on Vercel**
 You almost certainly skipped step 4 of Part 2. Go to the Vercel project →
-Settings → Environment Variables, add the two values, then **Redeploy**.
+Settings → Environment Variables, add all three values, then **Redeploy**.
+
+**"Sign in" says the system is not connected to its database**
+The `SUPABASE_SERVICE_ROLE_KEY` is missing from `.env.local` (or from Vercel).
+Signing in cannot work without it.
+
+**The setup page says setup is already done, but I have no account**
+An account row exists without you remembering it. Open Supabase →
+**Table Editor** → `profiles` to see what is there.
+
+**I am locked out after five wrong passwords**
+Wait 15 minutes and try again. If it is the owner account and you have
+forgotten the password, reset it from Supabase → **Authentication** → **Users**.
 
 **Anything else** — tell me what the screen says and I will work it out with you.

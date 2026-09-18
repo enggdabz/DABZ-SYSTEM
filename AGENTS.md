@@ -53,3 +53,47 @@ receiving code.
 - Gentle, short motion only; `prefers-reduced-motion` is already respected in
   `globals.css`.
 - Sentence case on buttons and labels ("Mark paid", "Add to sale", "Time in").
+
+## Security architecture (built in Phase 1)
+
+Three layers. Only the third is a real boundary:
+
+1. **Navigation** hides sections (`src/lib/auth/navigation.ts`) — a courtesy.
+2. **Every screen and Server Action** re-checks the asker via
+   `src/lib/auth/dal.ts` (`requireUser`, `requireOwnerOrAdmin`, `requireOwner`,
+   `requirePermission`). A Server Action is a public endpoint: never rely on the
+   caller having seen the button.
+3. **PostgreSQL Row Level Security** refuses the rows. This is the boundary.
+
+Rules that are easy to break:
+
+- Policies on `profiles` must not read `profiles` directly (infinite
+  recursion). Use the `SECURITY DEFINER` helpers: `current_role_name()`,
+  `is_owner()`, `is_owner_or_admin()`, `has_permission()`.
+- Write policies need **both** `using` and `with check`. Without `with check` an
+  admin could edit a staff row and set its role to `owner`.
+- `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS entirely. Only
+  `src/lib/supabase/admin.ts` may use it, only for work that happens before
+  anyone is signed in (username lookup, lockout counting, login history) or
+  that needs Supabase's admin API (creating accounts, resetting passwords).
+  That module is marked `server-only`. Everywhere else, use
+  `createSupabaseServerClient()` so RLS stays in force.
+- `audit_log` and `login_events` have **no** insert/update/delete policy on
+  purpose. Only the server writes them. Do not add one.
+
+## Verifying work
+
+```bash
+npm test              # unit tests: money, credentials, settings, permissions
+npm run test:rls      # security rules against a real PostgreSQL
+npm run check:schema  # every table/column the app asks for exists
+npm run typecheck && npm run lint && npm run build
+```
+
+`test:rls` and `check:schema` need a local PostgreSQL (they create and drop a
+throwaway database). Point them at one with `PGHOST`/`PGPORT`/`PGUSER`. They
+catch two classes of bug that nothing else does: a security policy that does
+not do what its name suggests, and a misspelled column in a query string.
+
+Supabase Auth cannot be run locally here (no Docker daemon), so the sign-in
+round trip is the one thing that must be tried against a real project.

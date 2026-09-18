@@ -7,9 +7,9 @@ Each phase ends with: what was built, how to run it, how to test it.
 
 | # | Phase | Status |
 |---|---|---|
-| 0 | Setup & learning | ✅ **Done — waiting on owner to confirm** |
-| 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | Not started |
-| 2 | Bills, loans, ledger, Overview (the money side) | Not started |
+| 0 | Setup & learning | ✅ Done |
+| 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ **Done — waiting on owner to confirm** |
+| 2 | Bills, loans, ledger, Overview (the money side) | Next |
 | 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | Not started |
 | 4 | Customers + Dabz Printshoppe POS | Not started |
 | 5 | Expenses pop-up and stocks | Not started |
@@ -61,22 +61,108 @@ a phone to confirm it reflows.
 
 ---
 
-## Phase 1 — Foundation (next)
+## Phase 1 — Foundation ✅
 
-Planned, pending the answers marked **needed for Phase 1** in
-[DECISIONS.md](DECISIONS.md):
+**Built**
 
-- Real database tables for users, roles, permissions, settings and the audit log
-  — every one with Row Level Security.
-- Username + password login, no public sign-up, temporary passwords that must be
-  changed on first use, account lock after 5 failed attempts, auto-logout, and a
-  **Switch user** button for the shared counter computer (spec 4.1).
-- Owner / Admin / Staff roles and the per-staff permission checkboxes (spec 4.2,
-  4.3).
-- The audit log: who did what, when, with before and after values (spec 2.1).
-- Settings: working days per month, work hours, week start, staff expense limit,
-  staff discount limit.
-- The real navigation bar, with only the sections a person is allowed to see.
+*Accounts and signing in (spec 4.1)*
+- Username and password sign-in. Staff never see an email address: each username
+  is mapped internally to `username@staff.dabz.local`, which Supabase uses as
+  its own name for the account and which is never written to.
+- No public sign-up. A one-time `/setup` page creates the owner account and then
+  refuses to work again; after that, accounts come from the Staff screen.
+- Temporary passwords for new accounts and resets, shown once, which the person
+  must replace on first sign-in. Nobody can read an existing password, including
+  the owner — only reset it.
+- An account locks for 15 minutes after 5 failed attempts in a row. A successful
+  sign-in clears the count, and repeated tries against an already-locked account
+  do not extend the lock.
+- Automatic sign-out after a configurable idle period (default 15 minutes) and a
+  **Switch user** button for the shared counter computer.
+- Sign-in history, readable by the owner and admins, including failures.
 
-**Logging in is not timing in.** The time clock is a separate action, and it
-arrives in Phase 3.
+*Roles and permissions (spec 4.2, 4.3)*
+- Owner, Admin and Staff. The database allows only one owner, and enforces that
+  an admin can manage staff but can neither edit the owner nor promote anyone
+  (including themselves) to admin.
+- The seven permission checkboxes, with **Add sales (POS)** ticked by default for
+  a new staff account and nothing else.
+- Owner/Admin-only areas — bills, loans, payroll, accounts, void approvals,
+  owner withdrawals, full reports and settings — which cannot be granted to
+  staff at all.
+- Deactivating an account keeps every record it entered and removes all access
+  immediately.
+
+*Everything else*
+- The audit log: who did what, when, on which record, with before and after
+  values. Nothing can edit or delete an entry — not staff, not admins, not the
+  owner — and no browser can even add one.
+- The Settings screen: working days a month, week start, shop hours, idle
+  sign-out, the staff expense limit, and both staff discount limits.
+- The real top navigation, showing only the sections a person may open, with
+  later phases visibly marked.
+- Reusable building blocks (`src/components/ui.tsx`) so every screen matches.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Money, usernames, passwords, lockout, settings, permissions | `npm test` | 78 tests |
+| The security rules themselves, against a real PostgreSQL | `npm run test:rls` | 30 checks |
+| That every table and column the app asks for exists | `npm run check:schema` | 29 tables, 96 columns |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The security tests are the ones worth knowing about. They prove, against a real
+database rather than by reading the code, that:
+
+- a staff member sees only their own profile, and cannot read the sign-in
+  history or change shop settings;
+- a staff member cannot grant themselves a permission or promote themselves;
+- an admin cannot edit the owner, cannot promote staff to admin, and cannot
+  promote themselves;
+- a deactivated account loses its role and every permission at once;
+- the audit log cannot be added to, rewritten or deleted from the app.
+
+**Not verified here** — the actual sign-in round trip needs a live Supabase
+project, which this build environment has no access to. Everything around it is
+tested; the first thing to try after setup is signing in.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 78 passed
+npm run dev
+```
+
+Then follow `docs/SETUP.md` to create the Supabase project, run **both**
+migration files, add the three settings, and create your owner account at
+`/setup`. After that:
+
+1. Sign in at `/login`.
+2. Open **Staff** and add a staff account. Write down the temporary password it
+   shows you — it is shown only once.
+3. Sign out (**Switch user**), sign in as that staff member, and confirm you are
+   made to choose a new password.
+4. Confirm the staff account cannot see Staff, Settings or Activity in the
+   navigation, and that typing `/settings` in the address bar bounces back.
+5. Sign back in as yourself, open **Settings**, change the working days, and
+   confirm the change appears in **Activity** with its old and new value.
+6. Try signing in with the wrong password five times and confirm the account
+   locks for 15 minutes.
+
+---
+
+## Phase 2 — Bills, loans, ledger, Overview (next)
+
+Needs the answers marked **needed for Phase 2** in [DECISIONS.md](DECISIONS.md)
+— chiefly the due day of the month for each of the 11 bills.
+
+- The 11 fixed bills and 6 loans from spec 12.1 and 12.2, seeded as starting
+  data.
+- Bill status per month, **Mark paid** with undo, and the 5-day reminder pop-up.
+- Loan balances, interest, months-to-payoff, and the **⚠ Balance growing**
+  warning when a monthly payment is no more than the monthly interest.
+- The money-in/money-out ledger, with entries created automatically by the other
+  modules so nothing is typed twice.
+- The daily target, and the Overview screen from spec 15.1.

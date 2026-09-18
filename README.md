@@ -7,9 +7,9 @@ point of sale, job orders, repairs and stock.
 Owner: Eddie boy Garcia · Founded 18 June 2017 · Philippines · Philippine peso
 (₱) · Asia/Manila
 
-> **Status: Phase 0 complete.** The project runs, the design system is in place,
-> and the money rules are tested. No real business data yet — that starts in
-> Phase 1. See [docs/PHASES.md](docs/PHASES.md).
+> **Status: Phase 1 complete.** Logins, roles, permissions, the audit log and
+> settings all work. No money records yet — bills, loans and the ledger are
+> Phase 2. See [docs/PHASES.md](docs/PHASES.md).
 
 ---
 
@@ -65,14 +65,30 @@ on the database card. That is expected on day one.
 
 ### Connecting the database
 
-1. Follow [docs/SETUP.md](docs/SETUP.md) to create the free Supabase project.
-2. Copy the settings template and fill it in:
+1. Follow [docs/SETUP.md](docs/SETUP.md) to create the free Supabase project and
+   run the two migration files.
+2. Copy the settings template and fill in the three values:
    ```bash
    cp .env.example .env.local
    ```
 3. Stop `npm run dev` and start it again (settings are only read at startup).
+4. Open **http://localhost:3000/setup** once, to create your owner account.
 
-The database card should turn to **"Connected ✓"**.
+After that, sign in at **/login**.
+
+### The three keys, and why one is different
+
+`.env.local` holds three values. Two are safe in a browser; one is not.
+
+| Setting | Safe in a browser? |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes — the database still decides what each person may see |
+| `SUPABASE_SERVICE_ROLE_KEY` | **No. Never.** It bypasses all security |
+
+The `NEXT_PUBLIC_` prefix is what sends a value to the browser, so the secret
+key deliberately does not have it. The code that uses it is also marked
+server-only, so the build fails rather than leaking it by accident.
 
 ---
 
@@ -86,12 +102,17 @@ The database card should turn to **"Connected ✓"**.
 | `npm run typecheck` | Finds mistakes without running anything | Before pushing |
 | `npm run lint` | Checks code style | Before pushing |
 | `npm run build` | Makes the fast version used on the internet | To confirm it will deploy |
+| `npm run test:rls` | Proves the security rules against a real database | After changing anything in `supabase/` |
+| `npm run check:schema` | Confirms every column the app asks for exists | After changing a query or a migration |
+
+The last two need PostgreSQL on the machine, so they are for whoever is
+developing, not for the shop. Everything else runs anywhere.
 
 ### What a passing test run looks like
 
 ```
- Test Files  1 passed (1)
-      Tests  24 passed (24)
+ Test Files  4 passed (4)
+      Tests  78 passed (78)
 ```
 
 If it says **failed**, read the lines above it — Vitest prints what it expected
@@ -104,27 +125,63 @@ so nothing should be deployed until it passes.
 
 ```
 src/
+  proxy.ts            Runs before every request: refreshes the session,
+                      sends signed-out visitors to the login screen
   app/
-    layout.tsx        The frame every screen sits in (font, theme, top bar slot)
-    page.tsx          The Phase 0 hello screen
+    layout.tsx        The frame every screen sits in (font, theme)
     globals.css       THE DESIGN SYSTEM - all Dabz colours and sizes
+    login/            Sign in, and the sign-out action
+    setup/            First-time setup: creates the owner account, once
+    change-password/  Choosing a new password
+    (app)/            Every screen you must be signed in to see
+      layout.tsx        Top bar, navigation, idle sign-out
+      page.tsx          Home
+      staff/            Accounts, roles, permission checkboxes
+      settings/         Working days, hours, staff limits
+      activity/         The audit log and sign-in history
   components/
-    TopBar.tsx        Black frosted top bar
+    ui.tsx            Buttons, cards, fields, notices - used everywhere
+    AppTopBar.tsx     Black frosted top bar with the navigation
+    AutoLogout.tsx    Signs an idle person out
     ThemeToggle.tsx   Light / dark switch
   lib/
     money.ts          Centavos: parsing, formatting, discounts, change
-    money.test.ts     The automated money checks
+    settings.ts       Shop settings, and the approval limits
+    audit.ts          Writing the audit log
     divisions.ts      The three divisions as data
     datetime.ts       Manila-time formatting
-    health.ts         "Can we reach the database?" check
-    supabase/         Database connection (browser + server)
+    auth/
+      permissions.ts  Who may do what
+      navigation.ts   Which sections a person sees
+      credentials.ts  Usernames, temporary passwords, the lockout
+      dal.ts          "Who is asking?" - checked by every screen
+    supabase/         Database connections (browser, server, admin)
 supabase/
   migrations/         Database changes, in order, as .sql files
+  tests/              Security tests for the rules above (optional)
+scripts/
+  check-schema-usage.mjs   Catches a misspelled column before you do
 docs/
   SETUP.md            Step-by-step Supabase and Vercel setup
   PHASES.md           The build plan and what is done
   DECISIONS.md        Questions still open, and answers already given
 ```
+
+### How the security works
+
+Three layers, and the important one is the last:
+
+1. **The navigation** hides sections a person may not open. A courtesy, not
+   security.
+2. **Every screen and every action** re-checks who is asking, through
+   `src/lib/auth/dal.ts`. A button being hidden is not enough — the action
+   behind it checks too.
+3. **The database itself** refuses the data, through PostgreSQL Row Level
+   Security. Even if layers 1 and 2 had a bug, a staff member asking for
+   payroll gets nothing back.
+
+That third layer is why `npm run test:rls` exists: it proves the rules against
+a real database instead of trusting that the code reads correctly.
 
 ### About `globals.css`
 
