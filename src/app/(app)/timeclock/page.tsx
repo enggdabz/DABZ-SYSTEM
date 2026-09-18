@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getStaff, getTodaysAttendance } from "@/lib/data/staff";
@@ -110,11 +110,11 @@ export default async function TimeClockPage() {
             {noLogins.map((member) => member.fullName).join(", ")} can no longer
             tap in, because each person now clocks only themselves. Either create
             them an account on{" "}
-            <Link href="/accounts" className="underline">
+            <Link href="/accounts" className={`underline ${TAP_AREA}`}>
               Accounts
             </Link>{" "}
             and link it on{" "}
-            <Link href="/staff" className="underline">
+            <Link href="/staff" className={`underline ${TAP_AREA}`}>
               Staff
             </Link>
             , or record their days here yourself.

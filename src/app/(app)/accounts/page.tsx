@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { formatManilaDate } from "@/lib/datetime";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
@@ -42,7 +42,7 @@ export default async function StaffPage() {
         <p className="mt-2 text-muted">
           Who can sign in, and what each person is allowed to do. There is no
           public sign-up: every account is created here. Wages and employment
-          details live on the <a className="underline" href="/staff">Staff</a>{" "}
+          details live on the <a className={`underline ${TAP_AREA}`} href="/staff">Staff</a>{" "}
           screen.
         </p>
       </div>

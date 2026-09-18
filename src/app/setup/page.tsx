@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Notice, Wordmark } from "@/components/ui";
+import { Notice, TAP_AREA, Wordmark } from "@/components/ui";
 import { isAdminClientConfigured } from "@/lib/supabase/admin";
 
 import { countProfiles } from "./actions";
@@ -41,7 +41,7 @@ export default async function SetupPage() {
               <Notice tone="info" title="Setup is already done">
                 <p>
                   This shop has {existing} account{existing === 1 ? "" : "s"}.{" "}
-                  <a className="underline" href="/login">
+                  <a className={`underline ${TAP_AREA}`} href="/login">
                     Sign in instead.
                   </a>
                 </p>

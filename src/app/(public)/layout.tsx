@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Wordmark } from "@/components/ui";
+import { TAP_AREA, Wordmark } from "@/components/ui";
 
 /**
  * The frame around the shop's public page (Phase 9).
@@ -50,7 +50,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
             </span>
           </p>
           {/* Small and at the bottom: this door is for staff, not customers. */}
-          <Link href="/login" className="-mx-1 inline-block px-1 py-1.5 text-xs underline">
+          <Link href="/login" className={`text-xs underline ${TAP_AREA}`}>
             Staff sign in
           </Link>
         </div>

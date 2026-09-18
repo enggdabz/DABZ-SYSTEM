@@ -273,8 +273,19 @@ to ask:
   "Facebook" and "facebook" are one line, printed the way the first person
   typed it.
 
-**Known gap, worth a later tidy:** inline text links inside prose (*Open the
-bills screen*, *See every entry*, and about thirty like them from phases 2–8)
-are 20px tall, under the 24px touch target the design rules ask for. The
-Phase 9 screens were fixed; the rest are listed here rather than changed in
-this phase, because it touches every screen in the system.
+- **Every tappable piece of text carries `TAP_AREA`** from
+  `src/components/ui.tsx` - links and small actions worded as links alike.
+  Bare underlined text measures about 20px and the design rules ask for 24px,
+  which had been quietly broken in thirty places across phases 1–8 until a
+  browser measured them. It is padding only, so nothing looks different; what
+  changed is how easy it is to hit. `src/components/tap-targets.test.ts` fails
+  if the next one is added without it. To change the size, change that one
+  constant.
+- The padding is **not** `inline-block`. Half of these links sit inside a
+  sentence, and an inline-block link cannot break across two lines. Vertical
+  padding on an ordinary inline element leaves the line height alone - the
+  paragraph does not reflow - and still takes the tap. Measured in a browser,
+  not assumed.
+- `py-1.5` rather than `py-1` because an inline box is sized by the **font**,
+  not by the `line-height` class: a `text-xs` link with `py-1` comes out at
+  23px, one pixel short of the rule.

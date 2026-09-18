@@ -1077,17 +1077,30 @@ starts with whoever found the page, so it is fenced deliberately:
 
 | What | How | Result |
 |---|---|---|
-| Field limits, the honeypot, the rate limit, the counts | `npm test` | 461 tests |
+| Field limits, the honeypot, the rate limit, the counts | `npm test` | 463 tests |
 | The security rules, against a real PostgreSQL | `npm run test:rls` | 231 checks |
 | That every table and column the app asks for exists | `npm run check:schema` | 42 tables |
 | Every screen at 390 / 768 / 1024 / 1440, every pop-up on screen | headless browser | 36 screens × 4 sizes |
+| That nothing tappable is under 24px | headless browser | 36 screens, then 15 again with every form opened |
 | Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+**One thing fixed everywhere while checking this**
+
+Measuring the screens turned up a rule that had been quietly broken since
+Phase 1. The design rules ask for a 24px touch target, and a bare underlined
+link — *Open the bills screen*, *See every entry*, *Remove*, *Clear sale* — is
+about 20px. There were about thirty of them, on nearly every screen.
+
+They now all wear one shared padding from `src/components/ui.tsx`, so nothing
+looks any different and everything is easier to hit. `npm test` fails if the
+next one is added without it, which is the only part of this a test can see —
+the 24px itself has to be measured in a browser.
 
 **How to check it**
 
 ```bash
 npm install
-npm test          # expect: 461 passed
+npm test          # expect: 463 passed
 ```
 
 Run `supabase/migrations/0009_phase9_public.sql` against your project, then:

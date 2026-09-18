@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { ORDER_STATUS_LABELS, isOpenOrder } from "@/lib/apparel";
 import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
@@ -99,7 +99,7 @@ export default async function ApparelPage() {
           The five items, the size surcharges and the down payment policy are
           all yours to set. Orders work without them &mdash; the price is asked
           for on each line.{" "}
-          <Link href="/apparel/prices" className="underline">
+          <Link href="/apparel/prices" className={`underline ${TAP_AREA}`}>
             Set the apparel prices
           </Link>
           .
@@ -125,7 +125,7 @@ export default async function ApparelPage() {
                   <div className="min-w-0">
                     <Link
                       href={`/apparel/${order.id}`}
-                      className="text-lg font-semibold underline-offset-2 hover:underline"
+                      className={`text-lg font-semibold underline-offset-2 hover:underline ${TAP_AREA}`}
                     >
                       {order.teamName ?? order.orderNumber}
                     </Link>
@@ -181,7 +181,7 @@ export default async function ApparelPage() {
                 <span className="min-w-0">
                   <Link
                     href={`/apparel/${order.id}`}
-                    className="font-medium underline-offset-2 hover:underline"
+                    className={`font-medium underline-offset-2 hover:underline ${TAP_AREA}`}
                   >
                     {order.teamName ?? order.orderNumber}
                   </Link>

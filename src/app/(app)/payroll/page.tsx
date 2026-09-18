@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getAdvanceBalances, getPayrollWeeks, getStaff } from "@/lib/data/staff";
 import { formatPesos, sumCentavos } from "@/lib/money";
@@ -105,7 +105,7 @@ export default async function PayrollPage({
         <Notice tone="attention" title="No active staff yet">
           <p>
             Add staff on the{" "}
-            <Link href="/staff" className="underline">
+            <Link href="/staff" className={`underline ${TAP_AREA}`}>
               Staff
             </Link>{" "}
             screen first.
@@ -116,7 +116,7 @@ export default async function PayrollPage({
           <p>
             Payroll cannot work out what to pay anyone until at least one person
             has a daily rate. Set them on the{" "}
-            <Link href="/staff" className="underline">
+            <Link href="/staff" className={`underline ${TAP_AREA}`}>
               Staff
             </Link>{" "}
             screen &mdash; nothing has been guessed.
@@ -306,7 +306,7 @@ export default async function PayrollPage({
                   >
                     <Link
                       href={`/payroll?staff=${selected.id}&week=${civilDateToISO(week.weekStart)}`}
-                      className="text-sm underline"
+                      className={`text-sm underline ${TAP_AREA}`}
                     >
                       {formatWeekRange(week.weekStart)}
                     </Link>

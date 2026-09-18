@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import {
   ORDER_FLOW,
   ORDER_STATUS_LABELS,
@@ -85,7 +85,7 @@ export default async function ApparelOrderPage({
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/apparel" className="text-sm text-muted underline">
+        <Link href="/apparel" className={`text-sm text-muted underline ${TAP_AREA}`}>
           &larr; All job orders
         </Link>
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
@@ -351,7 +351,7 @@ export default async function ApparelOrderPage({
             {isOwnerOrAdmin(user) ? (
               <>
                 {" "}
-                <Link href="/settings" className="underline">
+                <Link href="/settings" className={`underline ${TAP_AREA}`}>
                   Set one in Settings
                 </Link>{" "}
                 if you want the system to check.

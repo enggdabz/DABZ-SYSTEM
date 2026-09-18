@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
+import { TAP_AREA } from "@/components/ui";
 import { ORDER_STATUS_LABELS } from "@/lib/apparel";
 import { requirePermission } from "@/lib/auth/dal";
 import { getApparelOrder } from "@/lib/data/apparel";
@@ -55,7 +56,7 @@ export default async function JobOrderSheetPage({
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
-        <Link href={`/apparel/${order.id}`} className="text-sm underline">
+        <Link href={`/apparel/${order.id}`} className={`text-sm underline ${TAP_AREA}`}>
           {"←"} Back to the order
         </Link>
         <span className="text-sm text-muted">

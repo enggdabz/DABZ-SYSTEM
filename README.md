@@ -131,8 +131,8 @@ developing, not for the shop. Everything else runs anywhere.
 ### What a passing test run looks like
 
 ```
- Test Files  18 passed (18)
-      Tests  461 passed (461)
+ Test Files  19 passed (19)
+      Tests  463 passed (463)
 ```
 
 If it says **failed**, read the lines above it — Vitest prints what it expected

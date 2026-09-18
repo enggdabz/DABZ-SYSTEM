@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getStockOverview } from "@/lib/data/stocks";
@@ -78,7 +78,7 @@ export default async function RepairTicketPage({
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/repairs" className="text-sm text-muted underline">
+        <Link href="/repairs" className={`text-sm text-muted underline ${TAP_AREA}`}>
           &larr; All repair tickets
         </Link>
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">

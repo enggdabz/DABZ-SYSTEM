@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getAccountOptions, getAdvanceBalances, getStaff } from "@/lib/data/staff";
 import { DIVISIONS, type DivisionId } from "@/lib/divisions";
@@ -47,7 +47,7 @@ export default async function StaffPage() {
           The people the shop employs and pays. A login is optional &mdash;
           someone who only taps the time clock does not need one. Logins and
           permissions are on the{" "}
-          <Link href="/accounts" className="underline">
+          <Link href="/accounts" className={`underline ${TAP_AREA}`}>
             Accounts
           </Link>{" "}
           screen.
@@ -73,7 +73,7 @@ export default async function StaffPage() {
             Each person now clocks only themselves in, so{" "}
             {noLogins.map((member) => member.fullName).join(", ")} cannot tap in
             without an account. Create one on{" "}
-            <Link href="/accounts" className="underline">
+            <Link href="/accounts" className={`underline ${TAP_AREA}`}>
               Accounts
             </Link>{" "}
             and link it below &mdash; or leave it, and record their days

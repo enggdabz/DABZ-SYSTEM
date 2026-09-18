@@ -3,6 +3,7 @@ import { Fragment } from "react";
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { TAP_AREA } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getReportWithComparison, getStanding } from "@/lib/data/reports";
 import { formatPesos } from "@/lib/money";
@@ -60,7 +61,7 @@ export default async function PrintReportPage({
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
-        <Link href={`/reports?period=${preset}`} className="text-sm underline">
+        <Link href={`/reports?period=${preset}`} className={`text-sm underline ${TAP_AREA}`}>
           {"←"} Back to reports
         </Link>
         <span className="text-sm text-muted">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getApparelOptions,
@@ -35,7 +35,7 @@ export default async function ApparelPricesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/apparel" className="text-sm text-muted underline">
+        <Link href="/apparel" className={`text-sm text-muted underline ${TAP_AREA}`}>
           &larr; Back to job orders
         </Link>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -153,7 +153,7 @@ export default async function ApparelPricesPage() {
           <Notice tone="attention" title="No policy set">
             The order screen asks for whatever the customer hands over and never
             says a payment is short.{" "}
-            <Link href="/settings" className="underline">
+            <Link href="/settings" className={`underline ${TAP_AREA}`}>
               Set a percentage in Settings
             </Link>{" "}
             if you want it checked.
@@ -165,7 +165,7 @@ export default async function ApparelPricesPage() {
               {settings.apparelDownPaymentPercent}%
             </span>{" "}
             up front.{" "}
-            <Link href="/settings" className="underline">
+            <Link href="/settings" className={`underline ${TAP_AREA}`}>
               Change it in Settings
             </Link>
             .

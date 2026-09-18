@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getChecklist } from "@/lib/data/checklist";
 
@@ -83,7 +83,7 @@ export default async function ChecklistPage() {
             <strong className="text-ink">The rest of the debt.</strong> You said
             the real total is closer to ₱2,000,000; ₱1,336,264 is entered. Add
             the rest on{" "}
-            <Link href="/loans" className="underline">
+            <Link href="/loans" className={`underline ${TAP_AREA}`}>
               Loans
             </Link>
             .
@@ -93,7 +93,7 @@ export default async function ChecklistPage() {
             The defaults are 8:00&ndash;17:00 over 26 working days. They decide
             who is marked late and how overtime is counted, so they are worth
             correcting on{" "}
-            <Link href="/settings" className="underline">
+            <Link href="/settings" className={`underline ${TAP_AREA}`}>
               Settings
             </Link>
             .
@@ -102,7 +102,7 @@ export default async function ChecklistPage() {
             <strong className="text-ink">Bulk discount rules.</strong> The
             machinery is there; no rules are set, so every quantity costs the
             normal price. Add them per product on{" "}
-            <Link href="/products" className="underline">
+            <Link href="/products" className={`underline ${TAP_AREA}`}>
               Products
             </Link>
             .

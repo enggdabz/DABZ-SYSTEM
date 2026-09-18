@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
+import { TAP_AREA } from "@/components/ui";
 import { getSignedInUser } from "@/lib/auth/dal";
 import { getPayrollDays, getPayrollWeeks, getStaff } from "@/lib/data/staff";
 import { formatPesos } from "@/lib/money";
@@ -80,7 +81,7 @@ export default async function PayslipPage({
     <div className="mx-auto max-w-2xl">
       {/* Hidden when printing: the screen-only controls. */}
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
-        <Link href="/payroll" className="text-sm underline">
+        <Link href="/payroll" className={`text-sm underline ${TAP_AREA}`}>
           {"←"} Back to payroll
         </Link>
         <span className="text-sm text-muted">

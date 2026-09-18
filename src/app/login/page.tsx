@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Notice, Wordmark } from "@/components/ui";
+import { Notice, TAP_AREA, Wordmark } from "@/components/ui";
 import { isAdminClientConfigured } from "@/lib/supabase/admin";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
@@ -62,7 +62,7 @@ export default async function LoginPage({
             ) : firstRun ? (
               <Notice tone="info" title="No accounts exist yet">
                 <p>
-                  Open <a className="underline" href="/setup">the first-time setup page</a>{" "}
+                  Open <a className={`underline ${TAP_AREA}`} href="/setup">the first-time setup page</a>{" "}
                   to create the owner account.
                 </p>
               </Notice>

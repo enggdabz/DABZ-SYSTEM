@@ -101,6 +101,39 @@ export function Select({ className = "", ...props }: ComponentProps<"select">) {
   return <select {...props} className={`${INPUT_CLASS} ${className}`} />;
 }
 
+/*
+  Tappable text.
+
+  Underlined text on its own is about 20px tall, and the design rules ask for
+  at least 24px on anything a person taps - a rule that was quietly broken by
+  every "Open the bills screen" link in the system until a browser measured
+  them. The padding here IS the fix: it is the part a thumb lands on.
+
+  Three things worth knowing before changing it.
+
+  It deliberately does NOT use `inline-block`. Half of these links sit inside a
+  sentence, and an inline-block link cannot break across two lines - a long one
+  would push itself onto a line of its own. Vertical padding on an ordinary
+  inline element does not change the line height, so the paragraph does not
+  reflow, and the padding still receives the tap.
+
+  `py-1.5` rather than `py-1` because an inline box is sized by the FONT, not
+  by the `line-height` class: a `text-xs` link with `py-1` measures 23px, one
+  pixel short. Six pixels each side clears 24px at every size the app uses.
+
+  The negative margin cancels the horizontal padding, so a link inside a
+  sentence still lines up with the words either side of it.
+
+  It is hit area only - no colour, no underline. Those stay where the link is
+  written, so adding this changes nothing about how a screen looks, only how
+  easy it is to hit.
+
+  All of that was measured in a browser rather than reasoned about. No unit
+  test can see a pixel; `src/components/tap-targets.test.ts` only checks that
+  nobody forgot to add it.
+*/
+export const TAP_AREA = "-mx-1 px-1 py-1.5";
+
 type NoticeTone = "success" | "attention" | "info";
 
 /**

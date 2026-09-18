@@ -62,6 +62,15 @@ receiving code.
   layout falls apart. Anything a person taps at the counter needs a touch
   target of at least 24px, and the primary action must be reachable without
   scrolling.
+- **Tappable text wears `TAP_AREA`** from `src/components/ui.tsx`. Underlined
+  text on its own is about 20px, so every link and every small action worded as
+  a link - "Open the bills screen", "Remove", "Clear sale" - carries that
+  padding. It is hit area only: the colour and the underline stay where the
+  link is written, so adding it changes nothing about how a screen looks. Do
+  not reach for `inline-block` instead - a link inside a sentence has to be
+  able to break across two lines, and an inline-block one cannot.
+  `src/components/tap-targets.test.ts` fails if an underlined className appears
+  without it.
 - **A figure only the owner can know is never invented** - a price, a due day,
   an interest rate, a wage. It stays empty, with a warning and an editable
   field, AND it must appear in `src/lib/data/checklist.ts` so the To fill in
@@ -353,6 +362,6 @@ round trip is the one thing that must be tried against a real project.
 - **The system does not send the reply.** It records that the shop answered and
   what was said. A reply button that quietly failed would leave a customer
   waiting for something that never left.
-- **A link a customer taps is padded, not bare.** Bare text is a 20px target
-  and the rule is 24px. On the public page and the Messages screen, use
-  `-mx-1 inline-block px-1 py-1` rather than a naked `underline`.
+- **A link a customer taps is padded, not bare** - `TAP_AREA`, as everywhere
+  else in the system now. The public page is where it matters most: a customer
+  on a phone has one thumb and no patience.

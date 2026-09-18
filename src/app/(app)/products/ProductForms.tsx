@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
 import { DIVISION_LIST } from "@/lib/divisions";
 import { centavosToDecimalString } from "@/lib/money";
 
@@ -168,7 +168,7 @@ export function PriceTiersForm({
                   <input type="hidden" name="tierId" value={tier.id} />
                   <button
                     type="submit"
-                    className="text-xs text-muted underline hover:text-ink"
+                    className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
                   >
                     Remove
                   </button>

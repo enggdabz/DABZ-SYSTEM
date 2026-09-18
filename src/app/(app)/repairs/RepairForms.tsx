@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString } from "@/lib/money";
 import {
@@ -80,7 +80,7 @@ export function NewTicketForm({
   if (state.ticketId) {
     return (
       <Notice tone="success" title={state.success ?? "Ticket opened."}>
-        <Link href={`/repairs/${state.ticketId}`} className="underline">
+        <Link href={`/repairs/${state.ticketId}`} className={`underline ${TAP_AREA}`}>
           Open it and print the claim stub
         </Link>
       </Notice>
@@ -643,7 +643,7 @@ export function RemoveLineForm({
       <button
         type="submit"
         disabled={pending}
-        className="text-xs text-muted underline hover:text-ink"
+        className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
       >
         {pending ? "..." : "Remove"}
       </button>
@@ -747,7 +747,7 @@ export function VoidPaymentForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-muted underline hover:text-ink"
+        className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
       >
         Void
       </button>

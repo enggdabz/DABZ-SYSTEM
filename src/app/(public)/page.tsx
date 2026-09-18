@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card } from "@/components/ui";
+import { Card, TAP_AREA } from "@/components/ui";
 import { getPublicServices, getPublicSettings } from "@/lib/data/public";
 import { DIVISIONS, DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos } from "@/lib/money";
@@ -52,7 +52,7 @@ export default async function PublicHomePage() {
           Our page is being updated. Please message us on Facebook or drop by
           the shop.
         </p>
-        <Link href="/login" className="mt-8 inline-block text-sm underline">
+        <Link href="/login" className={`mt-8 inline-block text-sm underline ${TAP_AREA}`}>
           Staff sign in
         </Link>
       </section>
@@ -187,7 +187,7 @@ export default async function PublicHomePage() {
                 */}
                 <a
                   href="#contact"
-                  className="mt-4 -mx-1 inline-block px-1 py-1.5 text-sm underline underline-offset-2"
+                  className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}
                 >
                   Ask about {division.name}
                 </a>
@@ -231,7 +231,7 @@ export default async function PublicHomePage() {
                       <dd className="mt-0.5">
                         <a
                           href={`tel:${settings.shopPhone.replace(/\s/g, "")}`}
-                          className="-mx-1 inline-block px-1 py-1 underline"
+                          className={`underline ${TAP_AREA}`}
                         >
                           {settings.shopPhone}
                         </a>
@@ -245,7 +245,7 @@ export default async function PublicHomePage() {
                       <dd className="mt-0.5">
                         <a
                           href={`mailto:${settings.shopEmail}`}
-                          className="-mx-1 inline-block px-1 py-1 underline"
+                          className={`underline ${TAP_AREA}`}
                         >
                           {settings.shopEmail}
                         </a>

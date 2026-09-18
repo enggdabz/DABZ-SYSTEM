@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
+import { TAP_AREA } from "@/components/ui";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { DIVISIONS } from "@/lib/divisions";
 import { getCustomers, getSaleById, getSaleLines } from "@/lib/data/pos";
@@ -64,7 +65,7 @@ export default async function ReceiptPage({
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
-        <Link href="/pos" className="text-sm underline">
+        <Link href="/pos" className={`text-sm underline ${TAP_AREA}`}>
           {"←"} Back to the counter
         </Link>
         <span className="text-sm text-muted">

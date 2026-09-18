@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
+import { TAP_AREA } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { getRepairTicket } from "@/lib/data/repairs";
 import { DIVISIONS } from "@/lib/divisions";
@@ -52,7 +53,7 @@ export default async function ClaimStubPage({
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
-        <Link href={`/repairs/${ticket.id}`} className="text-sm underline">
+        <Link href={`/repairs/${ticket.id}`} className={`text-sm underline ${TAP_AREA}`}>
           {"←"} Back to the ticket
         </Link>
         <span className="text-sm text-muted">

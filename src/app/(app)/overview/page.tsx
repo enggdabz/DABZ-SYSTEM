@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { formatManilaDateTime } from "@/lib/datetime";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
@@ -96,7 +96,7 @@ export default async function HomePage({
         <p className="text-xs text-muted">
           Working days a month: {settings.workingDaysPerMonth} &middot; Shop hours{" "}
           {settings.workDayStart}&ndash;{settings.workDayEnd} &middot;{" "}
-          <Link href="/settings" className="underline">
+          <Link href="/settings" className={`underline ${TAP_AREA}`}>
             Change in Settings
           </Link>
         </p>
@@ -273,7 +273,7 @@ async function OwnerOverview() {
               <p>
                 No staff daily rates have been set yet, so wages are not in the
                 target. Set them on the{" "}
-                <Link href="/staff" className="underline">
+                <Link href="/staff" className={`underline ${TAP_AREA}`}>
                   Staff
                 </Link>{" "}
                 screen and this number will include payroll.
@@ -288,7 +288,7 @@ async function OwnerOverview() {
                 Wages for {payrollEstimate.staffWithRates} of{" "}
                 {payrollEstimate.staffWithRates + payrollEstimate.staffWithoutRates}{" "}
                 staff are counted. Set the rest on the{" "}
-                <Link href="/staff" className="underline">
+                <Link href="/staff" className={`underline ${TAP_AREA}`}>
                   Staff
                 </Link>{" "}
                 screen.
@@ -394,7 +394,7 @@ async function OwnerOverview() {
             ) : null}
           </dl>
 
-          <Link href="/bills" className="mt-4 inline-block text-sm underline">
+          <Link href="/bills" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
             Open the bills screen
           </Link>
         </Card>
@@ -424,7 +424,7 @@ async function OwnerOverview() {
             </p>
           )}
 
-          <Link href="/loans" className="mt-4 inline-block text-sm underline">
+          <Link href="/loans" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
             Open the loans screen
           </Link>
         </Card>
@@ -450,7 +450,7 @@ async function OwnerOverview() {
                 </dd>
               </div>
             </dl>
-            <Link href="/payroll" className="mt-4 inline-block text-sm underline">
+            <Link href="/payroll" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
               Open payroll
             </Link>
           </Card>
@@ -464,7 +464,7 @@ async function OwnerOverview() {
                 ? "Taken off payslips when you choose to, on payday."
                 : "Nobody owes an advance."}
             </p>
-            <Link href="/staff" className="mt-4 inline-block text-sm underline">
+            <Link href="/staff" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
               Open staff
             </Link>
           </Card>
@@ -483,7 +483,7 @@ async function OwnerOverview() {
               >
                 <Link
                   href={`/apparel/${order.id}`}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className={`font-medium underline-offset-2 hover:underline ${TAP_AREA}`}
                 >
                   {order.teamName ?? order.orderNumber}
                 </Link>
@@ -498,7 +498,7 @@ async function OwnerOverview() {
             {apparelOpen.length} order{apparelOpen.length === 1 ? "" : "s"} in
             progress.
           </p>
-          <Link href="/apparel" className="mt-2 inline-block text-sm underline">
+          <Link href="/apparel" className={`mt-2 inline-block text-sm underline ${TAP_AREA}`}>
             Open Dabz Apparel
           </Link>
         </Card>
@@ -516,7 +516,7 @@ async function OwnerOverview() {
               >
                 <Link
                   href={`/repairs/${ticket.id}`}
-                  className="font-medium underline-offset-2 hover:underline"
+                  className={`font-medium underline-offset-2 hover:underline ${TAP_AREA}`}
                 >
                   {ticket.customerName}
                 </Link>
@@ -531,7 +531,7 @@ async function OwnerOverview() {
             {repairsOnTheBench.length} unit
             {repairsOnTheBench.length === 1 ? "" : "s"} on the bench.
           </p>
-          <Link href="/repairs" className="mt-2 inline-block text-sm underline">
+          <Link href="/repairs" className={`mt-2 inline-block text-sm underline ${TAP_AREA}`}>
             Open DabzTech
           </Link>
         </Card>
@@ -565,7 +565,7 @@ async function OwnerOverview() {
                   and {stock.needingAttention.length - 5} more.
                 </p>
               ) : null}
-              <Link href="/stocks" className="mt-4 inline-block text-sm underline">
+              <Link href="/stocks" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
                 Open stocks
               </Link>
             </Card>
@@ -598,12 +598,12 @@ async function OwnerOverview() {
               </dl>
               <div className="mt-4 flex flex-wrap gap-4">
                 {expenseSummary.pendingCount > 0 ? (
-                  <Link href="/expenses" className="text-sm underline">
+                  <Link href="/expenses" className={`text-sm underline ${TAP_AREA}`}>
                     Open expenses
                   </Link>
                 ) : null}
                 {payableSummary.unpaidCount > 0 ? (
-                  <Link href="/payables" className="text-sm underline">
+                  <Link href="/payables" className={`text-sm underline ${TAP_AREA}`}>
                     Open what is owed
                   </Link>
                 ) : null}
@@ -641,7 +641,7 @@ async function OwnerOverview() {
           </div>
         </dl>
 
-        <Link href="/ledger" className="mt-4 inline-block text-sm underline">
+        <Link href="/ledger" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
           See every entry
         </Link>
       </Card>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getRepairServices } from "@/lib/data/repairs";
 import { formatPesos } from "@/lib/money";
@@ -37,7 +37,7 @@ export default async function RepairPricesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/repairs" className="text-sm text-muted underline">
+        <Link href="/repairs" className={`text-sm text-muted underline ${TAP_AREA}`}>
           &larr; Back to repair tickets
         </Link>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
@@ -140,7 +140,7 @@ export default async function RepairPricesPage() {
           The warranty is copied onto each ticket when the unit is released, so
           changing this number never shortens a promise already made.
         </p>
-        <Link href="/settings" className="mt-4 inline-block text-sm underline">
+        <Link href="/settings" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
           Change them in Settings
         </Link>
       </Card>

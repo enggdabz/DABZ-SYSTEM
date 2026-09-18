@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireUser } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getSales, getVoidRequests } from "@/lib/data/pos";
@@ -97,7 +97,7 @@ export default async function SalesPage() {
         {sales.length === 0 ? (
           <p className="text-sm text-muted">
             Nothing rung up yet today.{" "}
-            <Link href="/pos" className="underline">
+            <Link href="/pos" className={`underline ${TAP_AREA}`}>
               Open the counter
             </Link>
             .
@@ -144,7 +144,7 @@ export default async function SalesPage() {
                     <div className="flex flex-col items-end gap-2">
                       <Link
                         href={`/sales/${sale.id}/receipt`}
-                        className="text-sm underline"
+                        className={`text-sm underline ${TAP_AREA}`}
                       >
                         Receipt
                       </Link>

@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
 import type { DivisionId } from "@/lib/divisions";
 import { centavosToDecimalString, formatPesos, parsePesos } from "@/lib/money";
 import {
@@ -240,7 +240,7 @@ export function PosScreen({
               <button
                 type="button"
                 onClick={clearSale}
-                className="text-xs text-muted underline hover:text-ink"
+                className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
               >
                 Clear sale
               </button>
@@ -272,7 +272,7 @@ export function PosScreen({
                           current.filter((entry) => entry.key !== lines[index].key),
                         )
                       }
-                      className="text-xs text-muted underline hover:text-ink"
+                      className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
                     >
                       Remove
                     </button>
@@ -510,7 +510,7 @@ function Dialog({
           <button
             type="button"
             onClick={onClose}
-            className="text-sm text-muted underline hover:text-ink"
+            className={`text-sm text-muted underline hover:text-ink ${TAP_AREA}`}
           >
             Close
           </button>
@@ -612,7 +612,7 @@ function AddItemDialog({
             <p>
               <button
                 type="button"
-                className="underline"
+                className={`underline ${TAP_AREA}`}
                 onClick={() => setPrice(centavosToDecimalString(suggested))}
               >
                 Use the bulk price
@@ -931,7 +931,7 @@ function CustomerDialog({
                 <p>
                   <button
                     type="button"
-                    className="underline"
+                    className={`underline ${TAP_AREA}`}
                     onClick={() => onChoose(state.customerId!)}
                   >
                     Use {justSaved?.name ?? "them"} for this sale

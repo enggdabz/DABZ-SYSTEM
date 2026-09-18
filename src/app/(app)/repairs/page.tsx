@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getRepairTickets } from "@/lib/data/repairs";
@@ -102,7 +102,7 @@ export default async function RepairsPage() {
         <Notice tone="info" title="Nothing here is priced yet">
           The checking fee and every repair are yours to set. Tickets work
           without them &mdash; the price is asked for on each charge.{" "}
-          <Link href="/repairs/prices" className="underline">
+          <Link href="/repairs/prices" className={`underline ${TAP_AREA}`}>
             Set the repair prices
           </Link>
           .
@@ -119,7 +119,7 @@ export default async function RepairsPage() {
           <ul className="mt-1 space-y-1">
             {unclaimed.map(({ ticket, unclaimed: status }) => (
               <li key={ticket.id}>
-                <Link href={`/repairs/${ticket.id}`} className="underline">
+                <Link href={`/repairs/${ticket.id}`} className={`underline ${TAP_AREA}`}>
                   {ticket.ticketNumber}
                 </Link>{" "}
                 &mdash; {ticket.customerName}&apos;s{" "}
@@ -150,7 +150,7 @@ export default async function RepairsPage() {
                   <div className="min-w-0">
                     <Link
                       href={`/repairs/${ticket.id}`}
-                      className="text-lg font-semibold underline-offset-2 hover:underline"
+                      className={`text-lg font-semibold underline-offset-2 hover:underline ${TAP_AREA}`}
                     >
                       {ticket.customerName}
                     </Link>
@@ -206,7 +206,7 @@ export default async function RepairsPage() {
                 <span className="min-w-0">
                   <Link
                     href={`/repairs/${ticket.id}`}
-                    className="font-medium underline-offset-2 hover:underline"
+                    className={`font-medium underline-offset-2 hover:underline ${TAP_AREA}`}
                   >
                     {ticket.customerName}
                   </Link>
@@ -250,7 +250,7 @@ export default async function RepairsPage() {
                 <span className="min-w-0">
                   <Link
                     href={`/repairs/${ticket.id}`}
-                    className="font-medium underline-offset-2 hover:underline"
+                    className={`font-medium underline-offset-2 hover:underline ${TAP_AREA}`}
                   >
                     {ticket.customerName}
                   </Link>

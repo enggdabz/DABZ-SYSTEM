@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { billStatus, monthTotals, paidKey, type BillStatus } from "@/lib/bills";
 import { getBillPayments, getBills, paidKeysFrom } from "@/lib/data/money";
@@ -106,7 +106,7 @@ export default async function BillsPage({
             </Link>
           </div>
           {!isThisMonth ? (
-            <Link href="/bills" className="text-sm text-muted underline">
+            <Link href="/bills" className={`text-sm text-muted underline ${TAP_AREA}`}>
               Back to this month
             </Link>
           ) : null}
@@ -195,7 +195,7 @@ export default async function BillsPage({
                   {bill.loanId ? (
                     <p className="mt-2 text-xs text-muted">
                       Paying this also pays down its loan.{" "}
-                      <Link href="/loans" className="underline">
+                      <Link href="/loans" className={`underline ${TAP_AREA}`}>
                         See loans
                       </Link>
                     </p>

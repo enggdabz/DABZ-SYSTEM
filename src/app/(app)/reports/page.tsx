@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getReportWithComparison, getStanding } from "@/lib/data/reports";
 import { formatPesos } from "@/lib/money";
@@ -355,7 +355,7 @@ export default async function ReportsPage({
               {standing.stockUnpricedCount} material
               {standing.stockUnpricedCount === 1 ? " is" : "s are"} left out,
               with no price set.{" "}
-              <Link href="/stocks" className="underline">
+              <Link href="/stocks" className={`underline ${TAP_AREA}`}>
                 Set them on Stocks
               </Link>
               .

@@ -3,7 +3,7 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
 import {
   ORDER_FLOW,
   ORDER_STATUS_LABELS,
@@ -56,7 +56,7 @@ export function NewOrderForm({
   if (state.orderId) {
     return (
       <Notice tone="success" title={state.success ?? "Order opened."}>
-        <Link href={`/apparel/${state.orderId}`} className="underline">
+        <Link href={`/apparel/${state.orderId}`} className={`underline ${TAP_AREA}`}>
           Open it and add the items
         </Link>
       </Notice>
@@ -523,7 +523,7 @@ export function RemoveRosterEntryForm({
       <button
         type="submit"
         disabled={pending}
-        className="text-xs text-muted underline hover:text-ink"
+        className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
       >
         {pending ? "..." : "Remove"}
       </button>
@@ -630,7 +630,7 @@ export function VoidPaymentForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="text-xs text-muted underline hover:text-ink"
+        className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
       >
         Void
       </button>

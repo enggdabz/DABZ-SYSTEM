@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getEnquiries } from "@/lib/data/enquiries";
 import { formatManilaDateTime } from "@/lib/datetime";
@@ -168,7 +168,7 @@ function EnquiryDetail({ enquiry }: { enquiry: Enquiry }) {
 function ContactLink({ contact }: { contact: string }) {
   // Padded, not bare: bare text is a 20px target and this is the one thing on
   // the screen a person actually taps.
-  const className = "-mx-1 inline-block px-1 py-1 text-sm underline";
+  const className = `text-sm underline ${TAP_AREA}`;
 
   if (contact.includes("@")) {
     return (
