@@ -97,3 +97,28 @@ not do what its name suggests, and a misspelled column in a query string.
 
 Supabase Auth cannot be run locally here (no Docker daemon), so the sign-in
 round trip is the one thing that must be tried against a real project.
+
+## Money rules (built in Phase 2)
+
+- **Bills, loans and the ledger are Owner/Admin only.** Spec 4.3 puts them
+  beyond any staff checkbox, so those tables have no staff-facing policy at
+  all — not even read.
+- **Anything touching more than one money table goes in a database function**,
+  so it is one transaction. `mark_bill_paid` writes the payment, the ledger
+  entry and the loan payment together; doing that as three requests risks the
+  ledger saying money left while the loan balance never moved. Follow the same
+  pattern for payroll and sales.
+- **Ledger entries are voided, never deleted** (`voided_at`, `void_reason`).
+  Every total must skip voided rows — use `liveEntries()` from
+  `src/lib/data/money.ts`. Forgetting this shows money that was taken back.
+- **Borrowed money and owner capital are not income**; an owner withdrawal is
+  not a shop cost. Use `countsAsIncome()` / `countsAsShopExpense()` rather than
+  filtering on direction alone.
+- **Dates are Manila dates.** Never compare a stored UTC timestamp to a
+  calendar date directly — go through `src/lib/period.ts` (`manilaToday`,
+  `manilaDayRangeUtc`, `manilaMonthRangeUtc`). A UTC comparison makes bills
+  look overdue a day early, every month.
+- **A missing figure stays missing.** A bill with no due day and a loan with no
+  interest rate are real states, shown with a warning and an editable field.
+  Never substitute a default for something only the owner can know — a
+  confident wrong warning is worse than none, because it gets trusted.

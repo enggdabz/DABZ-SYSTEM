@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { BillsDueSoon, type DueSoonBill } from "./BillsDueSoon";
 import { ThemeToggle } from "./ThemeToggle";
 import { SwitchUserButton } from "./SwitchUserButton";
 import { Wordmark } from "./ui";
@@ -12,18 +13,26 @@ import { visibleSections } from "@/lib/auth/navigation";
  * Only shows the sections this person may open. Hiding a link is a courtesy,
  * not the security boundary - the database refuses the data either way.
  */
-export function AppTopBar({ user }: { user: SignedInUser }) {
+export function AppTopBar({
+  user,
+  billsDueSoon = [],
+}: {
+  user: SignedInUser;
+  /** Empty for staff, who never see the bills (spec 4.3). */
+  billsDueSoon?: DueSoonBill[];
+}) {
   const sections = visibleSections(user);
 
   return (
     <header className="sticky top-0 z-50 bg-topbar text-topbar-ink backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
-        <div className="flex h-16 items-center justify-between gap-4">
+        <div className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
           <Link href="/" className="shrink-0">
             <Wordmark />
           </Link>
 
           <div className="flex items-center gap-3">
+            {billsDueSoon.length > 0 ? <BillsDueSoon bills={billsDueSoon} /> : null}
             <span className="hidden text-right text-xs leading-tight sm:block">
               <span className="block font-medium">{user.fullName}</span>
               <span className="block text-white/50 capitalize">{user.role}</span>

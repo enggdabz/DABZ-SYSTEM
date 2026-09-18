@@ -31,19 +31,29 @@ answers are data typed into it. **Nothing needs rebuilding when they arrive.**
 the real shop hours, which day is payday, and whether ₱2,000 / 10% / ₱100 are
 the right limits.
 
-## Needed for Phase 2 — Bills, loans, ledger
+## Asked for Phase 2, and now waiting on you in the app
 
-| # | Question |
-|---|---|
-| 17.13 | **Due day of the month for each of the 11 bills.** Interest rates from the statements, especially Credit card 3. The remaining ~₱660,000 of debt. And what "Magic Payment" and "Forests Lake" are, so they land in the right category |
-| — | The prototype "Dabz Shop Manager" — are any bills already marked paid for this month, and do the amounts in spec 12.1 still match? |
-| 12.3 | Estimated monthly payroll for the daily target: sum of each staff's daily rate × typical working days, or recent actual payroll? |
+Phase 2 is built and seeded with your real figures. Rather than guess the
+missing pieces, the screens ask for them and warn until they are filled in.
 
-## Needed for Phase 3 — Staff and payroll
+| # | Question | Where to answer it |
+|---|---|---|
+| 17.13 | **The due day of each of the 11 bills.** Without these the system cannot warn you before a bill is late | **Bills** screen — a box beside each bill. It shows **⚠ Due day not set** until you fill it in |
+| 17.13 | **Interest rates from the statements**, especially Credit card 3 | **Loans** screen. Until a rate is entered, the payoff time ignores interest and says so, and no balance-growing warning can be raised |
+| 17.13 | **The remaining ~₱660,000 of debt** | **Loans** screen → Add a loan |
+| 17.13 | What **"Magic Payment"** and **"Forests Lake"** are, so they land in the right category | Tell me and I will categorise them. Both are seeded as operating costs with a note |
+| — | The prototype "Dabz Shop Manager": are any bills already marked paid this month, and do the spec 12.1 amounts still match? | Mark them paid on the **Bills** screen. The amounts seeded total ₱141,127.00, matching your figure |
+| 12.3 | Estimated monthly payroll for the daily target | Comes with Phase 3, from each staff member's daily rate × their typical working days. Confirm that approach when we get there |
+
+**Why nothing was guessed:** a made-up due day would produce confident, wrong
+warnings — worse than no warning at all, because you would start trusting them.
+
+## Needed for Phase 3 — Staff and payroll (next)
 
 | # | Question |
 |---|---|
 | 17.6 | **Half days:** half the daily rate, or a manual amount each time? |
+| — | **Each staff member's daily rate**, so payroll can join the daily target. Until then the target covers bills only and is too low |
 
 ## Needed for Phase 4 — POS and receipts
 
@@ -93,5 +103,17 @@ to ask:
 - Usernames are **lowercase, 3–30 characters**, letters and numbers with dots,
   underscores or hyphens inside. Narrow on purpose: easy to type at 7am, hard to
   confuse with someone else's.
+- A bill due on the **31st falls due on the last day** of a short month, rather
+  than being skipped or spilling into the next one — which is how a lender
+  treats it too.
+- A loan's remaining balance subtracts only payments made **after** the
+  statement date, since earlier ones are already inside the statement figure.
+- **"Equal to" counts as growing**: a payment that exactly matches the monthly
+  interest never reduces the debt, so it earns the warning (spec 12.2).
+- The daily target is **rounded up**, so a month of daily targets covers at
+  least what is actually owed.
+- Undoing a bill payment **voids** its ledger entry but **removes** the loan
+  payment. The first is a record that money moved; the second is a claim the
+  balance went down, which is no longer true.
 - Money is never hard-deleted by staff; corrections go through voids and
   adjustments with a reason (spec 2.1).

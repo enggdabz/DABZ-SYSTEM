@@ -3,6 +3,8 @@ import type { ReactNode } from "react";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AutoLogout } from "@/components/AutoLogout";
 import { getSettings, requireUser } from "@/lib/auth/dal";
+import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { getBillsDueSoon } from "@/lib/data/reminder";
 
 /**
  * The frame around every signed-in screen.
@@ -16,9 +18,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
   const settings = await getSettings();
 
+  // Staff never see the bills at all (spec 4.3), so the reminder is not even
+  // fetched for them - the database would refuse it anyway.
+  const billsDueSoon = isOwnerOrAdmin(user) ? await getBillsDueSoon() : [];
+
   return (
     <>
-      <AppTopBar user={user} />
+      <AppTopBar user={user} billsDueSoon={billsDueSoon} />
       <AutoLogout minutes={settings.autoLogoutMinutes} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         {children}

@@ -8,9 +8,9 @@ Each phase ends with: what was built, how to run it, how to test it.
 | # | Phase | Status |
 |---|---|---|
 | 0 | Setup & learning | ✅ Done |
-| 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ **Done — waiting on owner to confirm** |
-| 2 | Bills, loans, ledger, Overview (the money side) | Next |
-| 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | Not started |
+| 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ Done |
+| 2 | Bills, loans, ledger, Overview (the money side) | ✅ **Done — waiting on owner to confirm** |
+| 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | Next |
 | 4 | Customers + Dabz Printshoppe POS | Not started |
 | 5 | Expenses pop-up and stocks | Not started |
 | 6 | Dabz Apparel job orders | Not started |
@@ -153,16 +153,132 @@ migration files, add the three settings, and create your owner account at
 
 ---
 
-## Phase 2 — Bills, loans, ledger, Overview (next)
+## Phase 2 — Bills, loans, ledger, Overview ✅
 
-Needs the answers marked **needed for Phase 2** in [DECISIONS.md](DECISIONS.md)
-— chiefly the due day of the month for each of the 11 bills.
+**Built**
 
-- The 11 fixed bills and 6 loans from spec 12.1 and 12.2, seeded as starting
-  data.
-- Bill status per month, **Mark paid** with undo, and the 5-day reminder pop-up.
-- Loan balances, interest, months-to-payoff, and the **⚠ Balance growing**
-  warning when a monthly payment is no more than the monthly interest.
-- The money-in/money-out ledger, with entries created automatically by the other
-  modules so nothing is typed twice.
-- The daily target, and the Overview screen from spec 15.1.
+*Bills (spec 12.1)*
+- All eleven bills seeded from the specification, adding up to exactly
+  **₱141,127.00** a month. A test asserts that total, so if the seed ever
+  drifts from the owner's figure it fails rather than going quietly wrong.
+- Status badges per month: Paid ✓ · Not yet paid · Due in N days · Due today ·
+  Overdue N days ⚠ · **Due day not set ⚠**.
+- **Mark paid**, with undo. A bill can only be paid once per month, enforced by
+  the database rather than by hope, so pressing the button twice is safe.
+- Month navigation, with totals paid, unpaid and needing attention.
+- The **5-day reminder**: a pop-up when the owner or an admin opens the system,
+  at most once a day, plus a **Bills due soon (n)** button in the header that
+  reopens it. It looks into next month too, so a bill due on 2 October shows up
+  on 29 September.
+- Add, edit and stop counting a bill. Stopping keeps its history.
+
+*Loans (spec 12.2)*
+- All six loans seeded, adding up to exactly **₱1,336,264.00**, also asserted
+  by a test.
+- Remaining balance worked out from the statement figure and the payments made
+  **after** the statement date, so a payment the statement already includes is
+  never counted twice.
+- Estimated monthly interest, and the **⚠ Balance growing** warning when the
+  monthly payment is no more than the monthly interest.
+- Time to clear each loan, worked out month by month in whole centavos rather
+  than with a formula, so "never pays off" needs no special case.
+- **Record payment** and **Update from statement**.
+- Payment history per loan, marking which payments came from a bill.
+
+*Money in and out (spec 10)*
+- The ledger, with every category from the specification.
+- **Borrowed money and owner capital are never counted as income**, and an
+  owner withdrawal is never counted as a shop cost. Both are shown, separately,
+  so the profit figure stays honest.
+- Entries created automatically when a bill is paid or a loan payment recorded,
+  marked **Automatic**, so nothing is entered twice.
+- Manual entries for what the other screens do not cover yet.
+- Voiding with a reason, never deletion. A voided entry stays in the list,
+  struck through, and never reaches a total.
+
+*Overview (spec 15.1, 12.3)*
+- Today's target and progress as the biggest number on the screen.
+- Bills this month, total debt, balance-growing warnings, and the month's
+  income, money out and difference.
+
+**Two things the Overview says plainly, because they would otherwise mislead**
+
+1. **The target is too low.** It covers bills only. Staff daily rates arrive in
+   Phase 3, so payroll is not in it yet.
+2. **Today's figure is sales, not profit.** Material costs are not tracked until
+   Phase 5, so ₱5,000 of tarpaulin sales that used ₱2,000 of vinyl still counts
+   as ₱5,000. The specification asked for exactly this labelling (12.3).
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Money, dates, bill status, loan maths, ledger rules, target | `npm test` | 184 tests |
+| Security and money guarantees against a real PostgreSQL | `npm run test:rls` | 68 checks |
+| Every table and column the app asks for exists | `npm run check:schema` | 11 tables, 214 columns |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The checks worth knowing about:
+
+- **Marking a bill paid is one transaction.** It writes the payment, the ledger
+  entry and the loan payment together. A test proves that a refused double
+  payment leaves **no** half-finished ledger entry behind — which would
+  otherwise mean the books showing ₱33,250 leaving the bank while the loan
+  balance never moved.
+- **Undo is honest.** It voids the ledger entry (money records are never
+  erased) but *removes* the loan payment, because that payment is a claim the
+  balance went down, and that claim is no longer true. Leaving it would
+  understate the debt.
+- **Staff see nothing of the money.** Not the bills, not the loans, not the
+  ledger, not even a row count — tested from a staff account, a deactivated
+  account and a signed-out visitor.
+- **Dates are Manila dates.** At 01:30 on 1 October in Bacolod it is still
+  17:30 on 30 September in UTC. A bill checked against the UTC date would look
+  overdue a day early, every month. Tested directly.
+- **A bill due on the 31st still falls due in February**, landing on the 28th
+  (or the 29th in a leap year) rather than being skipped.
+
+**Not verified here** — the sign-in round trip and the live database still need
+a real Supabase project. The screens were checked by rendering them against
+fixture data in a throwaway copy of the project, which caught two layout
+problems; the real tree carries no fixture code.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 184 passed
+npm run dev
+```
+
+Then, with Supabase connected and **all three** migration files run:
+
+1. Open **Bills**. You should see your eleven bills, ₱141,127.00 in total, with
+   six or seven of them flagged **⚠ Due day not set**.
+2. **Fill in the due days.** This is the one thing the system cannot do for you,
+   and without it the reminders cannot work.
+3. Mark one bill paid, then check **Money in/out** — the entry should be there
+   already, marked Automatic. Then **Undo** it and confirm the entry is voided
+   rather than gone.
+4. Mark the **BPI** bill paid and open **Loans**: the BPI balance should drop by
+   ₱33,250. Undo it and confirm the balance goes back up.
+5. Enter the interest rate for **Credit card 3** from your statement. If it is
+   around 3%, the loan should immediately show **⚠ Balance growing** and *Never
+   at this payment* — because ₱12,000 a month against ₱15,000 of interest never
+   clears it.
+6. Open the **Home** screen and check today's target reads
+   ₱141,127.00 ÷ 26 days.
+
+---
+
+## Phase 3 — Staff, attendance, payroll (next)
+
+Needs open decision **17.6** (half days: half the daily rate, or a manual
+amount?), and the staff daily rates themselves.
+
+- Staff profiles with photo, daily rate and the rest of spec 13.1.
+- The time clock: tap your photo to time in and out, with late and absent flags.
+- Weekly payroll at a daily rate, with the per-day overtime choice from
+  spec 13.3, cash advance deductions, payslips and locking.
+- Once daily rates exist, payroll joins the daily target, and the Overview stops
+  under-reporting what the shop needs each day.

@@ -41,13 +41,22 @@ table rather than reading one.
 > may. Every table in this system will have it on, so a mistake in the app can
 > never leak staff salaries or customer records.
 
-### 3. Create the Phase 1 tables
+### 3. Create the rest of the tables
 
-Repeat step 2 with `supabase/migrations/0001_phase1_foundation.sql`: open it,
-copy everything, paste it into a **New query**, and click **Run**.
+Repeat step 2 for each remaining migration file, **in number order**:
 
-This creates the accounts, permissions, settings, audit log and sign-in history
-tables — all with Row Level Security switched on.
+| File | What it creates |
+|---|---|
+| `0001_phase1_foundation.sql` | Accounts, permissions, settings, the audit log, sign-in history |
+| `0002_phase2_money.sql` | Bills, loans and the money in/out ledger — **and seeds your eleven real bills and six loans** |
+
+Every table gets Row Level Security switched on.
+
+After `0002` runs, your bills and loans are already in the system: ₱141,127.00
+of monthly bills and ₱1,336,264.00 of debt, taken from what you told me. Two
+things are deliberately left blank, because a guess would be worse than a
+gap — every bill's **due day**, and every loan's **interest rate**. The screens
+ask you for them.
 
 > **Run the migration files in number order, and only once each.** They are the
 > written history of the database. Never edit one that you have already run;
@@ -88,6 +97,19 @@ You can now sign in at http://localhost:3000/login.
 > **Why there is no sign-up page:** spec 4.1 says only the Owner or an Admin may
 > create accounts. The setup page exists purely to solve the first-account
 > problem, and it refuses to work the moment any account exists.
+
+### 6. Fill in your bill due days
+
+Open **Bills**. Most of your bills will show **⚠ Due day not set**.
+
+This is the one job the system cannot do for you. Until a bill has a due day it
+cannot be counted as overdue, cannot appear in the 5-day reminder, and cannot
+warn you before a late fee. Type the day of the month beside each one and press
+Save.
+
+While you are there, open **Loans** and enter each interest rate from your
+statements. Without the rate the system cannot tell you whether a balance is
+growing — which is the single most useful thing it can say about a debt.
 
 ### ⚠ About the keys
 
@@ -179,6 +201,14 @@ Supabase dashboard shows the project as paused, resume it.
 **It works on my computer but not on Vercel**
 You almost certainly skipped step 4 of Part 2. Go to the Vercel project →
 Settings → Environment Variables, add all three values, then **Redeploy**.
+
+**A bill shows "Due day not set"**
+That is correct, not a fault — you have not told the system when it falls due.
+Type the day of the month beside it on the Bills screen.
+
+**A loan says its payoff time "ignores interest"**
+Also correct. Enter the monthly interest rate from that lender's statement and
+the figure becomes a real one.
 
 **"Sign in" says the system is not connected to its database**
 The `SUPABASE_SERVICE_ROLE_KEY` is missing from `.env.local` (or from Vercel).

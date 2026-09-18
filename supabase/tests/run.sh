@@ -28,5 +28,7 @@ run() { psql -q -v ON_ERROR_STOP=1 -d "$DB" -f "$1"; }
 quiet "$HERE/00_local_stub.sql"
 quiet "$HERE/../migrations/0000_phase0_hello.sql"
 quiet "$HERE/../migrations/0001_phase1_foundation.sql"
+quiet "$HERE/../migrations/0002_phase2_money.sql"
 quiet "$HERE/02_grants.sql"
 run "$HERE/03_rls.test.sql"
+run "$HERE/04_phase2_rls.test.sql"

@@ -28,8 +28,9 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/activity", label: "Activity", ownerOrAdminOnly: true, phase: 1 },
   { href: "/settings", label: "Settings", ownerOrAdminOnly: true, phase: 1 },
 
-  { href: "/bills", label: "Bills", ownerOrAdminOnly: true, phase: 2, comingSoon: true },
-  { href: "/loans", label: "Loans", ownerOrAdminOnly: true, phase: 2, comingSoon: true },
+  { href: "/bills", label: "Bills", ownerOrAdminOnly: true, phase: 2 },
+  { href: "/loans", label: "Loans", ownerOrAdminOnly: true, phase: 2 },
+  { href: "/ledger", label: "Money in/out", ownerOrAdminOnly: true, phase: 2 },
   { href: "/payroll", label: "Payroll", ownerOrAdminOnly: true, phase: 3, comingSoon: true },
   { href: "/pos", label: "POS", permission: "add_sales", phase: 4, comingSoon: true },
   { href: "/stocks", label: "Stocks", permission: "stock_in_out", phase: 5, comingSoon: true },
