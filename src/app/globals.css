@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+/*
+  Dabz design system (spec section 3).
+
+  Everything is driven by semantic tokens (--page, --surface, --ink, ...) rather
+  than raw colors, so a screen written once looks right in both light and dark
+  mode without sprinkling `dark:` classes through every component.
+
+  The raw brand colors from spec 3.2 are kept below as a reference palette, but
+  screens should use the semantic tokens.
+*/
+
+/* Dark mode is driven by data-theme on <html>, not by the device setting,
+   because the owner chose dark as the default look (open decision 17.4). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+:root {
+  /* Reference palette - spec 3.2 */
+  --dabz-red: #d10a0a;
+  --dabz-black: #000000;
+  --dabz-ink: #1d1d1f;
+  --dabz-white: #ffffff;
+  --dabz-gray-bg: #f5f5f7;
+  --dabz-gray-text: #6e6e73;
+  --dabz-line: #d2d2d7;
+  --apparel-gold: #ebb417;
+
+  /* Semantic tokens - light mode */
+  --page: #f5f5f7;
+  --surface: #ffffff;
+  --surface-sunken: #f5f5f7;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --accent: #d10a0a;
+  --on-accent: #ffffff;
+  --success: #187c3c;
+  /* Warnings are never colour-only (spec 3.2): always paired with an icon and
+     a text label, so they can't be mistaken for a red brand button. */
+  --attention: #92500a;
+  --attention-bg: #fdf3e3;
+
+  /* The top bar is black in both themes. */
+  --topbar: rgb(0 0 0 / 0.86);
+  --topbar-ink: #ffffff;
+
+  --radius-card: 16px;
+  --radius-control: 12px;
+}
+
+:root[data-theme="dark"] {
+  --page: #000000;
+  --surface: #18181b;
+  --surface-sunken: #0d0d0f;
+  --ink: #f5f5f7;
+  --muted: #9a9aa0;
+  --line: #35353a;
+  --accent: #d10a0a;
+  --on-accent: #ffffff;
+  --success: #4caf7a;
+  --attention: #f5a524;
+  --attention-bg: #2a1f0a;
+
+  --topbar: rgb(0 0 0 / 0.72);
+  --topbar-ink: #ffffff;
+}
+
+/* Expose the tokens to Tailwind so `bg-surface`, `text-muted`, etc. work. */
+@theme inline {
+  --color-page: var(--page);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-attention: var(--attention);
+  --color-attention-bg: var(--attention-bg);
+  --color-topbar: var(--topbar);
+  --color-topbar-ink: var(--topbar-ink);
+  --color-apparel-gold: var(--apparel-gold);
+
+  --radius-card: var(--radius-card);
+  --radius-control: var(--radius-control);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+}
+
+/* Spec 3.1: gentle motion only, and none at all for people who ask for less. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tell the browser which theme its own controls (scrollbars, inputs) should
+   match, so they don't flash white inside a dark screen. */
+:root {
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
