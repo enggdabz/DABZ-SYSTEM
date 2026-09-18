@@ -1,8 +1,10 @@
 import type { ReactNode } from "react";
 
+import { AppSidebar } from "@/components/AppSidebar";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AutoLogout } from "@/components/AutoLogout";
 import { getSettings, requireUser } from "@/lib/auth/dal";
+import { visibleSections } from "@/lib/auth/navigation";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getExpensePresets } from "@/lib/data/expenses";
 import { getBillsDueSoon } from "@/lib/data/reminder";
@@ -32,7 +34,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   const expensePresets = mayRecordExpenses ? await getExpensePresets() : null;
 
   return (
-    <>
+    /*
+      The rail sits beside everything, so the top bar and the page scroll
+      against it rather than under it.
+    */
+    <div className="flex min-h-dvh flex-1">
+      <AppSidebar sections={visibleSections(user)} />
+
+      <div className="flex min-w-0 flex-1 flex-col">
       <AppTopBar
         user={user}
         billsDueSoon={billsDueSoon}
@@ -48,13 +57,17 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         {children}
       </main>
-      <footer className="border-t border-line/60 px-4 py-6 text-xs text-muted sm:px-6">
+      <footer
+        data-app-chrome
+        className="border-t border-line/60 px-4 py-6 text-xs text-muted sm:px-6"
+      >
         <div className="mx-auto max-w-6xl">
           Dabz Printshoppe &middot; Philippine peso ({"₱"}) &middot; Times
           shown in Asia/Manila &middot; Signed out automatically after{" "}
           {settings.autoLogoutMinutes} minutes of no activity
         </div>
       </footer>
-    </>
+      </div>
+    </div>
   );
 }

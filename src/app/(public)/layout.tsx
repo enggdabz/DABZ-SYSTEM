@@ -15,7 +15,10 @@ import { TAP_AREA, Wordmark } from "@/components/ui";
 export default function PublicLayout({ children }: { children: ReactNode }) {
   return (
     <>
-      <header className="sticky top-0 z-50 bg-topbar text-topbar-ink backdrop-blur-xl">
+      <header
+        data-app-chrome
+        className="sticky top-0 z-50 bg-topbar text-topbar-ink backdrop-blur-xl"
+      >
         <div className="mx-auto flex min-h-16 max-w-5xl flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2 sm:px-6">
           <Link href="/" className="shrink-0">
             <Wordmark />
@@ -41,7 +44,10 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
 
       <main className="flex-1">{children}</main>
 
-      <footer className="border-t border-line/60 px-4 py-8 text-sm text-muted sm:px-6">
+      <footer
+        data-app-chrome
+        className="border-t border-line/60 px-4 py-8 text-sm text-muted sm:px-6"
+      >
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
           <p>
             Dabz Printshoppe &middot; Dabz Apparel &middot; DabzTech Solutions

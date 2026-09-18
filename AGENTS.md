@@ -85,6 +85,14 @@ receiving code.
   an interest rate, a wage. It stays empty, with a warning and an editable
   field, AND it must appear in `src/lib/data/checklist.ts` so the To fill in
   screen lists it. Adding a new such field means adding it there too.
+- **Sections live in the sidebar** (`src/components/AppSidebar.tsx`), grouped by
+  the `group` on each `NavSection`. A new section needs a group or it will not
+  appear. The rail is permanent from `lg` up and a drawer below it.
+- **A link in the rail must be a flex child or carry `block`.** `<a>` is inline,
+  so a group container that is not a flex column lets twenty-three links flow
+  into a paragraph and wrap across the rail. No unit test sees this and the page
+  does not overflow - the clipping is inside the aside - so it is only visible
+  in a browser.
 - **Anything that covers the screen is portalled into `<body>`.** A dialog or
   overlay rendered inside the top bar looks correct in the markup and is wrong
   on screen: the bar has a `backdrop-blur`, and a blur makes an element a

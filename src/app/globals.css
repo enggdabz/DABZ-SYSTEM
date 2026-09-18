@@ -45,6 +45,12 @@
   --topbar: rgb(0 0 0 / 0.86);
   --topbar-ink: #ffffff;
 
+  /* So is the sidebar. Solid rather than frosted: it sits against the page
+     rather than over it, and a translucent rail shows the content scrolling
+     behind it. */
+  --sidebar: #000000;
+  --sidebar-ink: #ffffff;
+
   --radius-card: 16px;
   --radius-control: 12px;
 }
@@ -64,6 +70,11 @@
 
   --topbar: rgb(0 0 0 / 0.72);
   --topbar-ink: #ffffff;
+
+  /* In dark mode the page is also black, so the rail needs its own edge -
+     see the border on the aside - rather than a different fill. */
+  --sidebar: #000000;
+  --sidebar-ink: #ffffff;
 }
 
 /* Expose the tokens to Tailwind so `bg-surface`, `text-muted`, etc. work. */
@@ -81,6 +92,8 @@
   --color-attention-bg: var(--attention-bg);
   --color-topbar: var(--topbar);
   --color-topbar-ink: var(--topbar-ink);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-ink: var(--sidebar-ink);
   --color-apparel-gold: var(--apparel-gold);
 
   --radius-card: var(--radius-card);
@@ -134,13 +147,16 @@ body {
   }
 
   /*
-    Only the app's own chrome is dropped - the top bar and page footer, which
-    are direct children of <body>. A bare `header { display: none }` would also
-    hide the payslip's own heading, printing a slip with no shop name, no week
-    and no staff name on it.
+    Only the app's own chrome is dropped. A bare `header { display: none }`
+    would also hide the payslip's own heading, printing a slip with no shop
+    name, no week and no staff name on it.
+
+    Marked with data-app-chrome rather than matched as `body > header`: the
+    chrome sits inside the sidebar layout now, so a depth-based selector would
+    quietly stop matching and put the navigation back on every payslip.
   */
-  body > header,
-  body > footer {
+  [data-app-chrome],
+  aside[data-app-sidebar] {
     display: none !important;
   }
 

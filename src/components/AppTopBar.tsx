@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { AppSidebarButton } from "./AppSidebar";
 import { BillsDueSoon, type DueSoonBill } from "./BillsDueSoon";
 import { QuickExpense } from "./QuickExpense";
 import { ThemeToggle } from "./ThemeToggle";
@@ -11,6 +12,10 @@ import { visibleSections } from "@/lib/auth/navigation";
 
 /**
  * The black frosted top bar for signed-in screens (spec 3.1).
+ *
+ * The sections themselves live in the sidebar now; what stays up here is what
+ * has to be reachable from any screen - recording an expense in under ten
+ * seconds, the bills falling due, and switching user at a shared counter.
  *
  * Only shows the sections this person may open. Hiding a link is a courtesy,
  * not the security boundary - the database refuses the data either way.
@@ -35,13 +40,22 @@ export function AppTopBar({
   const sections = visibleSections(user);
 
   return (
-    <header className="sticky top-0 z-50 bg-topbar text-topbar-ink backdrop-blur-xl">
+    <header
+      data-app-chrome
+      className="sticky top-0 z-50 bg-topbar text-topbar-ink backdrop-blur-xl"
+    >
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
-          {/* The Overview, not "/": the root is the shop's public page. */}
-          <Link href="/overview" className="shrink-0">
-            <Wordmark />
-          </Link>
+          <div className="flex min-w-0 items-center gap-2">
+            <AppSidebarButton sections={sections} />
+            {/*
+              The wordmark is in the sidebar from `lg` up, so showing it here
+              too would print it twice on the same screen.
+            */}
+            <Link href="/overview" className="shrink-0 lg:hidden">
+              <Wordmark />
+            </Link>
+          </div>
 
           <div className="flex items-center gap-3">
             {expensePresets ? (
@@ -60,33 +74,6 @@ export function AppTopBar({
           </div>
         </div>
 
-        {/*
-          Scrolls sideways on a phone or tablet rather than wrapping into two
-          rows. On a desktop it wraps instead: fifteen sections do not fit in
-          one row even at 1440px, and a half-cut last pill with nothing to say
-          it scrolls just looks like a section is missing.
-        */}
-        <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-x-visible">
-          {sections.map((section) => (
-            <Link
-              key={section.href}
-              href={section.comingSoon ? "/" : section.href}
-              aria-disabled={section.comingSoon}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-sm transition-colors ${
-                section.comingSoon
-                  ? "cursor-not-allowed text-white/30"
-                  : "text-white/70 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {section.label}
-              {section.comingSoon ? (
-                <span className="ml-1.5 text-[10px] text-white/30">
-                  Phase {section.phase}
-                </span>
-              ) : null}
-            </Link>
-          ))}
-        </nav>
       </div>
     </header>
   );
