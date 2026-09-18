@@ -55,6 +55,13 @@ receiving code.
   `supabase migration new` timestamp, so both naming styles can coexist. Verified
   by pushing all ten to a throwaway PostgreSQL and then running the whole RLS
   suite against the result: 42 tables, 231 checks, identical to `run.sh`.
+- **CI runs all of it on every push and pull request** (`.github/workflows/ci.yml`):
+  lint, typecheck, unit tests, the security rules and the schema checker, then
+  the build. The security rules and the schema checker need a real PostgreSQL,
+  so the workflow brings one up as a service container and points PGHOST/PGPORT
+  at it. They were the checks most worth automating: they are what stops a
+  policy change quietly opening the books, and by hand they only ran when
+  somebody remembered.
 - **`supabase test db` is NOT our test command.** It expects pgTAP tests in
   `supabase/tests/`, and ours are plain psql scripts with the same `.test.sql`
   suffix, so it fails confusingly. Use `npm run test:rls`.

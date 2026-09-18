@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A newer push makes an older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    # The security rules and the schema checker both need a real PostgreSQL —
+    # they build a throwaway database from supabase/migrations and prove the
+    # policies against it. Running them here is the point of this workflow:
+    # they are what stops a policy change quietly opening the books, and until
+    # now they only ran when somebody remembered to run them.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      # supabase/tests/run.sh and scripts/check-schema-usage.mjs read these.
+      # They default to a unix socket on port 5433 for a local install; the
+      # service container is reached over TCP instead.
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Security rules against a real PostgreSQL
+        run: npm run test:rls
+
+      - name: Every table and column the app uses exists
+        run: npm run check:schema
+
+      # Last because it is the slowest, and because nothing above needs it.
+      # No Supabase credentials: the app is built to render and explain itself
+      # when the database is not configured, so the build never needs them.
+      - name: Build
+        run: npm run build
