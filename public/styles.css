@@ -1,0 +1,123 @@
+/* DABZ PRINTSHOPPE - brand tokens sampled directly from the logo artwork.
+   Do not hand-tune these; they are the logo's own colours. */
+:root {
+  --dabz-red: #D30808;        /* DABZ wordmark + crest monogram */
+  --dabz-red-bright: #EE0808; /* highlight tone inside the wordmark */
+  --dabz-ink: #000000;        /* crest linework */
+  --dabz-tagline: #EFEFEE;    /* PRINTSHOPPE tagline */
+
+  --surface: #0D0D0F;         /* the dark ground the lockup is built for */
+  --surface-raised: #17171A;
+  --border: #26262B;
+  --text: #F4F4F5;
+  --text-muted: #A1A1AA;
+
+  /* The tagline is ~12% of the lockup's height, so below about 56px it stops
+     being legible. Use the mark alone in anything tighter. */
+  --logo-height: 56px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+}
+
+/* The lockup is a fixed-ratio raster: set height only and let width follow,
+   so it can never be stretched out of proportion. */
+.logo {
+  height: var(--logo-height);
+  width: auto;
+  display: block;
+}
+
+.site-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.brand { display: flex; align-items: center; }
+
+/* Full lockup by default, crest alone once the bar gets tight. */
+.logo-mark-only { display: none; }
+
+@media (max-width: 640px) {
+  .site-header .logo-lockup { display: none; }
+  .site-header .logo-mark-only { display: block; --logo-height: 40px; }
+}
+
+.site-header nav {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.site-header nav a {
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.site-header nav a:hover,
+.site-header nav a:focus-visible { color: var(--text); }
+
+main { max-width: 960px; margin: 0 auto; padding: 64px 24px; }
+
+.hero { text-align: center; }
+
+.hero .logo {
+  --logo-height: clamp(64px, 14vw, 112px);
+  margin: 0 auto 28px;
+}
+
+.hero p {
+  color: var(--text-muted);
+  font-size: 18px;
+  max-width: 52ch;
+  margin: 0 auto 32px;
+}
+
+.btn {
+  display: inline-block;
+  background: var(--dabz-red);
+  color: #fff;
+  padding: 12px 26px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.btn:hover, .btn:focus-visible { background: var(--dabz-red-bright); }
+
+.site-footer {
+  border-top: 1px solid var(--border);
+  padding: 28px 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.site-footer .logo { --logo-height: 30px; }
+
+/* The lockup's tagline is near-white, so it disappears on a light ground.
+   If a light surface is ever unavoidable, keep the logo on a dark plate
+   rather than recolouring the artwork. */
+.logo-plate {
+  background: var(--surface);
+  padding: 12px 18px;
+  border-radius: 8px;
+  display: inline-block;
+}
