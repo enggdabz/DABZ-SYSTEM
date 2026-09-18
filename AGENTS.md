@@ -195,3 +195,37 @@ round trip is the one thing that must be tried against a real project.
 - **A printed document adds up its own rows** - receipts as well as payslips.
 - **A missing price is a real state.** A product with no price makes the counter
   ask for the amount; that is the answer for anything the owner has not priced.
+
+## Stock and expense rules (built in Phase 5)
+
+- **A stock level is never stored.** It is `sum(delta_thousandths)` over the
+  movements, the same way a payslip adds up its own rows. A stored figure and a
+  movement history can disagree, and then nothing says which one is lying. The
+  cost is one sum per item; the benefit is that every number can be explained
+  by the rows under it.
+- **Quantities are whole thousandths** of a unit, for the reason money is whole
+  centavos: a stock level is a long addition, and decimals drift. Use
+  `src/lib/quantity.ts`. `costOfQuantity()` is a MONEY calculation and rounds
+  half away from zero - the same rule as `round()` in PostgreSQL, so
+  `record_stock_in` and the app agree to the centavo.
+- **A movement is append-only.** No update or delete policy exists. A wrong one
+  is answered with an opposite `adjustment`, exactly as a ledger entry is
+  voided rather than erased. A physical count writes the DIFFERENCE as its own
+  movement rather than overwriting the level, so a loss stays visible.
+- **The expenses table has no insert, update or delete policy at all.**
+  `record_expense` and `decide_expense` are the only ways in, and they check
+  the permission themselves. That is what makes it impossible to approve your
+  own expense or to record one without its ledger entry.
+- **The staff expense limit is read inside the database function**, never
+  passed in by the caller. A Server Action is a public endpoint: it must not be
+  the thing that judges its own limit.
+- **A pending expense has no ledger entry**, enforced by a check constraint.
+  Until the owner approves it, no money has moved anywhere in the system.
+- **Supplier payables are debt**, so they are Owner/Admin only with no staff
+  policy at all - the same class as bills and loans (spec 4.3). Staff can
+  create one by receiving stock on account; they just cannot see the list.
+- **The daily target measures profit, not sales** (spec 12.3). Today's
+  materials, fuel and meals come off the takings; today's bills, loan payments,
+  wages and cash advances do NOT, because the target exists to pay for those -
+  subtracting them as well would count them twice. The rule lives in
+  `countsAgainstDailyTarget()`, not in a screen.

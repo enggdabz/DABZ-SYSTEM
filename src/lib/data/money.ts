@@ -13,7 +13,11 @@ import {
   totalMonthlyBills,
   type Bill,
 } from "@/lib/bills";
-import { countsAsIncome, type LedgerEntry } from "@/lib/ledger";
+import {
+  countsAgainstDailyTarget,
+  countsAsIncome,
+  type LedgerEntry,
+} from "@/lib/ledger";
 import {
   summarizeLoan,
   totalRemainingDebt,
@@ -249,6 +253,15 @@ export function liveEntries(entries: readonly LedgerEntryRow[]): LedgerEntryRow[
 
 export interface OverviewData {
   todayIncomeCentavos: Centavos;
+  /**
+   * Today's costs that the daily target has NOT already covered - materials,
+   * fuel, a meal for whoever stayed late. Bills and wages are left out because
+   * the target exists to pay for them; subtracting them as well would count
+   * them twice (spec 12.3).
+   */
+  todayTargetCostsCentavos: Centavos;
+  /** Income less those costs. What the daily target is really measured against. */
+  todayTowardTargetCentavos: Centavos;
   monthIncomeCentavos: Centavos;
   monthExpensesCentavos: Centavos;
   monthlyBillsCentavos: Centavos;
@@ -273,10 +286,17 @@ export const getOverviewMoney = cache(async (): Promise<OverviewData> => {
   const liveDay = liveEntries(dayEntries);
   const liveMonth = liveEntries(monthEntries);
 
+  const todayIncomeCentavos = sumCentavos(
+    liveDay.filter(countsAsIncome).map((entry) => entry.amountCentavos),
+  );
+  const todayTargetCostsCentavos = sumCentavos(
+    liveDay.filter(countsAgainstDailyTarget).map((entry) => entry.amountCentavos),
+  );
+
   return {
-    todayIncomeCentavos: sumCentavos(
-      liveDay.filter(countsAsIncome).map((entry) => entry.amountCentavos),
-    ),
+    todayIncomeCentavos,
+    todayTargetCostsCentavos,
+    todayTowardTargetCentavos: todayIncomeCentavos - todayTargetCostsCentavos,
     monthIncomeCentavos: sumCentavos(
       liveMonth.filter(countsAsIncome).map((entry) => entry.amountCentavos),
     ),

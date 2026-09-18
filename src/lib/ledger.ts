@@ -171,6 +171,37 @@ export function countsAsShopExpense(entry: {
   return !NON_EXPENSE_CATEGORIES.includes(entry.category as ExpenseCategory);
 }
 
+/**
+ * The costs the daily target has NOT already accounted for.
+ *
+ * The daily target is (monthly bills + monthly payroll) / working days: it is
+ * what the shop must clear to cover those two things. So subtracting a bill
+ * payment or a wage from the day's takings would count them twice - once in
+ * the target and once against it - and the shop would look as though it never
+ * got anywhere.
+ *
+ * What the target does NOT include is the cost of doing the work: paper, ink,
+ * vinyl, fuel, a meal for whoever stayed late. Those come out of the takings
+ * before anything reaches the bills, which is exactly why the target is a
+ * profit figure rather than a sales figure (spec 12.3).
+ */
+export const DAILY_TARGET_COVERS: readonly ExpenseCategory[] = [
+  "fixed_bills",
+  "loan_payments",
+  "salaries",
+  // An advance is next payday's wage handed over early, not an extra cost.
+  "cash_advances",
+];
+
+/** Does this money out come off today's progress toward the daily target? */
+export function countsAgainstDailyTarget(entry: {
+  direction: LedgerDirection;
+  category: LedgerCategory;
+}): boolean {
+  if (!countsAsShopExpense(entry)) return false;
+  return !DAILY_TARGET_COVERS.includes(entry.category as ExpenseCategory);
+}
+
 export interface LedgerTotals {
   /** Earnings only - excludes borrowed money and owner capital. */
   income: Centavos;
@@ -185,6 +216,13 @@ export interface LedgerTotals {
   /** Everything that actually moved, whatever it was for. */
   totalIn: Centavos;
   totalOut: Centavos;
+  /**
+   * Costs the daily target has not already covered - materials, fuel, meals.
+   * Income less this is real progress toward the target (spec 12.3).
+   */
+  targetCosts: Centavos;
+  /** income - targetCosts. What the daily target is measured against. */
+  towardTarget: Centavos;
 }
 
 export function totalsFor(entries: readonly LedgerEntry[]): LedgerTotals {
@@ -192,6 +230,7 @@ export function totalsFor(entries: readonly LedgerEntry[]): LedgerTotals {
   const expenses: Centavos[] = [];
   const nonIncomeIn: Centavos[] = [];
   const ownerWithdrawals: Centavos[] = [];
+  const targetCosts: Centavos[] = [];
   const allIn: Centavos[] = [];
   const allOut: Centavos[] = [];
 
@@ -204,11 +243,13 @@ export function totalsFor(entries: readonly LedgerEntry[]): LedgerTotals {
       allOut.push(entry.amountCentavos);
       if (countsAsShopExpense(entry)) expenses.push(entry.amountCentavos);
       else ownerWithdrawals.push(entry.amountCentavos);
+      if (countsAgainstDailyTarget(entry)) targetCosts.push(entry.amountCentavos);
     }
   }
 
   const incomeTotal = sumCentavos(income);
   const expenseTotal = sumCentavos(expenses);
+  const targetCostTotal = sumCentavos(targetCosts);
 
   return {
     income: incomeTotal,
@@ -218,6 +259,8 @@ export function totalsFor(entries: readonly LedgerEntry[]): LedgerTotals {
     ownerWithdrawals: sumCentavos(ownerWithdrawals),
     totalIn: sumCentavos(allIn),
     totalOut: sumCentavos(allOut),
+    targetCosts: targetCostTotal,
+    towardTarget: incomeTotal - targetCostTotal,
   };
 }
 

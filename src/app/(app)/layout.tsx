@@ -3,8 +3,11 @@ import type { ReactNode } from "react";
 import { AppTopBar } from "@/components/AppTopBar";
 import { AutoLogout } from "@/components/AutoLogout";
 import { getSettings, requireUser } from "@/lib/auth/dal";
-import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { getExpensePresets } from "@/lib/data/expenses";
 import { getBillsDueSoon } from "@/lib/data/reminder";
+import { describeApprovalRule } from "@/lib/expenses";
+import { formatPesos } from "@/lib/money";
 
 /**
  * The frame around every signed-in screen.
@@ -22,9 +25,25 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
   // fetched for them - the database would refuse it anyway.
   const billsDueSoon = isOwnerOrAdmin(user) ? await getBillsDueSoon() : [];
 
+  // The expense pop-up is in the top bar so a purchase can be recorded from
+  // wherever the person is standing - under ten seconds is the whole point
+  // (spec 11). Only fetched for those who may use it.
+  const mayRecordExpenses = can(user, "record_expenses");
+  const expensePresets = mayRecordExpenses ? await getExpensePresets() : null;
+
   return (
     <>
-      <AppTopBar user={user} billsDueSoon={billsDueSoon} />
+      <AppTopBar
+        user={user}
+        billsDueSoon={billsDueSoon}
+        expensePresets={expensePresets}
+        expenseApprovalHint={describeApprovalRule({
+          isOwnerOrAdmin: isOwnerOrAdmin(user),
+          staffExpenseApprovalLimitCentavos:
+            settings.staffExpenseApprovalLimitCentavos,
+          formatAmount: formatPesos,
+        })}
+      />
       <AutoLogout minutes={settings.autoLogoutMinutes} />
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         {children}

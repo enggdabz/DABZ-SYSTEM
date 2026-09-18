@@ -1,10 +1,12 @@
 import Link from "next/link";
 
 import { BillsDueSoon, type DueSoonBill } from "./BillsDueSoon";
+import { QuickExpense } from "./QuickExpense";
 import { ThemeToggle } from "./ThemeToggle";
 import { SwitchUserButton } from "./SwitchUserButton";
 import { Wordmark } from "./ui";
 import type { SignedInUser } from "@/lib/auth/dal";
+import type { ExpensePreset } from "@/lib/expenses";
 import { visibleSections } from "@/lib/auth/navigation";
 
 /**
@@ -16,10 +18,19 @@ import { visibleSections } from "@/lib/auth/navigation";
 export function AppTopBar({
   user,
   billsDueSoon = [],
+  expensePresets,
+  expenseApprovalHint,
 }: {
   user: SignedInUser;
   /** Empty for staff, who never see the bills (spec 4.3). */
   billsDueSoon?: DueSoonBill[];
+  /**
+   * The quick picks for the expense pop-up, or null when this person may not
+   * record expenses. Recording one has to be possible from wherever they are
+   * standing, which is why it lives up here rather than on a screen of its own.
+   */
+  expensePresets?: ExpensePreset[] | null;
+  expenseApprovalHint?: string | null;
 }) {
   const sections = visibleSections(user);
 
@@ -32,6 +43,12 @@ export function AppTopBar({
           </Link>
 
           <div className="flex items-center gap-3">
+            {expensePresets ? (
+              <QuickExpense
+                presets={expensePresets}
+                approvalHint={expenseApprovalHint ?? null}
+              />
+            ) : null}
             {billsDueSoon.length > 0 ? <BillsDueSoon bills={billsDueSoon} /> : null}
             <span className="hidden text-right text-xs leading-tight sm:block">
               <span className="block font-medium">{user.fullName}</span>

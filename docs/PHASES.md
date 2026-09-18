@@ -12,8 +12,8 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 2 | Bills, loans, ledger, Overview (the money side) | ✅ Done |
 | 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ Done |
 | 4 | Customers + Dabz Printshoppe POS | ✅ **Done — waiting on owner to confirm** |
-| 5 | Expenses pop-up and stocks | Next |
-| 6 | Dabz Apparel job orders | Not started |
+| 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — waiting on owner to confirm** |
+| 6 | Dabz Apparel job orders | Next |
 | 7 | DabzTech Solutions job tickets | Not started |
 | 8 | Reports | Not started |
 | 9 | Later: public website, Messenger, Meta Ads, chatbot, notifications | Not in first build |
@@ -208,6 +208,7 @@ migration files, add the three settings, and create your owner account at
 2. **Today's figure is sales, not profit.** Material costs are not tracked until
    Phase 5, so ₱5,000 of tarpaulin sales that used ₱2,000 of vinyl still counts
    as ₱5,000. The specification asked for exactly this labelling (12.3).
+   *Phase 5 fixed this: the Overview now measures profit.*
 
 **How it is verified**
 
@@ -551,14 +552,131 @@ things that matter at the till are always in reach without scrolling.
 
 ---
 
-## Phase 5 — Expenses and stocks (next)
+## Phase 5 — Expenses, stocks and supplier payables ✅
 
-Needs, when convenient: your most frequent purchases and suppliers (17.14), and
-your main materials with their units and reorder levels (17.15). As before, I
-will build the machinery and you fill in the figures.
+**Built**
 
-- The expenses pop-up, aimed at under ten seconds per entry, with quick picks.
-- Stock items with photos, stock in/out, history, low-stock alerts and counts.
-- Supplier payables for anything received but not yet paid for.
-- Once material costs are tracked, the daily target can finally compare against
-  **profit** rather than sales.
+*The expense pop-up (spec 11)*
+- A **+ Expense** button in the top bar of every screen, because the
+  specification asks for under ten seconds per entry and walking to a screen
+  first does not fit in ten seconds.
+- **Eight quick picks**, seeded from the specification's own expense
+  categories. A quick pick already knows what the money was for and which
+  division it belongs to, so the only thing that always has to be typed is the
+  amount. Rename them to what you actually buy and it gets faster still.
+- The category, division and payment method are folded away **below** the
+  button, with a line showing what will be saved. On a phone they would
+  otherwise push "Record expense" off the bottom of the screen, for a choice
+  the quick pick had already made correctly.
+- **No usual amounts were invented.** Every quick pick asks. Fill one in only
+  where it really is always the same.
+- **A staff expense above the Settings limit waits for you**, and until you
+  approve it **no money has moved anywhere in the system** — a check constraint
+  in the database enforces that a waiting expense has no ledger entry at all.
+  Refusing one leaves no money trace either.
+- The limit is read inside the database function, never sent by the browser, so
+  a staff member cannot send a larger limit along with their expense.
+
+*Stocks (spec 14)*
+- Materials with a unit you choose (ream, litre, piece, pack), a division, an
+  optional reorder level and an optional price.
+- **A stock level is never stored.** It is added up from every delivery and
+  withdrawal, so the number on the screen can always be explained by the
+  history under it. A stored figure and a movement list can disagree, and then
+  nothing says which is lying.
+- Quantities are whole thousandths of a unit, for the same reason money is
+  whole centavos: a level built from hundreds of movements must not drift. A
+  test adds a tenth of a ream two hundred times and expects exactly zero.
+- **Received**, **Took out** and **Counted the shelf**, per material. A count
+  asks only for what you can see and writes the **difference** as its own
+  movement — overwriting the level would hide the loss, and a loss is the
+  reason you count.
+- A movement is **append-only**. A wrong one is answered with an opposite
+  correction, never erased, exactly as a ledger entry is voided.
+- Low-stock and out-of-stock warnings, on the Stocks screen and the Overview.
+  A material with no reorder level says so rather than being assumed fine.
+- The value of everything on the shelf, with unpriced materials **counted and
+  left out** rather than valued at zero.
+
+*Supplier payables (spec 11)*
+- Receiving a delivery "on account" raises a payable by itself, with the cost
+  worked out from the quantity and the unit price in the same transaction.
+- Marking one paid writes the ledger entry and marks it paid **together**, and
+  a paid payable can never be edited again — the update policy only matches an
+  unpaid row.
+- Owner/Admin only, with no staff-facing policy at all. It is debt, in the same
+  class as bills and loans (spec 4.3). Staff can create one by receiving stock;
+  they just cannot see the list.
+- A payable with **no due date** is a real state, shown with a warning. The
+  supplier may genuinely not have given a term.
+
+*The daily target finally measures profit (spec 12.3)*
+- The Overview now shows **income less today's materials and running costs**
+  against the target, with the two figures underneath it.
+- Today's bills, loan payments, wages and cash advances are **not** subtracted,
+  because the target exists to pay for exactly those — taking them off as well
+  would count them twice and the shop would look as though it never got
+  anywhere.
+- ₱5,000 of tarpaulin sales that used ₱2,000 of vinyl is ₱3,000 toward the
+  target. That is the number that was always meant, and until now the screen
+  showed ₱5,000.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Quantities, costs, stock levels, expense limits, payable dates | `npm test` | 339 tests |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 169 checks |
+| That every table and column the app asks for exists | `npm run check:schema` | 30 tables, 492 columns |
+| Every screen at 390 / 768 / 1024 / 1440, and every pop-up fully on screen | headless browser | 22 screens × 4 sizes |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The database tests worth knowing about prove, against a real PostgreSQL:
+
+- a staff expense one centavo above the limit is held, and leaves **no ledger
+  entry** — while one exactly at the limit goes straight through;
+- a staff member cannot approve their own expense, nor reach the table to do it
+  another way;
+- refusing an expense leaves no money trace at all;
+- a stock level equals the sum of its movements, and a movement can be neither
+  edited nor deleted;
+- 2.5 reams at ₱240.00 comes to exactly ₱600.00, in the database and in the app;
+- a payable cannot be paid twice, and a paid one can never be edited;
+- a refused delivery leaves behind no movement AND no expense.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 339 passed
+npm run dev
+```
+
+Run `supabase/migrations/0006_phase5_expenses_stocks.sql` in the Supabase SQL
+editor first. Then:
+
+1. Press **+ Expense** in the top bar. Tap **Meals & snacks**, type an amount,
+   press Record expense. It should take about five seconds.
+2. Open **Money in/out** and confirm the entry is there.
+3. Open **Stocks** and add a material — say Bond paper A4, counted in reams.
+   Leave the reorder level and price empty for now.
+4. Press **Received**, enter 20 and a price, leave it on "Paid now". Check
+   **Money in/out**: the purchase is there. Check **Stocks**: 20 reams.
+5. Press **Received** again, choose **On account**, and look at **Owed to
+   suppliers**.
+6. Press **Counted the shelf** and type a smaller number than it shows. The
+   difference is recorded as its own movement rather than quietly overwriting.
+7. Set a reorder level above what is on the shelf and confirm the warning
+   appears on the Overview.
+8. Sign in as a staff member with **Record expenses** ticked, record something
+   above the limit in Settings, then sign back in as yourself: it is waiting on
+   the Expenses screen, and **not** yet in Money in/out.
+
+---
+
+## Phase 6 — Dabz Apparel job orders (next)
+
+Needs, when convenient: apparel pricing (17.10) — price per jersey set, shirt,
+jacket and long sleeves; size add-ons for 2XL and up; fabric and collar
+options; the down payment policy; and DTF print prices. As always, I will build
+the machinery and the prices stay empty until you give them.

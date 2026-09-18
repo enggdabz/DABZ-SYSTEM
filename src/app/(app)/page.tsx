@@ -8,6 +8,10 @@ import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
 import { PERMISSION_INFO, isOwnerOrAdmin, type Permission } from "@/lib/auth/permissions";
 import { monthTotals } from "@/lib/bills";
 import { getChecklist } from "@/lib/data/checklist";
+import { getExpenses, getPayables } from "@/lib/data/expenses";
+import { getStockOverview } from "@/lib/data/stocks";
+import { expenseTotals, payableTotals } from "@/lib/expenses";
+import { formatQuantity } from "@/lib/quantity";
 import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom } from "@/lib/data/money";
 import {
   getAdvanceBalances,
@@ -101,17 +105,34 @@ async function OwnerOverview() {
   const period = currentPeriod();
   const today = manilaToday();
 
-  const [money, bills, payments, payrollEstimate, staff, balances, weeks, checklist] =
-    await Promise.all([
-      getOverviewMoney(),
-      getBills(),
-      getBillPayments(period),
-      getEstimatedMonthlyPayroll(),
-      getStaff(),
-      getAdvanceBalances(),
-      getPayrollWeeks({ limit: 200 }),
-      getChecklist(),
-    ]);
+  const [
+    money,
+    bills,
+    payments,
+    payrollEstimate,
+    staff,
+    balances,
+    weeks,
+    checklist,
+    stock,
+    expenses,
+    payables,
+  ] = await Promise.all([
+    getOverviewMoney(),
+    getBills(),
+    getBillPayments(period),
+    getEstimatedMonthlyPayroll(),
+    getStaff(),
+    getAdvanceBalances(),
+    getPayrollWeeks({ limit: 200 }),
+    getChecklist(),
+    getStockOverview(),
+    getExpenses({ limit: 200 }),
+    getPayables(),
+  ]);
+
+  const expenseSummary = expenseTotals(expenses);
+  const payableSummary = payableTotals(payables, civilDateToISO(today));
 
   const billTotals = monthTotals({
     bills,
@@ -141,8 +162,16 @@ async function OwnerOverview() {
     activeStaff.map((member) => balances.get(member.id) ?? 0),
   );
 
+  /*
+    Measured against PROFIT, not sales, now that expenses are tracked (Phase 5).
+
+    PHP 5,000 of tarpaulin sales that used PHP 2,000 of vinyl has not covered
+    PHP 5,000 of bills. Today's materials, fuel and meals come off the takings
+    first; today's bills and wages do not, because the target is what pays for
+    those - taking them off as well would count them twice.
+  */
   const progress = targetProgress({
-    achievedCentavos: money.todayIncomeCentavos,
+    achievedCentavos: money.todayTowardTargetCentavos,
     targetCentavos: target.targetCentavos,
   });
 
@@ -159,11 +188,25 @@ async function OwnerOverview() {
         </div>
 
         <p className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
-          {formatPesos(money.todayIncomeCentavos)}
+          {formatPesos(money.todayTowardTargetCentavos)}
           <span className="text-2xl font-medium text-muted">
             {" "}
             of {formatPesos(target.targetCentavos)}
           </span>
+        </p>
+
+        <p className="mt-2 text-sm text-muted">
+          {formatPesos(money.todayIncomeCentavos)} taken in
+          {money.todayTargetCostsCentavos > 0 ? (
+            <>
+              {" "}
+              less {formatPesos(money.todayTargetCostsCentavos)} spent on
+              materials and running costs today
+            </>
+          ) : (
+            " · nothing spent on materials yet today"
+          )}
+          .
         </p>
 
         <div
@@ -178,6 +221,7 @@ async function OwnerOverview() {
         </div>
 
         <p className="mt-4 text-sm text-muted">
+          The target is what the shop must CLEAR, after materials:{" "}
           {formatPesos(money.monthlyBillsCentavos)} of monthly bills
           {payrollEstimate.centavos !== null
             ? ` plus ${formatPesos(payrollEstimate.centavos)} of wages`
@@ -366,6 +410,82 @@ async function OwnerOverview() {
               Open staff
             </Link>
           </Card>
+        </div>
+      ) : null}
+
+      {stock.needingAttention.length > 0 ||
+      expenseSummary.pendingCount > 0 ||
+      payableSummary.unpaidCount > 0 ? (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {stock.needingAttention.length > 0 ? (
+            <Card title="Stock needing attention">
+              <ul className="space-y-2">
+                {stock.needingAttention.slice(0, 5).map((line) => (
+                  <li
+                    key={line.item.id}
+                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                  >
+                    <span className="font-medium">{line.item.name}</span>
+                    <span className="text-attention">
+                      <span aria-hidden="true">{"⚠"} </span>
+                      {line.status.label}
+                      <span className="ml-1 text-muted">
+                        ({formatQuantity(line.onHand, line.item.unit)} left)
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              {stock.needingAttention.length > 5 ? (
+                <p className="mt-3 text-sm text-muted">
+                  and {stock.needingAttention.length - 5} more.
+                </p>
+              ) : null}
+              <Link href="/stocks" className="mt-4 inline-block text-sm underline">
+                Open stocks
+              </Link>
+            </Card>
+          ) : null}
+
+          {expenseSummary.pendingCount > 0 || payableSummary.unpaidCount > 0 ? (
+            <Card title="Money waiting on you">
+              <dl className="space-y-3 text-sm">
+                {expenseSummary.pendingCount > 0 ? (
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <dt className="text-muted">
+                      <span aria-hidden="true">{"⚠"} </span>
+                      Expenses waiting for approval
+                    </dt>
+                    <dd className="font-medium">
+                      {formatPesos(expenseSummary.pendingCentavos)} (
+                      {expenseSummary.pendingCount})
+                    </dd>
+                  </div>
+                ) : null}
+                {payableSummary.unpaidCount > 0 ? (
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <dt className="text-muted">Owed to suppliers</dt>
+                    <dd className="font-medium">
+                      {formatPesos(payableSummary.unpaidCentavos)} (
+                      {payableSummary.unpaidCount})
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+              <div className="mt-4 flex flex-wrap gap-4">
+                {expenseSummary.pendingCount > 0 ? (
+                  <Link href="/expenses" className="text-sm underline">
+                    Open expenses
+                  </Link>
+                ) : null}
+                {payableSummary.unpaidCount > 0 ? (
+                  <Link href="/payables" className="text-sm underline">
+                    Open what is owed
+                  </Link>
+                ) : null}
+              </div>
+            </Card>
+          ) : null}
         </div>
       ) : null}
 

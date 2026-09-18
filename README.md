@@ -7,16 +7,18 @@ point of sale, job orders, repairs and stock.
 Owner: Eddie boy Garcia · Founded 18 June 2017 · Philippines · Philippine peso
 (₱) · Asia/Manila
 
-> **Status: Phase 4 complete.** Logins, bills, loans, the ledger, staff, the
-> time clock and payroll all work — and now the counter: products, customers,
-> sales, receipts, voids and the end-of-day count. Expenses and stocks are
-> Phase 5. See [docs/PHASES.md](docs/PHASES.md).
+> **Status: Phase 5 complete.** Logins, bills, loans, the ledger, staff, the
+> time clock, payroll and the counter all work — and now expenses, stocks and
+> what is owed to suppliers. The daily target finally measures **profit**
+> rather than sales. Dabz Apparel job orders are Phase 6.
+> See [docs/PHASES.md](docs/PHASES.md).
 
 ## Two things worth knowing up front
 
 **You do not have to set everything up before you start.** Every figure only
 you can know — a bill's due day, a loan's interest rate, a staff daily rate, a
-product price — starts empty on purpose, and the system runs anyway. It says
+product price, a material's reorder level — starts empty on purpose, and the
+system runs anyway. It says
 what it cannot do without each one rather than guessing. The **To fill in**
 screen gathers them all in one place, so you can work through them over weeks
 while the shop is open.

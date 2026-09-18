@@ -33,11 +33,14 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/sales", label: "Sales", permission: "add_sales", phase: 4 },
   { href: "/timeclock", label: "Time clock", phase: 3 },
   { href: "/closing", label: "End of day", permission: "add_sales", phase: 4 },
+  { href: "/expenses", label: "Expenses", permission: "record_expenses", phase: 5 },
+  { href: "/stocks", label: "Stocks", permission: "stock_in_out", phase: 5 },
   { href: "/customers", label: "Customers", phase: 4 },
 
   { href: "/bills", label: "Bills", ownerOrAdminOnly: true, phase: 2 },
   { href: "/loans", label: "Loans", ownerOrAdminOnly: true, phase: 2 },
   { href: "/ledger", label: "Money in/out", ownerOrAdminOnly: true, phase: 2 },
+  { href: "/payables", label: "Owed to suppliers", ownerOrAdminOnly: true, phase: 5 },
   { href: "/payroll", label: "Payroll", ownerOrAdminOnly: true, phase: 3 },
   { href: "/staff", label: "Staff", ownerOrAdminOnly: true, phase: 3 },
 
@@ -46,8 +49,6 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/activity", label: "Activity", ownerOrAdminOnly: true, phase: 1 },
   { href: "/settings", label: "Settings", ownerOrAdminOnly: true, phase: 1 },
   { href: "/checklist", label: "To fill in", ownerOrAdminOnly: true, phase: 4 },
-
-  { href: "/stocks", label: "Stocks", permission: "stock_in_out", phase: 5, comingSoon: true },
 ];
 
 export function visibleSections(actor: Actor | null): NavSection[] {

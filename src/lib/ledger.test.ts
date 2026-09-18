@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CATEGORY_LABELS,
+  countsAgainstDailyTarget,
   EXPENSE_CATEGORIES,
   INCOME_CATEGORIES,
   countsAsIncome,
@@ -137,6 +138,8 @@ describe("totalsFor", () => {
       ownerWithdrawals: 0,
       totalIn: 0,
       totalOut: 0,
+      targetCosts: 0,
+      towardTarget: 0,
     });
   });
 
@@ -284,5 +287,98 @@ describe("targetProgress", () => {
     });
     expect(progress.percent).toBe(0);
     expect(progress.reached).toBe(false);
+  });
+});
+
+describe("countsAgainstDailyTarget", () => {
+  it("counts materials, fuel and meals, which the target does not cover", () => {
+    for (const category of [
+      "materials_supplies",
+      "fuel_transportation",
+      "meals_snacks",
+      "delivery_shipping",
+      "machine_maintenance",
+      "new_equipment",
+      "meta_ads",
+      "miscellaneous",
+    ] as const) {
+      expect(
+        countsAgainstDailyTarget({ direction: "out", category }),
+        category,
+      ).toBe(true);
+    }
+  });
+
+  it("does NOT count a bill, a loan payment or a wage - the target IS those", () => {
+    // Counting them would subtract them from the day's takings while the
+    // target is already asking the takings to cover them: twice over.
+    for (const category of [
+      "fixed_bills",
+      "loan_payments",
+      "salaries",
+      "cash_advances",
+    ] as const) {
+      expect(
+        countsAgainstDailyTarget({ direction: "out", category }),
+        category,
+      ).toBe(false);
+    }
+  });
+
+  it("does NOT count an owner withdrawal, which is not a shop cost at all", () => {
+    expect(
+      countsAgainstDailyTarget({ direction: "out", category: "owner_withdrawal" }),
+    ).toBe(false);
+  });
+
+  it("does not count money coming in", () => {
+    expect(
+      countsAgainstDailyTarget({ direction: "in", category: "photocopy" }),
+    ).toBe(false);
+  });
+});
+
+describe("progress toward the daily target", () => {
+  it("takes materials off the takings but leaves the bill alone", () => {
+    const totals = totalsFor([
+      entry({ direction: "in", category: "photocopy", amountCentavos: parsePesos("5000") }),
+      entry({
+        direction: "out",
+        category: "materials_supplies",
+        amountCentavos: parsePesos("2000"),
+      }),
+      entry({
+        direction: "out",
+        category: "fixed_bills",
+        amountCentavos: parsePesos("3500"),
+      }),
+    ]);
+
+    // ₱5,000 of tarpaulin sales that used ₱2,000 of vinyl is ₱3,000 toward the
+    // target - not ₱5,000, and not -₱500 after also subtracting the bill.
+    expect(totals.targetCosts).toBe(parsePesos("2000"));
+    expect(totals.towardTarget).toBe(parsePesos("3000"));
+
+    // The full profit figure still counts the bill, because it is a real cost.
+    expect(totals.expenses).toBe(parsePesos("5500"));
+    expect(totals.profit).toBe(parsePesos("-500"));
+  });
+
+  it("is the same as income when nothing was bought", () => {
+    const totals = totalsFor([
+      entry({ direction: "in", category: "photocopy", amountCentavos: parsePesos("1200") }),
+    ]);
+    expect(totals.towardTarget).toBe(totals.income);
+  });
+
+  it("can go negative on a day that only spent", () => {
+    const totals = totalsFor([
+      entry({
+        direction: "out",
+        category: "materials_supplies",
+        amountCentavos: parsePesos("800"),
+      }),
+    ]);
+    expect(totals.towardTarget).toBe(parsePesos("-800"));
   });
 });

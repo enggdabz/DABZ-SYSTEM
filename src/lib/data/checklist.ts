@@ -17,6 +17,7 @@ import { cache } from "react";
 import { getBills, getLoans } from "@/lib/data/money";
 import { getAllProducts } from "@/lib/data/pos";
 import { getStaff } from "@/lib/data/staff";
+import { getStockItems } from "@/lib/data/stocks";
 
 export interface ChecklistItem {
   id: string;
@@ -38,11 +39,12 @@ export interface Checklist {
 }
 
 export const getChecklist = cache(async (): Promise<Checklist> => {
-  const [bills, loans, staff, products] = await Promise.all([
+  const [bills, loans, staff, products, stockItems] = await Promise.all([
     getBills(),
     getLoans(),
     getStaff(),
     getAllProducts(),
+    getStockItems(),
   ]);
 
   const items: ChecklistItem[] = [];
@@ -120,6 +122,54 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       names: productsWithoutPrice.map((product) => product.name),
       href: "/products",
       linkLabel: "Open Products",
+      important: false,
+    });
+  }
+
+  const activeStock = stockItems.filter((item) => item.active);
+
+  const stockWithoutReorderLevel = activeStock.filter(
+    (item) => item.reorderLevel === null,
+  );
+  if (stockWithoutReorderLevel.length > 0) {
+    items.push({
+      id: "stock-reorder-levels",
+      title: `${stockWithoutReorderLevel.length} material${
+        stockWithoutReorderLevel.length === 1 ? "" : "s"
+      } with no reorder level`,
+      why: "Until you say when to worry, the system cannot tell you to buy more. It will not guess a level - it would warn on the wrong day and you would learn to ignore it.",
+      names: stockWithoutReorderLevel.map((item) => item.name),
+      href: "/stocks",
+      linkLabel: "Open Stocks",
+      important: true,
+    });
+  }
+
+  const stockWithoutCost = activeStock.filter(
+    (item) => item.unitCostCentavos === null,
+  );
+  if (stockWithoutCost.length > 0) {
+    items.push({
+      id: "stock-costs",
+      title: `${stockWithoutCost.length} material${
+        stockWithoutCost.length === 1 ? "" : "s"
+      } with no price`,
+      why: "Without a price the shelf cannot be valued, so what you are holding is left out of the total.",
+      names: stockWithoutCost.map((item) => item.name),
+      href: "/stocks",
+      linkLabel: "Open Stocks",
+      important: false,
+    });
+  }
+
+  if (activeStock.length === 0) {
+    items.push({
+      id: "no-stock",
+      title: "No materials added yet",
+      why: "Stock levels, low-stock warnings and the value of the shelf all wait on your list of materials - paper, ink, vinyl, blank shirts - and the unit you count each one in.",
+      names: [],
+      href: "/stocks",
+      linkLabel: "Open Stocks",
       important: false,
     });
   }

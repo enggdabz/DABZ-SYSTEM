@@ -91,12 +91,28 @@ Still worth sending when convenient: **one-colour black logo files** for
 receipts. Until they arrive, receipts print a plain text wordmark, because a
 white crest on white paper is invisible (spec 3.3).
 
-## Needed for Phase 5 — Expenses and stocks
+## Decided for Phase 5 — Expenses and stocks
 
-| # | Question |
-|---|---|
-| 17.14 | **Quick-pick expenses:** your most frequent purchases, and the usual suppliers |
-| 17.15 | **Starting stock items:** the main materials, their units, reorder levels and costs |
+Made by me, per the owner's instruction to decide and revise later.
+
+| # | Question | What I decided | How to change it |
+|---|---|---|---|
+| 17.14 | Quick-pick expenses | Seeded **eight buttons** named after the specification's own expense categories — Paper, Ink, Tarpaulin roll, Meals & snacks, Fuel, Delivery / shipping, Machine repair, Other — with **no amounts at all** | Rename, add or hide them on **Expenses**. Rename them to what you actually buy and the pop-up gets faster |
+| 17.14 | Where the expense pop-up lives | A **+ Expense** button in the top bar, on every screen. Spec 11 asks for under ten seconds; walking to a screen first does not fit in ten seconds | It is in `AppTopBar` |
+| 17.15 | Starting stock items | **None seeded.** Your materials, the unit you count each in, and the level you reorder at are all figures only you can know | Add them on **Stocks** |
+| — | Receiving stock that is not paid for | Becomes a **supplier payable**, and paying it later writes the ledger entry. Buying on account is normal for a shop this size, and pretending the money left when it did not would make the drawer look short | Choose "Paid now" on the delivery form instead |
+| — | Physical counts | The count writes the **difference** as its own movement. Overwriting the level would hide the loss, and a loss is the reason you count | — |
+
+**Amounts I did not invent.** No quick pick has a usual amount and no material
+has a reorder level or a price, so every one of them asks. Same rule as bill
+due days, loan interest rates, daily rates and product prices: a figure only
+the owner can know is never guessed, because a confident wrong number gets
+trusted.
+
+Still worth sending when convenient: your **most frequent purchases and usual
+suppliers** (17.14), and your **main materials with their units, reorder levels
+and costs** (17.15). All of it goes in while the shop is running, and the
+**To fill in** screen lists whatever is still missing.
 
 ## Needed for Phase 6 — Dabz Apparel
 
@@ -154,3 +170,16 @@ to ask:
   negative. The remainder carries over to the next payday (spec 13.4).
 - Money is never hard-deleted by staff; corrections go through voids and
   adjustments with a reason (spec 2.1).
+- A stock quantity is stored as **whole thousandths** of its unit (20 reams is
+  20000), so a level built from hundreds of movements stays exact. Three
+  decimals is as fine as a print shop measures.
+- **At the reorder level counts as low**, not below it: "order more when you
+  are down to 5 reams" means 5 is already the moment, not the moment after.
+- **An expense exactly at the staff limit is allowed.** The limit is what staff
+  may spend, not what they may not.
+- **Receiving stock with no price recorded still updates the shelf**, and
+  claims no money moved. That is the honest answer when nobody at the counter
+  knows what the delivery cost.
+- The daily target now measures **profit**: today's income less today's
+  materials and running costs. Bills, loan payments, wages and cash advances
+  are excluded, because the target is what pays for them.
