@@ -25,6 +25,8 @@ jobs:
 
       - run: npm run lint
 
+      - run: npm test
+
       # Must precede typecheck: Next.js generates the route type definitions
       # (PageProps, LayoutProps) into .next/types during the build.
       # No Supabase credentials are needed — every env read is lazy and every

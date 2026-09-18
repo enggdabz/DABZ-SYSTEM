@@ -25,7 +25,7 @@ export const MODULES: readonly Module[] = [
     short: "Sales",
     body: "Point of sale, sale lines, discounts and void requests.",
     roles: ["owner", "admin", "staff"],
-    ready: false,
+    ready: true,
   },
   {
     key: "repairs",
