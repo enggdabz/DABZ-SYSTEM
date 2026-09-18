@@ -47,22 +47,3 @@ export function centavosFromForm(
   return typeof raw === "string" ? parsePesosToCentavos(raw) : null;
 }
 
-/** Stock quantities are stored as thousandths of a unit. */
-export function formatQuantity(thousandths: number): string {
-  const negative = thousandths < 0;
-  const absolute = Math.abs(Math.trunc(thousandths));
-  const whole = Math.floor(absolute / 1000).toLocaleString("en-PH");
-  const fraction = String(absolute % 1000).padStart(3, "0").replace(/0+$/, "");
-  return `${negative ? "−" : ""}${whole}${fraction ? `.${fraction}` : ""}`;
-}
-
-export function parseQuantityToThousandths(input: string): number | null {
-  const cleaned = input.replace(/[,\s]/g, "");
-  if (cleaned === "" || cleaned === ".") return null;
-  if (!/^-?\d*(\.\d{0,3})?$/.test(cleaned)) return null;
-  const negative = cleaned.startsWith("-");
-  const [whole = "0", fraction = ""] = cleaned.replace("-", "").split(".");
-  const value =
-    Number(whole || "0") * 1000 + Number((fraction + "000").slice(0, 3));
-  return negative ? -value : value;
-}

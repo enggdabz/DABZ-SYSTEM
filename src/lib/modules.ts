@@ -52,7 +52,7 @@ export const MODULES: readonly Module[] = [
     short: "Inventory",
     body: "Stock items, stock movements, suppliers and payables.",
     roles: ["owner", "admin", "staff"],
-    ready: false,
+    ready: true,
   },
   {
     key: "expenses",
