@@ -51,7 +51,8 @@ recolouring the logo; put it on a dark surface, or on a dark plate:
 
 ## Brand colours
 
-Sampled from the artwork, already defined in `public/styles.css`:
+Sampled from the artwork. The app's own tokens live in
+`src/app/globals.css`; these are the raw values measured off the logo:
 
 ```
 --dabz-red:        #D30808   /* wordmark + monogram */
@@ -91,4 +92,4 @@ The source here is a raster PNG. An **SVG** (or the original Illustrator /
 Photoshop vector) would stay razor sharp at any size, print cleanly, and
 drop the header logo from ~32 KB to a couple of KB. If you have the vector
 file from whoever designed this, add it as `logo/logo.svg` and point
-`index.html` and `styles.css` at it - everything else keeps working.
+`Wordmark` in `src/components/ui.tsx` at it - everything else keeps working.
