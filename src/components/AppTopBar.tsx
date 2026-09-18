@@ -42,8 +42,13 @@ export function AppTopBar({
           </div>
         </div>
 
-        {/* Scrolls sideways on a phone rather than wrapping into two rows. */}
-        <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0">
+        {/*
+          Scrolls sideways on a phone or tablet rather than wrapping into two
+          rows. On a desktop it wraps instead: fifteen sections do not fit in
+          one row even at 1440px, and a half-cut last pill with nothing to say
+          it scrolls just looks like a section is missing.
+        */}
+        <nav className="-mx-4 flex gap-1 overflow-x-auto px-4 pb-2 sm:mx-0 sm:px-0 lg:flex-wrap lg:overflow-x-visible">
           {sections.map((section) => (
             <Link
               key={section.href}

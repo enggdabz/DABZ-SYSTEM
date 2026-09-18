@@ -66,6 +66,13 @@ receiving code.
   an interest rate, a wage. It stays empty, with a warning and an editable
   field, AND it must appear in `src/lib/data/checklist.ts` so the To fill in
   screen lists it. Adding a new such field means adding it there too.
+- **Anything that covers the screen is portalled into `<body>`.** A dialog or
+  overlay rendered inside the top bar looks correct in the markup and is wrong
+  on screen: the bar has a `backdrop-blur`, and a blur makes an element a
+  containing block, so `fixed inset-0` measures itself against the BAR, not the
+  screen. The bill reminder hung 260px off the top of a phone that way. Use
+  `createPortal(dialog, document.body)`, and check a new overlay in a browser -
+  no unit test can see this.
 - Gentle, short motion only; `prefers-reduced-motion` is already respected in
   `globals.css`.
 - Sentence case on buttons and labels ("Mark paid", "Add to sale", "Time in").
