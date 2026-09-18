@@ -16,6 +16,11 @@ import {
   periodToMonthStartISO,
   parsePeriodKey,
   periodKey,
+  formatWeekRange,
+  scheduledHours,
+  startOfWeek,
+  weekDays,
+  weekdayName,
 } from "./period";
 
 describe("manilaToday", () => {
@@ -241,5 +246,122 @@ describe("periodToMonthStartISO", () => {
   it("writes the first of the month, as the database stores it", () => {
     expect(periodToMonthStartISO({ year: 2026, month: 9 })).toBe("2026-09-01");
     expect(periodToMonthStartISO({ year: 2026, month: 12 })).toBe("2026-12-01");
+  });
+});
+
+describe("startOfWeek", () => {
+  it("finds Monday for a Monday-start week", () => {
+    // 18 September 2026 is a Friday.
+    expect(startOfWeek({ year: 2026, month: 9, day: 18 }, "monday")).toEqual({
+      year: 2026,
+      month: 9,
+      day: 14,
+    });
+  });
+
+  it("puts Sunday at the END of a Monday-start week", () => {
+    // 20 September 2026 is a Sunday. Its week began on Monday the 14th, not
+    // the 20th - getting this wrong would move a day's wages into the wrong
+    // week.
+    expect(startOfWeek({ year: 2026, month: 9, day: 20 }, "monday")).toEqual({
+      year: 2026,
+      month: 9,
+      day: 14,
+    });
+  });
+
+  it("finds Sunday for a Sunday-start week", () => {
+    expect(startOfWeek({ year: 2026, month: 9, day: 18 }, "sunday")).toEqual({
+      year: 2026,
+      month: 9,
+      day: 13,
+    });
+    expect(startOfWeek({ year: 2026, month: 9, day: 20 }, "sunday")).toEqual({
+      year: 2026,
+      month: 9,
+      day: 20,
+    });
+  });
+
+  it("is unchanged when the date is already the first day", () => {
+    expect(startOfWeek({ year: 2026, month: 9, day: 14 }, "monday")).toEqual({
+      year: 2026,
+      month: 9,
+      day: 14,
+    });
+  });
+
+  it("reaches back into the previous month and year", () => {
+    // 1 September 2026 is a Tuesday, so its week began on 31 August.
+    expect(startOfWeek({ year: 2026, month: 9, day: 1 }, "monday")).toEqual({
+      year: 2026,
+      month: 8,
+      day: 31,
+    });
+    // 1 January 2027 is a Friday, so its week began on 28 December 2026.
+    expect(startOfWeek({ year: 2027, month: 1, day: 1 }, "monday")).toEqual({
+      year: 2026,
+      month: 12,
+      day: 28,
+    });
+  });
+});
+
+describe("weekDays", () => {
+  it("gives seven days in order", () => {
+    const days = weekDays({ year: 2026, month: 9, day: 14 });
+    expect(days).toHaveLength(7);
+    expect(days[0]).toEqual({ year: 2026, month: 9, day: 14 });
+    expect(days[6]).toEqual({ year: 2026, month: 9, day: 20 });
+  });
+
+  it("crosses a month boundary", () => {
+    const days = weekDays({ year: 2026, month: 9, day: 28 });
+    expect(days[6]).toEqual({ year: 2026, month: 10, day: 4 });
+  });
+
+  it("names the weekdays for the payroll table", () => {
+    const days = weekDays({ year: 2026, month: 9, day: 14 });
+    expect(days.map(weekdayName)).toEqual([
+      "Mon",
+      "Tue",
+      "Wed",
+      "Thu",
+      "Fri",
+      "Sat",
+      "Sun",
+    ]);
+  });
+});
+
+describe("formatWeekRange", () => {
+  it("shortens a week inside one month", () => {
+    expect(formatWeekRange({ year: 2026, month: 9, day: 14 })).toBe(
+      "14–20 Sep 2026",
+    );
+  });
+
+  it("spells out a week spanning two months", () => {
+    expect(formatWeekRange({ year: 2026, month: 9, day: 28 })).toBe(
+      "28 Sep – 4 Oct 2026",
+    );
+  });
+
+  it("spells out a week spanning two years", () => {
+    expect(formatWeekRange({ year: 2026, month: 12, day: 28 })).toBe(
+      "28 Dec 2026 – 3 Jan 2027",
+    );
+  });
+});
+
+describe("scheduledHours", () => {
+  it("measures the working day from the settings", () => {
+    expect(scheduledHours("08:00", "17:00")).toBe(9);
+    expect(scheduledHours("08:30", "17:00")).toBe(8.5);
+    expect(scheduledHours("09:00", "18:00")).toBe(9);
+  });
+
+  it("never returns a negative day", () => {
+    expect(scheduledHours("17:00", "08:00")).toBe(0);
   });
 });

@@ -9,9 +9,9 @@ Each phase ends with: what was built, how to run it, how to test it.
 |---|---|---|
 | 0 | Setup & learning | ✅ Done |
 | 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ Done |
-| 2 | Bills, loans, ledger, Overview (the money side) | ✅ **Done — waiting on owner to confirm** |
-| 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | Next |
-| 4 | Customers + Dabz Printshoppe POS | Not started |
+| 2 | Bills, loans, ledger, Overview (the money side) | ✅ Done |
+| 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ **Done — waiting on owner to confirm** |
+| 4 | Customers + Dabz Printshoppe POS | Next |
 | 5 | Expenses pop-up and stocks | Not started |
 | 6 | Dabz Apparel job orders | Not started |
 | 7 | DabzTech Solutions job tickets | Not started |
@@ -271,14 +271,143 @@ Then, with Supabase connected and **all three** migration files run:
 
 ---
 
-## Phase 3 — Staff, attendance, payroll (next)
+## Phase 3 — Staff, attendance, payroll ✅
 
-Needs open decision **17.6** (half days: half the daily rate, or a manual
-amount?), and the staff daily rates themselves.
+**Built**
 
-- Staff profiles with photo, daily rate and the rest of spec 13.1.
-- The time clock: tap your photo to time in and out, with late and absent flags.
-- Weekly payroll at a daily rate, with the per-day overtime choice from
-  spec 13.3, cash advance deductions, payslips and locking.
-- Once daily rates exist, payroll joins the daily target, and the Overview stops
-  under-reporting what the shop needs each day.
+*Staff (spec 13.1)*
+- Employee records with position, contact, address, emergency contact, start
+  date, divisions and **daily rate**.
+- **A login is optional.** An employee and an account are two different things:
+  someone who only taps the time clock has a staff record and no login at all.
+  That is why `staff` is its own table rather than more columns on `profiles`.
+- Logins and permissions moved to their own **Accounts** screen, so "staff"
+  means the people you employ and "accounts" means who can sign in.
+- Deactivating keeps every record; nothing is deleted.
+
+*Time clock (spec 13.2)*
+- Tap your name to time in and out, with a confirmation step.
+- Who is currently in, and today's log with hours, **⚠ Late** and
+  **⚠ No time out** flags.
+- Owner/Admin can correct or remove a shift, written to the audit log with the
+  old and new times.
+- One shift per person per day, enforced by the database, so pressing Time in
+  twice is harmless.
+
+*Weekly payroll (spec 13.3)*
+- A table of the seven days with time in/out, hours, and the owner's choice of
+  **Full day / Half day / Absent**.
+- **A half day pays half the daily rate** — the owner's answer to open decision
+  17.6.
+- Overtime is the owner's choice per day: the hours are recorded either way,
+  and leaving the OT pay blank pays nothing.
+- Bonus line, cash advance deduction, gross and net.
+- **Mark paid** records the wages leaving the shop and locks the week. Only the
+  owner can unlock it, and must give a reason.
+- Printable payslip with a signature line. Past weeks are kept with the rate
+  that was actually paid.
+
+*Cash advances (spec 13.4)*
+- Recorded with the money leaving the shop on the day it is handed over.
+- Running balance per person, and a shop-wide total on the Overview.
+- On payday the owner chooses how much to take; the rest carries over.
+
+*The daily target now includes wages*
+Each active staff member's daily rate × the working days in a month is added to
+the bills. While anyone still has no rate, the Overview says the target is short
+rather than pretending wages cost nothing.
+
+**Three rules the money depends on**
+
+1. **The rate is copied onto the week, not looked up.** Giving someone a raise
+   must not rewrite what they were paid last month.
+2. **A deduction never takes net pay below zero.** Whatever will not fit stays
+   owed for next payday, and the owner is told.
+3. **A paid week is locked by the database, not the app.** The update policy
+   only matches draft weeks, so a paid week cannot be edited at all — and
+   `unlock_payroll_week` is the single sanctioned way past it.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Money, dates, payroll, attendance, half days, advances | `npm test` | 234 tests |
+| Security and money guarantees against a real PostgreSQL | `npm run test:rls` | 106 checks |
+| Every table and column the app asks for exists | `npm run check:schema` | 17 tables, 336 columns |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+What the database tests prove, rather than assert in a comment:
+
+- A staff member sees **their own** employee record, attendance, payslips and
+  advance balance — and not one colleague's wage, address or emergency contact.
+- Staff cannot raise their own daily rate, give themselves an advance, or create
+  a payroll week.
+- Staff cannot rewrite a finished shift to add hours.
+- An inactive staff member cannot be clocked in.
+- A paid week cannot be rewritten, its days cannot be changed, and it cannot be
+  deleted. An admin cannot unlock it; only the owner, and only with a reason.
+- Unlocking **voids** the wages ledger entry but **removes** the advance
+  repayment — because the repayment claims the balance owed went down, and if
+  the wages were not really paid, it did not.
+
+**Three real bugs these checks caught**, worth recording because none would
+have been obvious from reading the code:
+
+1. The time clock policy checked "is this person active?" with a sub-query
+   against `staff` — which is itself row-protected, so a staff member could not
+   clock in a colleague they cannot *see*. Fixed with a `SECURITY DEFINER`
+   helper.
+2. The paid-week lock worked so well it blocked the unlock function too. That
+   function is now `SECURITY DEFINER` with its own owner check, making it the
+   one sanctioned way past the lock rather than loosening the policy.
+3. The payslip worked out "Day pay" by subtracting from the stored total, so it
+   could print a figure that did not match its own rows. It now adds up the rows
+   it prints, and says so out loud if the stored total disagrees.
+
+Plus one found by looking at the printed page: the print styles hid every
+`<header>`, including the payslip's own — printing a slip with no shop name, no
+week and no staff name on it.
+
+**Not verified here** — signing in and the live database still need a real
+Supabase project. The screens were checked by rendering them against fixture
+data in a throwaway copy; the real tree carries no fixture code.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 234 passed
+npm run dev
+```
+
+With Supabase connected and **all four** migrations run:
+
+1. Open **Staff** and add each person with their **daily rate**. Leave the
+   login blank for anyone who only uses the time clock.
+2. Open **Home**: the daily target should now include wages, not just bills.
+3. Open **Time clock**, tap a name to time in, then time out. Check the log
+   shows the hours, and a **⚠ Late** flag if they arrived after opening time.
+4. Open **Payroll**, pick the week, and check the days were filled in from the
+   time clock. Set one day to **Half day** and confirm it pays exactly half.
+5. Give someone a cash advance on the **Staff** screen, then deduct part of it
+   on their payslip and confirm the balance carries the rest over.
+6. **Mark paid**, open the payslip, and print it (Ctrl+P). Then try to change
+   the week — it should be locked.
+7. As the owner, unlock it with a reason, and check **Money in/out**: the wages
+   entry should be voided rather than gone.
+
+---
+
+## Phase 4 — Customers and the Dabz Printshoppe POS (next)
+
+Needs the answers marked **needed for Phase 4** in [DECISIONS.md](DECISIONS.md):
+the receipt printer (17.3), the Printshoppe prices behind each colour tier and
+the bulk discount rules (17.9), and whether to add Maya alongside Cash, GCash
+and Bank (17.12).
+
+- Customers, shared across all three divisions.
+- The POS rules from spec 6: always starts blank, quantity confirmed before a
+  line is added, discounts within the limits already in Settings, change
+  computed instantly.
+- Printshoppe presets, the tarpaulin calculator, and the new-product box.
+- Receipts, void requests, and end-of-day closing.

@@ -74,9 +74,23 @@ function extractUsages(source, file) {
 
     // .insert({ a: ..., b: ... }) and .update({ ... }), including the
     // shorthand spread form used for settings.
+    //
+    // A ternary inside a value - `{ profile_id: id === "" ? null : id }` -
+    // also matches "something followed by a colon", so JavaScript's own words
+    // are skipped rather than reported as missing columns.
+    const NOT_COLUMNS = new Set([
+      "null",
+      "undefined",
+      "true",
+      "false",
+      "default",
+      "case",
+      "return",
+    ]);
+
     for (const write of chain.matchAll(/\.(?:insert|update|upsert)\(\s*\{([\s\S]{0,600}?)\}\s*\)/g)) {
       for (const key of write[1].matchAll(/(?:^|[\s,{])([a-z_][a-z0-9_]*)\s*:/g)) {
-        columns.add(key[1]);
+        if (!NOT_COLUMNS.has(key[1])) columns.add(key[1]);
       }
     }
 

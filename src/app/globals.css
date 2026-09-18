@@ -114,3 +114,38 @@ body {
 :root[data-theme="dark"] {
   color-scheme: dark;
 }
+
+/* Printing (spec 13.3 payslips, and receipts from Phase 4).
+   Screen furniture is dropped and the page forced to black on white, because a
+   payslip is signed on paper and a dark background would empty the ink. */
+@media print {
+  :root,
+  :root[data-theme="dark"] {
+    --page: #ffffff;
+    --surface: #ffffff;
+    --ink: #000000;
+    --muted: #444444;
+    --line: #999999;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  /*
+    Only the app's own chrome is dropped - the top bar and page footer, which
+    are direct children of <body>. A bare `header { display: none }` would also
+    hide the payslip's own heading, printing a slip with no shop name, no week
+    and no staff name on it.
+  */
+  body > header,
+  body > footer {
+    display: none !important;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

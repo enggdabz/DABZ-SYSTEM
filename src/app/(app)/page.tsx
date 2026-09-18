@@ -8,8 +8,21 @@ import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
 import { PERMISSION_INFO, isOwnerOrAdmin, type Permission } from "@/lib/auth/permissions";
 import { monthTotals } from "@/lib/bills";
 import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom } from "@/lib/data/money";
-import { formatPesos } from "@/lib/money";
-import { currentPeriod, formatPeriod, manilaToday } from "@/lib/period";
+import {
+  getAdvanceBalances,
+  getEstimatedMonthlyPayroll,
+  getPayrollWeeks,
+  getStaff,
+} from "@/lib/data/staff";
+import { formatPesos, sumCentavos } from "@/lib/money";
+import {
+  civilDateToISO,
+  currentPeriod,
+  formatPeriod,
+  formatWeekRange,
+  manilaToday,
+  startOfWeek,
+} from "@/lib/period";
 import { computeDailyTarget, targetProgress } from "@/lib/target";
 
 export const metadata = { title: "Overview · Dabz System" };
@@ -87,11 +100,16 @@ async function OwnerOverview() {
   const period = currentPeriod();
   const today = manilaToday();
 
-  const [money, bills, payments] = await Promise.all([
-    getOverviewMoney(),
-    getBills(),
-    getBillPayments(period),
-  ]);
+  const [money, bills, payments, payrollEstimate, staff, balances, weeks] =
+    await Promise.all([
+      getOverviewMoney(),
+      getBills(),
+      getBillPayments(period),
+      getEstimatedMonthlyPayroll(),
+      getStaff(),
+      getAdvanceBalances(),
+      getPayrollWeeks({ limit: 200 }),
+    ]);
 
   const billTotals = monthTotals({
     bills,
@@ -100,13 +118,26 @@ async function OwnerOverview() {
     today,
   });
 
-  // Payroll is null until staff daily rates exist in Phase 3, so the target
-  // covers bills only and says so rather than quietly understating itself.
+  /*
+    The target now includes wages, as spec 12.3 asks: each active staff
+    member's daily rate times the working days in a month. It stays null while
+    nobody has a rate set, so the screen says the target is incomplete rather
+    than pretending wages cost nothing.
+  */
   const target = computeDailyTarget({
     monthlyBillsCentavos: money.monthlyBillsCentavos,
-    monthlyPayrollCentavos: null,
+    monthlyPayrollCentavos: payrollEstimate.centavos,
     workingDaysPerMonth: settings.workingDaysPerMonth,
   });
+
+  const thisWeekStart = startOfWeek(today, settings.weekStartsOn);
+  const thisWeeksPayroll = weeks.filter(
+    (week) => civilDateToISO(week.weekStart) === civilDateToISO(thisWeekStart),
+  );
+  const activeStaff = staff.filter((member) => member.status === "active");
+  const totalAdvances = sumCentavos(
+    activeStaff.map((member) => balances.get(member.id) ?? 0),
+  );
 
   const progress = targetProgress({
     achievedCentavos: money.todayIncomeCentavos,
@@ -145,21 +176,52 @@ async function OwnerOverview() {
         </div>
 
         <p className="mt-4 text-sm text-muted">
-          The target is {formatPesos(money.monthlyBillsCentavos)} of monthly
-          bills divided by {settings.workingDaysPerMonth} working days.
+          {formatPesos(money.monthlyBillsCentavos)} of monthly bills
+          {payrollEstimate.centavos !== null
+            ? ` plus ${formatPesos(payrollEstimate.centavos)} of wages`
+            : ""}
+          , divided by {settings.workingDaysPerMonth} working days.
         </p>
 
         <div className="mt-4">
-          <Notice tone="attention" title="This target is still too low, and today's figure is sales, not profit">
-            <p>
-              Two things are missing until later phases. Payroll is not in the
-              target yet, because staff daily rates arrive in Phase 3 - so the
-              real number you need is higher. And the figure above is money in,
-              not profit: material costs are not tracked until Phase 5, so
-              PHP 5,000 of tarpaulin sales that used PHP 2,000 of vinyl still
-              counts as PHP 5,000 here.
-            </p>
-          </Notice>
+          {payrollEstimate.centavos === null ? (
+            <Notice
+              tone="attention"
+              title="This target covers bills only, so it is too low"
+            >
+              <p>
+                No staff daily rates have been set yet, so wages are not in the
+                target. Set them on the{" "}
+                <Link href="/staff" className="underline">
+                  Staff
+                </Link>{" "}
+                screen and this number will include payroll.
+              </p>
+            </Notice>
+          ) : payrollEstimate.staffWithoutRates > 0 ? (
+            <Notice
+              tone="attention"
+              title={`${payrollEstimate.staffWithoutRates} staff ${payrollEstimate.staffWithoutRates === 1 ? "member has" : "members have"} no daily rate, so the target is still short`}
+            >
+              <p>
+                Wages for {payrollEstimate.staffWithRates} of{" "}
+                {payrollEstimate.staffWithRates + payrollEstimate.staffWithoutRates}{" "}
+                staff are counted. Set the rest on the{" "}
+                <Link href="/staff" className="underline">
+                  Staff
+                </Link>{" "}
+                screen.
+              </p>
+            </Notice>
+          ) : (
+            <Notice tone="info" title="Today's figure is sales, not profit yet">
+              <p>
+                Material costs are not tracked until Phase 5, so PHP 5,000 of
+                tarpaulin sales that used PHP 2,000 of vinyl still counts as
+                PHP 5,000 here. The target itself now includes bills and wages.
+              </p>
+            </Notice>
+          )}
         </div>
       </Card>
 
@@ -237,6 +299,47 @@ async function OwnerOverview() {
           </Link>
         </Card>
       </div>
+
+      {activeStaff.length > 0 ? (
+        <div className="grid gap-5 lg:grid-cols-2">
+          <Card title={`Payroll, week of ${formatWeekRange(thisWeekStart)}`}>
+            <p className="text-3xl font-semibold tracking-tight">
+              {formatPesos(
+                sumCentavos(thisWeeksPayroll.map((week) => week.netCentavos)),
+              )}
+            </p>
+            <dl className="mt-4 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <dt className="text-muted">Active staff</dt>
+                <dd className="font-medium">{activeStaff.length}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-muted">Weeks not yet paid</dt>
+                <dd className="font-medium">
+                  {thisWeeksPayroll.filter((week) => week.status === "draft").length}
+                </dd>
+              </div>
+            </dl>
+            <Link href="/payroll" className="mt-4 inline-block text-sm underline">
+              Open payroll
+            </Link>
+          </Card>
+
+          <Card title="Cash advances outstanding">
+            <p className="text-3xl font-semibold tracking-tight">
+              {formatPesos(totalAdvances)}
+            </p>
+            <p className="mt-3 text-sm text-muted">
+              {totalAdvances > 0
+                ? "Taken off payslips when you choose to, on payday."
+                : "Nobody owes an advance."}
+            </p>
+            <Link href="/staff" className="mt-4 inline-block text-sm underline">
+              Open staff
+            </Link>
+          </Card>
+        </div>
+      ) : null}
 
       <Card title={`Money this month (${formatPeriod(period)})`}>
         <dl className="grid gap-4 sm:grid-cols-3">

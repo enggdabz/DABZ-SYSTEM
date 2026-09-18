@@ -49,6 +49,7 @@ Repeat step 2 for each remaining migration file, **in number order**:
 |---|---|
 | `0001_phase1_foundation.sql` | Accounts, permissions, settings, the audit log, sign-in history |
 | `0002_phase2_money.sql` | Bills, loans and the money in/out ledger — **and seeds your eleven real bills and six loans** |
+| `0003_phase3_staff.sql` | Staff records, the time clock, weekly payroll and cash advances |
 
 Every table gets Row Level Security switched on.
 
@@ -110,6 +111,16 @@ Save.
 While you are there, open **Loans** and enter each interest rate from your
 statements. Without the rate the system cannot tell you whether a balance is
 growing — which is the single most useful thing it can say about a debt.
+
+### 7. Add your staff and their daily rates
+
+Open **Staff** and add each person. The **daily rate** is the important one:
+payroll will not guess a wage, and until at least one rate is set the daily
+target on the Home screen covers bills only and says so.
+
+Leave the login blank for anyone who only uses the time clock — that is a
+supported setup, not a gap. Give a login to the people who need to see their own
+attendance and payslips, or to use the POS later.
 
 ### ⚠ About the keys
 

@@ -122,3 +122,29 @@ round trip is the one thing that must be tried against a real project.
   interest rate are real states, shown with a warning and an editable field.
   Never substitute a default for something only the owner can know — a
   confident wrong warning is worse than none, because it gets trusted.
+
+## Payroll rules (built in Phase 3)
+
+- **An employee is not an account.** `staff` holds people the shop pays;
+  `profiles` holds people who can sign in. `staff.profile_id` is nullable
+  because spec 13.1 makes a login optional. Never require one.
+- **A half day pays half the daily rate** (open decision 17.6, answered). What
+  makes a day a half day is the OWNER'S choice, stored on `payroll_days`; the
+  system may suggest it from the hours worked but never decides.
+- **The daily rate is copied onto the payroll week**, not read live from
+  `staff`. A later raise must not rewrite what someone was paid last month.
+- **A cash advance deduction is capped at gross pay.** Net pay can never go
+  negative; the remainder carries over and the owner is told.
+- **A paid week is locked by the database.** The update policy on
+  `payroll_weeks` only matches `status = 'draft'`, so a paid week cannot be
+  edited at all. `unlock_payroll_week` is `SECURITY DEFINER` and is the single
+  sanctioned way past that lock — do not loosen the policy instead.
+- **A policy sub-query is subject to RLS too.** Checking a row in another
+  protected table from inside a policy needs a `SECURITY DEFINER` helper (see
+  `is_active_staff`), or the check silently fails for the very people it is
+  meant to allow.
+- **A printed document adds up its own rows.** Never derive a total on a
+  payslip or receipt by subtracting from a stored figure — if they disagree,
+  show the disagreement.
+- Print styles must target `body > header` / `body > footer`, never bare
+  `header`, or a document's own heading disappears from the page.

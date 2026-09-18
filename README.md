@@ -7,9 +7,9 @@ point of sale, job orders, repairs and stock.
 Owner: Eddie boy Garcia · Founded 18 June 2017 · Philippines · Philippine peso
 (₱) · Asia/Manila
 
-> **Status: Phase 2 complete.** Logins and permissions work, and so do bills,
-> loans, the money in/out ledger and the daily target — seeded with the shop's
-> real figures. Staff, the time clock and payroll are Phase 3. See
+> **Status: Phase 3 complete.** Logins, bills, loans and the ledger all work,
+> and so do staff records, the time clock, weekly payroll, cash advances and
+> printable payslips. The POS is Phase 4. See
 > [docs/PHASES.md](docs/PHASES.md).
 
 ---
@@ -67,7 +67,7 @@ on the database card. That is expected on day one.
 ### Connecting the database
 
 1. Follow [docs/SETUP.md](docs/SETUP.md) to create the free Supabase project and
-   run the three migration files, in number order.
+   run the four migration files, in number order.
 2. Copy the settings template and fill in the three values:
    ```bash
    cp .env.example .env.local
@@ -112,8 +112,8 @@ developing, not for the shop. Everything else runs anywhere.
 ### What a passing test run looks like
 
 ```
- Test Files  8 passed (8)
-      Tests  184 passed (184)
+ Test Files  9 passed (9)
+      Tests  234 passed (234)
 ```
 
 If it says **failed**, read the lines above it — Vitest prints what it expected

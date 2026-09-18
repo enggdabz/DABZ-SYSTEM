@@ -162,3 +162,86 @@ export function manilaMonthRangeUtc(period: Period): { from: string; to: string 
 export function periodToMonthStartISO(period: Period): string {
   return `${periodKey(period)}-01`;
 }
+
+// ---------------------------------------------------------------------------
+// Payroll weeks (spec 2.1, 13.3)
+// ---------------------------------------------------------------------------
+
+export type WeekStart = "monday" | "sunday";
+
+/**
+ * The first day of the week a date falls in.
+ *
+ * Which day a week starts on is a setting, because payroll weeks have to match
+ * how the shop actually counts them (spec 2.1 defaults to Monday). Getting this
+ * wrong would put a day's wages in the wrong week.
+ */
+export function startOfWeek(date: CivilDate, weekStartsOn: WeekStart): CivilDate {
+  const asUtc = new Date(Date.UTC(date.year, date.month - 1, date.day));
+  // getUTCDay: 0 = Sunday ... 6 = Saturday
+  const dayOfWeek = asUtc.getUTCDay();
+  const offset =
+    weekStartsOn === "monday"
+      ? // Monday is 1, so Sunday (0) belongs to the week that began 6 days ago.
+        (dayOfWeek + 6) % 7
+      : dayOfWeek;
+
+  asUtc.setUTCDate(asUtc.getUTCDate() - offset);
+
+  return {
+    year: asUtc.getUTCFullYear(),
+    month: asUtc.getUTCMonth() + 1,
+    day: asUtc.getUTCDate(),
+  };
+}
+
+/** The seven days of the week beginning at `weekStart`. */
+export function weekDays(weekStart: CivilDate): CivilDate[] {
+  return Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+}
+
+export function addDays(date: CivilDate, days: number): CivilDate {
+  const asUtc = new Date(Date.UTC(date.year, date.month - 1, date.day));
+  asUtc.setUTCDate(asUtc.getUTCDate() + days);
+  return {
+    year: asUtc.getUTCFullYear(),
+    month: asUtc.getUTCMonth() + 1,
+    day: asUtc.getUTCDate(),
+  };
+}
+
+/** "Mon", "Tue", ... for the payroll table. */
+export function weekdayName(date: CivilDate): string {
+  return new Intl.DateTimeFormat("en-PH", {
+    weekday: "short",
+    timeZone: "UTC",
+  }).format(new Date(Date.UTC(date.year, date.month - 1, date.day)));
+}
+
+/** "1-7 Sep 2026" / "29 Sep - 5 Oct 2026", for a payroll week heading. */
+export function formatWeekRange(weekStart: CivilDate): string {
+  const end = addDays(weekStart, 6);
+  const sameMonth = weekStart.year === end.year && weekStart.month === end.month;
+
+  const monthName = (date: CivilDate) =>
+    new Intl.DateTimeFormat("en-PH", { month: "short", timeZone: "UTC" }).format(
+      new Date(Date.UTC(date.year, date.month - 1, date.day)),
+    );
+
+  if (sameMonth) {
+    return `${weekStart.day}–${end.day} ${monthName(end)} ${end.year}`;
+  }
+  if (weekStart.year === end.year) {
+    return `${weekStart.day} ${monthName(weekStart)} – ${end.day} ${monthName(end)} ${end.year}`;
+  }
+  return `${weekStart.day} ${monthName(weekStart)} ${weekStart.year} – ${end.day} ${monthName(end)} ${end.year}`;
+}
+
+/** How long the scheduled working day is, in hours. */
+export function scheduledHours(workDayStart: string, workDayEnd: string): number {
+  const toMinutes = (time: string) => {
+    const [hours, minutes] = time.split(":").map(Number);
+    return hours * 60 + minutes;
+  };
+  return Math.max(0, (toMinutes(workDayEnd) - toMinutes(workDayStart)) / 60);
+}

@@ -9,6 +9,7 @@ for each one **before the phase that needs it**, rather than all at once.
 |---|---|---|---|
 | 17.1 | Technology and hosting | **Approved:** Next.js + TypeScript + Supabase + Vercel, as in spec section 2 | 18 Sep 2026 |
 | 17.4 | Default theme | **Dark mode**, with a light/dark switch available | 18 Sep 2026 |
+| 17.6 | Half days | **Half the daily rate.** A ₱500 daily rate pays ₱250 for a half day | 18 Sep 2026 |
 
 Still open from 17.1: **is there a monthly hosting budget limit?** The free
 tiers cover the shop for now (see [SETUP.md](SETUP.md#what-this-costs)), so this
@@ -48,12 +49,13 @@ missing pieces, the screens ask for them and warn until they are filled in.
 **Why nothing was guessed:** a made-up due day would produce confident, wrong
 warnings — worse than no warning at all, because you would start trusting them.
 
-## Needed for Phase 3 — Staff and payroll (next)
+## Asked for Phase 3, and now waiting on you in the app
 
-| # | Question |
-|---|---|
-| 17.6 | **Half days:** half the daily rate, or a manual amount each time? |
-| — | **Each staff member's daily rate**, so payroll can join the daily target. Until then the target covers bills only and is too low |
+| # | Question | Where to answer it |
+|---|---|---|
+| — | **Each staff member's daily rate** | **Staff** screen. Until a rate is set, payroll will not guess a wage, and the daily target says it is short |
+| 17.5 | The real **shop hours** and which day is **payday** | **Settings**. Shop hours decide who is marked late and how overtime hours are counted, so the 8:00–17:00 default is worth correcting |
+| 17.2 | **Devices** — one shared computer, or each person's own phone? | Affects the time clock. It is built for the shared case: anyone signed in can tap a colleague in, and who pressed the button is recorded. If each person should only clock themselves in, say so and I will tighten it (that needs every staff member to have a login) |
 
 ## Needed for Phase 4 — POS and receipts
 
@@ -115,5 +117,14 @@ to ask:
 - Undoing a bill payment **voids** its ledger entry but **removes** the loan
   payment. The first is a record that money moved; the second is a claim the
   balance went down, which is no longer true.
+- A **half day pays half the daily rate**, rounded to the nearest centavo. On a
+  whole-peso rate the halves are exact; an odd-centavo rate can differ from a
+  true half by one centavo.
+- **What makes a day a half day is the owner's choice**, set on the payroll
+  screen, exactly like the overtime choice in spec 13.3. The system suggests it
+  when someone worked less than half the scheduled hours, but never decides it -
+  a wrongly guessed half day is a wrong wage.
+- A **cash advance deduction is capped at gross pay**, so net pay can never go
+  negative. The remainder carries over to the next payday (spec 13.4).
 - Money is never hard-deleted by staff; corrections go through voids and
   adjustments with a reason (spec 2.1).
