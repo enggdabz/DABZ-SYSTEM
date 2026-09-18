@@ -21,6 +21,15 @@ export interface AppSettings {
   unclaimedUnitDays: number;
   /** Which paper receipts print on (open decision 17.3). */
   receiptPaper: ReceiptPaper;
+  /**
+   * Share of a Dabz Apparel order asked for up front (open decision 17.10).
+   *
+   * NULL until the owner sets one. The specification offers "e.g. 50%", which
+   * is an example rather than the owner saying so - and a made-up policy would
+   * have staff turning away a customer who paid what the owner actually
+   * wanted.
+   */
+  apparelDownPaymentPercent: number | null;
 }
 
 /**
@@ -59,6 +68,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultWarrantyDays: 30, // spec 9.3
   unclaimedUnitDays: 30, // spec 9.4
   receiptPaper: "thermal_58", // open decision 17.3, decided
+  apparelDownPaymentPercent: null, // open decision 17.10, never guessed
 };
 
 /** Shape of the settings row as it comes back from PostgreSQL. */
@@ -74,6 +84,7 @@ export interface SettingsRow {
   default_warranty_days: number;
   unclaimed_unit_days: number;
   receipt_paper?: string;
+  apparel_down_payment_percent?: string | number | null;
 }
 
 export function settingsFromRow(row: SettingsRow): AppSettings {
@@ -95,6 +106,12 @@ export function settingsFromRow(row: SettingsRow): AppSettings {
     )
       ? (row.receipt_paper as ReceiptPaper)
       : "thermal_58",
+    apparelDownPaymentPercent:
+      row.apparel_down_payment_percent === null ||
+      row.apparel_down_payment_percent === undefined ||
+      row.apparel_down_payment_percent === ""
+        ? null
+        : Number(row.apparel_down_payment_percent),
   };
 }
 
@@ -127,6 +144,8 @@ export function validateSettingsForm(form: {
   defaultWarrantyDays: string;
   unclaimedUnitDays: string;
   receiptPaper: string;
+  /** Empty means "no policy", which is a real answer, not zero. */
+  apparelDownPaymentPercent: string;
 }): SettingsValidation {
   const errors: Record<string, string> = {};
 
@@ -199,6 +218,18 @@ export function validateSettingsForm(form: {
     errors.receiptPaper = "Choose which paper receipts print on.";
   }
 
+  // Blank stays blank: "no down payment policy" is a real state, and a zero
+  // would read as "ask for nothing", which is a different thing.
+  let downPayment: number | null = null;
+  const downPaymentText = form.apparelDownPaymentPercent.trim();
+  if (downPaymentText !== "") {
+    downPayment = Number(downPaymentText);
+    if (!Number.isFinite(downPayment) || downPayment < 0 || downPayment > 100) {
+      errors.apparelDownPaymentPercent =
+        "Leave empty for no policy, or enter a percentage from 0 to 100.";
+    }
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -217,6 +248,7 @@ export function validateSettingsForm(form: {
       defaultWarrantyDays: warrantyDays,
       unclaimedUnitDays: unclaimedDays,
       receiptPaper: form.receiptPaper as ReceiptPaper,
+      apparelDownPaymentPercent: downPayment,
     },
   };
 }
@@ -235,6 +267,7 @@ export function settingsToRow(settings: AppSettings): SettingsRow {
     default_warranty_days: settings.defaultWarrantyDays,
     unclaimed_unit_days: settings.unclaimedUnitDays,
     receipt_paper: settings.receiptPaper,
+    apparel_down_payment_percent: settings.apparelDownPaymentPercent,
   };
 }
 

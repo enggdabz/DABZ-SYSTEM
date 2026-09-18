@@ -169,6 +169,34 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
+          <h2 className="text-lg font-semibold tracking-tight">Dabz Apparel</h2>
+          <p className="mt-1 text-sm text-muted">
+            How much of a job order you ask for up front. Leaving this empty is
+            a real answer: the order screen then asks for whatever the customer
+            actually hands over, and never says a payment is short.
+          </p>
+        </div>
+
+        <Field
+          label="Down payment asked for (%)"
+          hint="Leave empty for no policy. Enter 50 to ask for half."
+          error={errors.apparelDownPaymentPercent}
+        >
+          <Input
+            name="apparelDownPaymentPercent"
+            inputMode="decimal"
+            placeholder="e.g. 50"
+            defaultValue={
+              settings.apparelDownPaymentPercent === null
+                ? ""
+                : String(settings.apparelDownPaymentPercent)
+            }
+          />
+        </Field>
+      </section>
+
+      <section className="space-y-5">
+        <div>
           <h2 className="text-lg font-semibold tracking-tight">DabzTech repairs</h2>
           <p className="mt-1 text-sm text-muted">
             Set now, used from Phase 7. Confirm these against how you actually

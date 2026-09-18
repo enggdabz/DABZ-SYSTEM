@@ -229,3 +229,32 @@ round trip is the one thing that must be tried against a real project.
   wages and cash advances do NOT, because the target exists to pay for those -
   subtracting them as well would count them twice. The rule lives in
   `countsAgainstDailyTarget()`, not in a screen.
+
+## Apparel rules (built in Phase 6)
+
+- **A roster IS the quantity.** Fifteen names means fifteen jerseys. A typed
+  quantity beside a name list is a second answer to the same question, and the
+  names are the one the customer checked. `lineTotal()` uses the roster when
+  there is one and the typed quantity only when there is not.
+- **The size surcharge is COPIED onto each roster entry** when it is added, not
+  looked up when the total is shown. Raising the 2XL surcharge next month must
+  never rewrite a quote the customer already agreed to. A test proves it.
+- **An order's total is never stored.** It is added up from its lines and
+  roster every time, the same rule as a payslip and a receipt. A stored total
+  and a name list can disagree, and a customer holding the job order sheet will
+  believe whichever is larger.
+- **`record_apparel_payment` is the only way money reaches the ledger**, and it
+  refuses a split that does not add back up to the payment. The split is worked
+  out on the SERVER from the order's own lines, never taken from the browser -
+  the same shape as `complete_sale` and `record_expense`.
+- **A payment is voided, never deleted**, and its ledger entries are voided with
+  it. Staff may take a payment; only Owner/Admin may void one (spec 4.4).
+- **An order may be released with money still owed.** A shop does let a regular
+  take the jerseys, so the system says so and keeps the order on the list rather
+  than refusing - an order that disappears is an order nobody chases.
+- **An order is cancelled with a reason, never deleted.** There is no delete
+  policy at all; the customer may be holding the sheet.
+- The down payment percentage is **null until the owner sets one**. Spec 17.10
+  offers "e.g. 50%", which is an example, not the owner saying so - a made-up
+  policy would have staff turning away a customer who paid what the owner
+  actually wanted.

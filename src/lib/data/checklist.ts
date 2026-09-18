@@ -18,6 +18,8 @@ import { getBills, getLoans } from "@/lib/data/money";
 import { getAllProducts } from "@/lib/data/pos";
 import { getStaff } from "@/lib/data/staff";
 import { getStockItems } from "@/lib/data/stocks";
+import { getApparelProducts, getSizePrices } from "@/lib/data/apparel";
+import { getSettings } from "@/lib/auth/dal";
 
 export interface ChecklistItem {
   id: string;
@@ -39,13 +41,17 @@ export interface Checklist {
 }
 
 export const getChecklist = cache(async (): Promise<Checklist> => {
-  const [bills, loans, staff, products, stockItems] = await Promise.all([
-    getBills(),
-    getLoans(),
-    getStaff(),
-    getAllProducts(),
-    getStockItems(),
-  ]);
+  const [bills, loans, staff, products, stockItems, apparelItems, sizes, settings] =
+    await Promise.all([
+      getBills(),
+      getLoans(),
+      getStaff(),
+      getAllProducts(),
+      getStockItems(),
+      getApparelProducts(),
+      getSizePrices(),
+      getSettings(),
+    ]);
 
   const items: ChecklistItem[] = [];
 
@@ -170,6 +176,50 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       names: [],
       href: "/stocks",
       linkLabel: "Open Stocks",
+      important: false,
+    });
+  }
+
+  const apparelWithoutPrice = apparelItems.filter(
+    (item) => item.active && item.basePriceCentavos === null,
+  );
+  if (apparelWithoutPrice.length > 0) {
+    items.push({
+      id: "apparel-prices",
+      title: `${apparelWithoutPrice.length} apparel item${
+        apparelWithoutPrice.length === 1 ? "" : "s"
+      } with no price`,
+      why: "A job order still works - whoever writes one is asked for the price - but two people quoting the same jersey will quote it differently.",
+      names: apparelWithoutPrice.map((item) => item.name),
+      href: "/apparel/prices",
+      linkLabel: "Open apparel prices",
+      important: true,
+    });
+  }
+
+  const sizesWithoutPrice = sizes.filter((size) => size.extraCentavos === null);
+  if (sizesWithoutPrice.length > 0) {
+    items.push({
+      id: "apparel-size-prices",
+      title: `${sizesWithoutPrice.length} apparel size${
+        sizesWithoutPrice.length === 1 ? "" : "s"
+      } with no add-on`,
+      why: "A 2XL costs more fabric to make. Until you say how much, those sizes go onto an order at no extra charge - which is not the same as free, only unknown.",
+      names: sizesWithoutPrice.map((size) => size.size),
+      href: "/apparel/prices",
+      linkLabel: "Open apparel prices",
+      important: false,
+    });
+  }
+
+  if (settings.apparelDownPaymentPercent === null) {
+    items.push({
+      id: "apparel-down-payment",
+      title: "No down payment policy for apparel",
+      why: "The order screen asks for whatever the customer hands over and never says a payment is short. Set a percentage and it starts checking.",
+      names: [],
+      href: "/settings",
+      linkLabel: "Open Settings",
       important: false,
     });
   }

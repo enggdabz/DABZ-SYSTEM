@@ -10,6 +10,8 @@ import { monthTotals } from "@/lib/bills";
 import { getChecklist } from "@/lib/data/checklist";
 import { getExpenses, getPayables } from "@/lib/data/expenses";
 import { getStockOverview } from "@/lib/data/stocks";
+import { getApparelOrders } from "@/lib/data/apparel";
+import { isOpenOrder } from "@/lib/apparel";
 import { expenseTotals, payableTotals } from "@/lib/expenses";
 import { formatQuantity } from "@/lib/quantity";
 import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom } from "@/lib/data/money";
@@ -117,6 +119,7 @@ async function OwnerOverview() {
     stock,
     expenses,
     payables,
+    apparelOrders,
   ] = await Promise.all([
     getOverviewMoney(),
     getBills(),
@@ -129,7 +132,17 @@ async function OwnerOverview() {
     getStockOverview(),
     getExpenses({ limit: 200 }),
     getPayables(),
+    getApparelOrders(),
   ]);
+
+  // Job orders that need a person: overdue, promised within days, or released
+  // with the money still owed (spec 8).
+  const apparelNeedingAttention = apparelOrders.filter(
+    (entry) => entry.warnings.length > 0 && entry.order.status !== "cancelled",
+  );
+  const apparelOpen = apparelOrders.filter((entry) =>
+    isOpenOrder(entry.order.status),
+  );
 
   const expenseSummary = expenseTotals(expenses);
   const payableSummary = payableTotals(payables, civilDateToISO(today));
@@ -411,6 +424,39 @@ async function OwnerOverview() {
             </Link>
           </Card>
         </div>
+      ) : null}
+
+      {apparelNeedingAttention.length > 0 ? (
+        <Card
+          title={`Apparel job orders needing attention (${apparelNeedingAttention.length})`}
+        >
+          <ul className="space-y-2">
+            {apparelNeedingAttention.slice(0, 5).map(({ order, warnings }) => (
+              <li
+                key={order.id}
+                className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+              >
+                <Link
+                  href={`/apparel/${order.id}`}
+                  className="font-medium underline-offset-2 hover:underline"
+                >
+                  {order.teamName ?? order.orderNumber}
+                </Link>
+                <span className="text-attention">
+                  <span aria-hidden="true">{"⚠"} </span>
+                  {warnings[0].label}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-sm text-muted">
+            {apparelOpen.length} order{apparelOpen.length === 1 ? "" : "s"} in
+            progress.
+          </p>
+          <Link href="/apparel" className="mt-2 inline-block text-sm underline">
+            Open Dabz Apparel
+          </Link>
+        </Card>
       ) : null}
 
       {stock.needingAttention.length > 0 ||

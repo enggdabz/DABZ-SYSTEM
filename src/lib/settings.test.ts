@@ -22,6 +22,7 @@ const goodForm = {
   defaultWarrantyDays: "30",
   unclaimedUnitDays: "30",
   receiptPaper: "thermal_58",
+  apparelDownPaymentPercent: "",
 };
 
 describe("validateSettingsForm", () => {

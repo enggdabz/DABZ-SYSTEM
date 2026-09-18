@@ -114,11 +114,23 @@ suppliers** (17.14), and your **main materials with their units, reorder levels
 and costs** (17.15). All of it goes in while the shop is running, and the
 **To fill in** screen lists whatever is still missing.
 
-## Needed for Phase 6 — Dabz Apparel
+## Decided for Phase 6 — Dabz Apparel job orders
 
-| # | Question |
-|---|---|
-| 17.10 | **Apparel pricing:** price per jersey set / shirt / jacket / long sleeves; size add-ons (2XL and up); fabric and collar options; down payment policy (e.g. 50%); DTF print prices |
+Made by me, per the owner's instruction to decide and revise later.
+
+| # | Question | What I decided | How to change it |
+|---|---|---|---|
+| — | The steps an order moves through | **Quoted → Confirmed → Layout approved → In production → Ready for pickup → Released**, plus Cancelled. "Layout approved" is its own step because a sublimation order stalls there more than anywhere else, waiting on the customer to say yes to the design | It is a fixed list in the code; tell me to add or drop a step |
+| — | Names, numbers and sizes | A **pasted list**, one player per line: `name, number, size`. A team captain sends a list — typing fifteen names into fifteen little forms is how a shop ends up keeping it on paper instead | — |
+| — | How a line is counted | The **name list is the quantity**. A typed quantity is used only when there is no list (50 plain shirts) | — |
+| — | Releasing with money owed | **Allowed**, and said out loud. A shop does let a regular take the jerseys; the order stays on the list until the balance is paid | — |
+| 17.10 | Down payment policy | **Left empty.** Spec 17.10 offers "e.g. 50%" as an example, not as your answer | **Settings → Dabz Apparel**. Until then the order screen asks for whatever the customer hands over and never calls a payment short |
+| 17.10 | Item prices and size add-ons | **The five items and the size ladder XS–5XL are seeded with NO amounts** | **Apparel → Set the apparel prices** |
+| 17.10 | Fabric and collar options | **None seeded** — those are your suppliers and your words. The order form takes free text, so no job is ever blocked, and the list is only a shortcut | Add them on the apparel prices screen |
+
+**What this means in practice:** a job order works today. Write the team, paste
+the names, and the price is asked for on each line. Filling in the price list
+only makes it faster and stops two people quoting the same jersey differently.
 
 ## Needed for Phase 7 — DabzTech
 
@@ -183,3 +195,10 @@ to ask:
 - The daily target now measures **profit**: today's income less today's
   materials and running costs. Bills, loan payments, wages and cash advances
   are excluded, because the target is what pays for them.
+- A **size surcharge is copied onto each name** when it is added, so raising it
+  later never rewrites a quote the customer already agreed to.
+- A size with **no surcharge set** goes onto an order at no extra charge, and
+  the screen says so when the list is pasted in. That is not the same as free —
+  it is unknown, and the order still has to total something.
+- An apparel **order number is `A-YYMMDD-NNN`**, counting orders within the day,
+  the same shape as a receipt number.

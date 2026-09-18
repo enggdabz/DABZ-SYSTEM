@@ -13,8 +13,8 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ Done |
 | 4 | Customers + Dabz Printshoppe POS | ✅ **Done — waiting on owner to confirm** |
 | 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — waiting on owner to confirm** |
-| 6 | Dabz Apparel job orders | Next |
-| 7 | DabzTech Solutions job tickets | Not started |
+| 6 | Dabz Apparel job orders | ✅ **Done — waiting on owner to confirm** |
+| 7 | DabzTech Solutions job tickets | Next |
 | 8 | Reports | Not started |
 | 9 | Later: public website, Messenger, Meta Ads, chatbot, notifications | Not in first build |
 
@@ -674,9 +674,115 @@ editor first. Then:
 
 ---
 
-## Phase 6 — Dabz Apparel job orders (next)
+## Phase 6 — Dabz Apparel job orders ✅
 
-Needs, when convenient: apparel pricing (17.10) — price per jersey set, shirt,
-jacket and long sleeves; size add-ons for 2XL and up; fabric and collar
-options; the down payment policy; and DTF print prices. As always, I will build
-the machinery and the prices stay empty until you give them.
+**Built**
+
+*The job order (spec 8)*
+- An order per team, numbered `A-260918-001`, with the customer optionally
+  linked to their record so their number is one tap away.
+- Six steps: **Quoted → Confirmed → Layout approved → In production → Ready for
+  pickup → Released**, plus Cancelled. "Layout approved" is its own step
+  because a sublimation order stalls there more than anywhere else, waiting on
+  the customer to say yes to the design — and "in production" would hide that.
+- Going **back** a step is a button too. A layout gets rejected after approval;
+  pretending otherwise means the screen stops matching the shop.
+- A **promised date** that may be left empty, with the order warning as the
+  date approaches and counting the days once it has passed.
+
+*The name list — the heart of a jersey order*
+- Players are **pasted in one go**, one per line: `name, number, size`. A team
+  captain sends a list; typing fifteen names into fifteen little forms is how a
+  shop ends up keeping the list on paper instead.
+- **The list is the quantity.** Fifteen names means fifteen jerseys. A typed
+  quantity is used only when there is no list — 50 plain shirts, no names.
+- Each name carries its own size add-on, **copied at the moment it is added**.
+  Raising the 2XL surcharge next month never rewrites a quote the customer
+  already agreed to; a test proves it, and so does a database check.
+
+*Money (spec 8, 10.1)*
+- A down payment and any number of later payments. The **balance is always
+  total less payments** — never typed, never stored.
+- A payment is **split across the income categories in the order** — jerseys
+  and jackets keep their own books — and the parts add back up to the payment
+  exactly. The database refuses any split that does not.
+- The split is worked out on the **server**, from the order's own lines, never
+  from anything the browser sent.
+- A payment is **voided, never deleted**, and its takings are voided with it.
+  Staff may take a payment; only Owner/Admin may void one.
+- **Releasing with money still owed is allowed** and said out loud. A shop does
+  let a regular take the jerseys — and the order stays on the list until the
+  balance is paid, because an order that disappears is an order nobody chases.
+
+*The printed job order sheet*
+- One copy for production, one for the customer. It carries the **whole name
+  list**, because production needs every size and the customer needs to check
+  their own spelling before anything is printed on a shirt.
+- Every figure on it is **added up from the rows printed above it** — the same
+  rule as a payslip and a receipt.
+
+*Prices, all of them empty*
+- The five items from your own list, the size ladder XS–5XL, and the fabric and
+  collar lists are all there with **no amounts at all**.
+- An order works anyway: whoever writes one is asked for the price, and the
+  screen marks any line nobody has priced. Filling the list in only makes it
+  faster and stops two people quoting the same jersey differently.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Line totals, size add-ons, balances, down payments, payment splits | `npm test` | 372 tests |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 194 checks |
+| That every table and column the app asks for exists | `npm run check:schema` | 37 tables, 568 columns |
+| Every screen at 390 / 768 / 1024 / 1440, every pop-up fully on screen | headless browser | 27 screens × 4 sizes |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The database tests worth knowing about prove, against a real PostgreSQL:
+
+- three jerseys with one 2XL come to exactly ₱2,000.00, from the rows alone;
+- raising the 2XL surcharge afterwards does **not** change that order;
+- a payment cannot be written straight to the table — only through the function,
+  which checks the permission itself;
+- a split that does not add up to the payment is refused outright;
+- voiding a payment voids its takings too, and cannot be done twice;
+- a job order cannot be deleted, and a cancelled one cannot take more money;
+- job orders and payments are invisible to staff without the permission, while
+  the price list is readable by anyone signed in.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 372 passed
+npm run dev
+```
+
+Run `supabase/migrations/0007_phase6_apparel.sql` in the Supabase SQL editor
+first. Then:
+
+1. Open **Apparel** and press **New job order**. Give it a team name.
+2. Press **Add an item**, choose Sublimation jersey set, and type a price —
+   it will ask, because nothing is priced yet.
+3. Press **Add names and sizes** and paste a few lines:
+   `Dela Cruz, 7, M` / `Santos, 23, 2XL`. The total follows the names.
+4. Open **Apparel → Set the apparel prices**, give 2XL an add-on, then go back:
+   the order you already wrote is **unchanged**. Add one more name and it picks
+   the new add-on up.
+5. Press **Take a payment** for part of the total, and check **Money in/out**:
+   the takings are there, tagged to Dabz Apparel.
+6. Press **Print the job order** and check the name list and the arithmetic.
+7. Move it through to **Released** while a balance is still owed — it says so,
+   and stays on the list.
+
+---
+
+## Phase 7 — DabzTech Solutions job tickets (next)
+
+Needs, when convenient: DabzTech prices (17.11) — the checking fee, common
+repair prices, whether a laptop and a desktop cost the same for the same
+service, the warranty period (30 days is the current default) and what to do
+with units left unclaimed. As always, I will build the machinery and the prices
+stay empty until you give them.
+
+**Not stored, ever:** laptop passwords (spec 9.3).

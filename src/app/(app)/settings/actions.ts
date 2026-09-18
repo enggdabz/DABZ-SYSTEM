@@ -43,6 +43,9 @@ export async function saveSettingsAction(
     defaultWarrantyDays: String(formData.get("defaultWarrantyDays") ?? ""),
     unclaimedUnitDays: String(formData.get("unclaimedUnitDays") ?? ""),
     receiptPaper: String(formData.get("receiptPaper") ?? ""),
+    apparelDownPaymentPercent: String(
+      formData.get("apparelDownPaymentPercent") ?? "",
+    ),
   });
 
   if (!result.ok) {
