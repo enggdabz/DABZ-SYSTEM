@@ -7,12 +7,13 @@ point of sale, job orders, repairs and stock.
 Owner: Eddie boy Garcia · Founded 18 June 2017 · Philippines · Philippine peso
 (₱) · Asia/Manila
 
-> **Status: Phases 1–8 complete — the system the specification asked for is
+> **Status: Phases 1–9 complete — the system the specification asked for is
 > built.** Logins and permissions, bills and loans, the money ledger, staff and
 > payroll, the printing counter, expenses and stocks, Dabz Apparel job orders,
-> DabzTech repair tickets, and now **reports** that add all of it up. What is
-> left is Phase 9: the public website, Messenger, Meta Ads — things outside the
-> shop's own records. See [docs/PHASES.md](docs/PHASES.md).
+> DabzTech repair tickets, reports that add all of it up, and now a **public
+> page** customers can find you on and send a message from. What is left needs
+> accounts the shop does not yet have: the Messenger API, Meta Ads tracking, a
+> chatbot and push notifications. See [docs/PHASES.md](docs/PHASES.md).
 
 ## Two things worth knowing up front
 
@@ -85,7 +86,7 @@ on the database card. That is expected on day one.
 ### Connecting the database
 
 1. Follow [docs/SETUP.md](docs/SETUP.md) to create the free Supabase project and
-   run the six migration files, in number order.
+   run the migration files in `supabase/migrations/`, in number order.
 2. Copy the settings template and fill in the three values:
    ```bash
    cp .env.example .env.local
@@ -130,8 +131,8 @@ developing, not for the shop. Everything else runs anywhere.
 ### What a passing test run looks like
 
 ```
- Test Files  11 passed (11)
-      Tests  270 passed (270)
+ Test Files  18 passed (18)
+      Tests  461 passed (461)
 ```
 
 If it says **failed**, read the lines above it — Vitest prints what it expected
@@ -145,18 +146,22 @@ so nothing should be deployed until it passes.
 ```
 src/
   proxy.ts            Runs before every request: refreshes the session,
-                      sends signed-out visitors to the login screen
+                      sends signed-out visitors to the login screen -
+                      except on "/", which is the shop's public page
   app/
     layout.tsx        The frame every screen sits in (font, theme)
     globals.css       THE DESIGN SYSTEM - all Dabz colours and sizes
     login/            Sign in, and the sign-out action
     setup/            First-time setup: creates the owner account, once
     change-password/  Choosing a new password
+    (public)/         The shop's page at "/" - no sign-in, and the one
+                      form a stranger may send into the system
     (app)/            Every screen you must be signed in to see
       layout.tsx        Top bar, navigation, idle sign-out
-      page.tsx          Home
+      overview/         The owner's home
+      enquiries/        Messages sent from the public page
       staff/            Accounts, roles, permission checkboxes
-      settings/         Working days, hours, staff limits
+      settings/         Working days, hours, staff limits, public details
       activity/         The audit log and sign-in history
   components/
     ui.tsx            Buttons, cards, fields, notices - used everywhere
@@ -165,7 +170,8 @@ src/
     ThemeToggle.tsx   Light / dark switch
   lib/
     money.ts          Centavos: parsing, formatting, discounts, change
-    settings.ts       Shop settings, and the approval limits
+    settings.ts       Shop settings, approval limits, public details
+    enquiries.ts      Checking and counting messages from customers
     audit.ts          Writing the audit log
     divisions.ts      The three divisions as data
     datetime.ts       Manila-time formatting
@@ -201,6 +207,16 @@ Three layers, and the important one is the last:
 
 That third layer is why `npm run test:rls` exists: it proves the rules against
 a real database instead of trusting that the code reads correctly.
+
+**The one exception, and how it is fenced.** Since Phase 9 a stranger can send
+the shop a message from the public page. That is the only write in the whole
+system that does not start with somebody signed in, so the `enquiries` table has
+**no insert policy at all** — there is no way into it from a browser. The single
+way in is one server function that checks every field, caps every length,
+silently drops anything filling a hidden field no person can see, and refuses
+more than five messages an hour from the same address. Enquiries are then read
+by the owner and admins only: a message carries a stranger's name and phone
+number.
 
 ### About `globals.css`
 

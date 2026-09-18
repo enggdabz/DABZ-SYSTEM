@@ -229,3 +229,52 @@ to ask:
   percentages are a reading aid and the screen says so.
 - Reports are **computed on the spot, never stored**. Nothing to rebuild,
   nothing to fall out of step.
+- The shop's **address, phone, opening hours, Facebook page and Messenger name
+  are settings that start empty**, and the public page leaves out whatever is
+  missing. They are facts only the owner knows, and this page is read by people
+  who might drive to it. They are listed on **To fill in** instead — to change
+  that, edit `src/lib/data/checklist.ts`.
+- The public page is **on by default**. Off by default would mean a page nobody
+  could see and no reason to look for the switch; on, it simply shows less
+  until it is filled in.
+- **The public page never carries a note addressed to the owner.** What is
+  missing is on the To fill in screen. A "fill this in" message on the front of
+  the shop reads to a customer as a shop that is not open yet.
+- The **owner's home moved from `/` to `/overview`** when `/` became the public
+  page. Everything that used to send a person to `/` now sends them to
+  `/overview`.
+- A repair service on the public page is shown **with its machine in the name**
+  — "Cleaning & repaste (laptop)". Internally the machine is its own column;
+  on a page read once by a customer, two identical lines at two prices look
+  like a mistake.
+- **An enquiry is written only by the server.** The `enquiries` table has no
+  insert policy for anyone, so the single way in is a Server Action that
+  validates, drops honeypot submissions and rate-limits first. An insert policy
+  open enough to let a stranger write is open enough to fill with rubbish, and
+  there is no closing it afterwards. To change the limits, edit
+  `ENQUIRY_LIMITS` in `src/lib/enquiries.ts`.
+- **Five enquiries an hour from one address.** Generous for a person — an
+  office or an internet café shares one address — and useless for a script.
+  Where there is no address header at all, everyone counts as one sender, which
+  makes the limit stricter rather than looser.
+- **Staff cannot read an enquiry at all.** It carries a stranger's name and
+  phone number, so it sits with bills and payroll (spec 4.3) rather than behind
+  a staff checkbox. Change this by adding a staff policy to `enquiries` and a
+  permission to go with it.
+- **The system does not send the reply.** The shop answers on Messenger, by
+  text or by phone, and records here that it did. Sending mail would need a
+  mail account the shop has not set up, and a reply that silently failed is
+  worse than no reply button at all.
+- **"How did you hear about us" is the whole of the advertising measurement.**
+  Meta Ads tracking needs a Meta app, a page token and Meta's app review — the
+  owner's own credentials. The customer's own answer needs none of them, and a
+  pixel cannot tell you somebody came because their cousin recommended you.
+- Answers are **grouped without regard to case but shown as first spelled** —
+  "Facebook" and "facebook" are one line, printed the way the first person
+  typed it.
+
+**Known gap, worth a later tidy:** inline text links inside prose (*Open the
+bills screen*, *See every entry*, and about thirty like them from phases 2–8)
+are 20px tall, under the 24px touch target the design rules ask for. The
+Phase 9 screens were fixed; the rest are listed here rather than changed in
+this phase, because it touches every screen in the system.

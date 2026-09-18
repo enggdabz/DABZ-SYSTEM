@@ -118,7 +118,7 @@ export async function addLedgerEntryAction(
   });
 
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: `Recorded ${formatPesos(amountCentavos)} ${direction === "in" ? "in" : "out"}.`,
@@ -183,7 +183,7 @@ export async function voidLedgerEntryAction(
   });
 
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: "The entry is voided. It stays in the list, marked." };
 }

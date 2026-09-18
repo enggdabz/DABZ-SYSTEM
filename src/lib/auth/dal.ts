@@ -97,14 +97,14 @@ export const requireUser = cache(async (): Promise<SignedInUser> => {
 /** Requires Owner or Admin (spec 4.3: bills, payroll, settings, reports). */
 export const requireOwnerOrAdmin = cache(async (): Promise<SignedInUser> => {
   const user = await requireUser();
-  if (!isOwnerOrAdmin(user)) redirect("/?denied=1");
+  if (!isOwnerOrAdmin(user)) redirect("/overview?denied=1");
   return user;
 });
 
 /** Requires the Owner specifically (spec 4.2: creating and removing Admins). */
 export const requireOwner = cache(async (): Promise<SignedInUser> => {
   const user = await requireUser();
-  if (user.role !== "owner") redirect("/?denied=1");
+  if (user.role !== "owner") redirect("/overview?denied=1");
   return user;
 });
 
@@ -113,7 +113,7 @@ export async function requirePermission(
   permission: Permission,
 ): Promise<SignedInUser> {
   const user = await requireUser();
-  if (!can(user, permission)) redirect("/?denied=1");
+  if (!can(user, permission)) redirect("/overview?denied=1");
   return user;
 }
 

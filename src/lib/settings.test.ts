@@ -23,6 +23,14 @@ const goodForm = {
   unclaimedUnitDays: "30",
   receiptPaper: "thermal_58",
   apparelDownPaymentPercent: "",
+  shopAddress: "",
+  shopPhone: "",
+  shopEmail: "",
+  facebookPageUrl: "",
+  messengerUsername: "",
+  mapUrl: "",
+  publicOpeningHours: "",
+  publicPageEnabled: true,
 };
 
 describe("validateSettingsForm", () => {

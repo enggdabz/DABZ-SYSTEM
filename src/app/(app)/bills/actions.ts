@@ -102,7 +102,7 @@ export async function markBillPaidAction(
   revalidatePath("/bills");
   revalidatePath("/ledger");
   revalidatePath("/loans");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `${bill.name} is marked paid for ${formatPeriod(period)}.` };
 }
@@ -149,7 +149,7 @@ export async function undoBillPaymentAction(
   revalidatePath("/bills");
   revalidatePath("/ledger");
   revalidatePath("/loans");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `${bill.name} is no longer marked paid for ${formatPeriod(period)}.` };
 }
@@ -208,7 +208,7 @@ export async function setDueDayAction(
   });
 
   revalidatePath("/bills");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success:
@@ -280,7 +280,7 @@ export async function saveBillAction(
     });
 
     revalidatePath("/bills");
-    revalidatePath("/");
+    revalidatePath("/overview");
     return { success: `Added ${name}.` };
   }
 
@@ -305,7 +305,7 @@ export async function saveBillAction(
   });
 
   revalidatePath("/bills");
-  revalidatePath("/");
+  revalidatePath("/overview");
   return { success: `Saved ${name}.` };
 }
 
@@ -344,7 +344,7 @@ export async function setBillActiveAction(
   });
 
   revalidatePath("/bills");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: active

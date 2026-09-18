@@ -46,6 +46,14 @@ export async function saveSettingsAction(
     apparelDownPaymentPercent: String(
       formData.get("apparelDownPaymentPercent") ?? "",
     ),
+    shopAddress: String(formData.get("shopAddress") ?? ""),
+    shopPhone: String(formData.get("shopPhone") ?? ""),
+    shopEmail: String(formData.get("shopEmail") ?? ""),
+    facebookPageUrl: String(formData.get("facebookPageUrl") ?? ""),
+    messengerUsername: String(formData.get("messengerUsername") ?? ""),
+    mapUrl: String(formData.get("mapUrl") ?? ""),
+    publicOpeningHours: String(formData.get("publicOpeningHours") ?? ""),
+    publicPageEnabled: formData.get("publicPageEnabled") !== null,
   });
 
   if (!result.ok) {
@@ -95,7 +103,7 @@ export async function saveSettingsAction(
   }
 
   revalidatePath("/settings");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success:

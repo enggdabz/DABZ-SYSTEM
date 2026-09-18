@@ -62,7 +62,7 @@ export async function payPayableAction(
 
   revalidatePath("/payables");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: "Paid. The money is recorded in Money in/out." };
 }

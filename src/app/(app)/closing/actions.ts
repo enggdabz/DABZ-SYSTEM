@@ -103,7 +103,7 @@ export async function saveClosingAction(
   });
 
   revalidatePath("/closing");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: result.balanced

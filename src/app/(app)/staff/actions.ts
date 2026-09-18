@@ -145,7 +145,7 @@ export async function saveStaffAction(
   revalidatePath("/staff");
   revalidatePath("/timeclock");
   revalidatePath("/payroll");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `Saved ${fullName}.` };
 }
@@ -320,7 +320,7 @@ export async function giveCashAdvanceAction(
   revalidatePath("/staff");
   revalidatePath("/payroll");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: `Recorded ${formatPesos(amountCentavos)} advanced to ${member.full_name}.`,

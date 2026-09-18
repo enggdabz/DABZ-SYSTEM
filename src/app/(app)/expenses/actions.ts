@@ -97,7 +97,7 @@ export async function recordExpenseAction(
 
   revalidatePath("/expenses");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: waiting
@@ -146,7 +146,7 @@ export async function decideExpenseAction(
 
   revalidatePath("/expenses");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: approve

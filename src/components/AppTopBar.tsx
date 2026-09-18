@@ -38,7 +38,8 @@ export function AppTopBar({
     <header className="sticky top-0 z-50 bg-topbar text-topbar-ink backdrop-blur-xl">
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
-          <Link href="/" className="shrink-0">
+          {/* The Overview, not "/": the root is the shop's public page. */}
+          <Link href="/overview" className="shrink-0">
             <Wordmark />
           </Link>
 

@@ -123,9 +123,18 @@ describe("visibleSections", () => {
   });
 
   it("always shows Home to anyone signed in", () => {
+    // "/" is the shop's public page since Phase 9; the signed-in home is
+    // "/overview".
     for (const actor of [owner, admin, staff, staffNothing]) {
-      expect(visibleSections(actor).map((s) => s.href)).toContain("/");
+      expect(visibleSections(actor).map((s) => s.href)).toContain("/overview");
     }
+  });
+
+  it("keeps customer messages away from staff", () => {
+    // An enquiry carries a stranger's name and phone number, so it sits with
+    // bills and payroll rather than behind a staff checkbox.
+    expect(visibleSections(staff).map((s) => s.href)).not.toContain("/enquiries");
+    expect(visibleSections(admin).map((s) => s.href)).toContain("/enquiries");
   });
 
   it("shows a deactivated account and a visitor nothing at all", () => {

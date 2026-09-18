@@ -8,6 +8,8 @@ import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
 import { PERMISSION_INFO, isOwnerOrAdmin, type Permission } from "@/lib/auth/permissions";
 import { monthTotals } from "@/lib/bills";
 import { getChecklist } from "@/lib/data/checklist";
+import { getEnquiries } from "@/lib/data/enquiries";
+import { unansweredCount } from "@/lib/enquiries";
 import { getExpenses, getPayables } from "@/lib/data/expenses";
 import { getStockOverview } from "@/lib/data/stocks";
 import { getApparelOrders } from "@/lib/data/apparel";
@@ -123,6 +125,7 @@ async function OwnerOverview() {
     payables,
     apparelOrders,
     repairTickets,
+    enquiries,
   ] = await Promise.all([
     getOverviewMoney(),
     getBills(),
@@ -137,7 +140,11 @@ async function OwnerOverview() {
     getPayables(),
     getApparelOrders(),
     getRepairTickets({ unclaimedAfterDays: settings.unclaimedUnitDays }),
+    getEnquiries({ limit: 200 }),
   ]);
+
+  // Customers who wrote from the public page and have had no answer (Phase 9).
+  const waitingEnquiries = unansweredCount(enquiries);
 
   // Job orders that need a person: overdue, promised within days, or released
   // with the money still owed (spec 8).
@@ -320,6 +327,29 @@ async function OwnerOverview() {
               className="shrink-0 rounded-control bg-ink/5 px-4 py-2 text-sm font-medium ring-1 ring-line hover:bg-ink/10"
             >
               See the list
+            </Link>
+          </div>
+        </Card>
+      ) : null}
+
+      {waitingEnquiries > 0 ? (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="font-semibold tracking-tight">
+                {waitingEnquiries} customer message
+                {waitingEnquiries === 1 ? "" : "s"} waiting for an answer
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Sent from your public page. A customer who gets no reply asks
+                the next shop.
+              </p>
+            </div>
+            <Link
+              href="/enquiries"
+              className="shrink-0 rounded-control bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
+            >
+              Read them
             </Link>
           </div>
         </Card>
@@ -626,7 +656,7 @@ async function StaffHome({
   user: Awaited<ReturnType<typeof requireUser>>;
 }) {
   const available = visibleSections(user).filter(
-    (section) => !section.comingSoon && section.href !== "/",
+    (section) => !section.comingSoon && section.href !== "/overview",
   );
 
   return (

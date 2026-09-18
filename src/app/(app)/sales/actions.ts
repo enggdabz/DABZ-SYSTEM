@@ -131,7 +131,7 @@ export async function decideVoidAction(
 
   revalidatePath("/sales");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success:

@@ -34,10 +34,17 @@ export interface LoginState {
 /** The same message for every kind of refusal, on purpose. */
 const GENERIC_FAILURE = "That username and password do not match.";
 
-/** Only same-site paths, so a crafted link cannot bounce staff off-site. */
+/**
+ * Only same-site paths, so a crafted link cannot bounce staff off-site.
+ *
+ * The default is the Overview, not "/": since Phase 9 the root is the shop's
+ * PUBLIC page, and signing in should land somebody in the system rather than
+ * back on the page they came from.
+ */
 function safeRedirectPath(input: string | null): string {
-  if (!input) return "/";
-  if (!input.startsWith("/") || input.startsWith("//")) return "/";
+  if (!input) return "/overview";
+  if (!input.startsWith("/") || input.startsWith("//")) return "/overview";
+  if (input === "/") return "/overview";
   return input;
 }
 

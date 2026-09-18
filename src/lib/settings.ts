@@ -30,6 +30,24 @@ export interface AppSettings {
    * wanted.
    */
   apparelDownPaymentPercent: number | null;
+
+  /**
+   * The shop's own details, for the public page (Phase 9).
+   *
+   * All null until the owner types them. A customer arriving from Facebook is
+   * shown only what is filled in - the page leaves out what is missing rather
+   * than printing "123 Example Street" to a real person who might drive there.
+   */
+  shopAddress: string | null;
+  shopPhone: string | null;
+  shopEmail: string | null;
+  facebookPageUrl: string | null;
+  /** The m.me name, so the page can open Messenger without any Meta app. */
+  messengerUsername: string | null;
+  mapUrl: string | null;
+  publicOpeningHours: string | null;
+  /** False takes the public page down without removing anything. */
+  publicPageEnabled: boolean;
 }
 
 /**
@@ -69,6 +87,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   unclaimedUnitDays: 30, // spec 9.4
   receiptPaper: "thermal_58", // open decision 17.3, decided
   apparelDownPaymentPercent: null, // open decision 17.10, never guessed
+
+  // The shop's own details. Empty until the owner types them (Phase 9).
+  shopAddress: null,
+  shopPhone: null,
+  shopEmail: null,
+  facebookPageUrl: null,
+  messengerUsername: null,
+  mapUrl: null,
+  publicOpeningHours: null,
+  publicPageEnabled: true,
 };
 
 /** Shape of the settings row as it comes back from PostgreSQL. */
@@ -85,6 +113,14 @@ export interface SettingsRow {
   unclaimed_unit_days: number;
   receipt_paper?: string;
   apparel_down_payment_percent?: string | number | null;
+  shop_address?: string | null;
+  shop_phone?: string | null;
+  shop_email?: string | null;
+  facebook_page_url?: string | null;
+  messenger_username?: string | null;
+  map_url?: string | null;
+  public_opening_hours?: string | null;
+  public_page_enabled?: boolean | null;
 }
 
 export function settingsFromRow(row: SettingsRow): AppSettings {
@@ -112,7 +148,29 @@ export function settingsFromRow(row: SettingsRow): AppSettings {
       row.apparel_down_payment_percent === ""
         ? null
         : Number(row.apparel_down_payment_percent),
+
+    shopAddress: blankToNull(row.shop_address),
+    shopPhone: blankToNull(row.shop_phone),
+    shopEmail: blankToNull(row.shop_email),
+    facebookPageUrl: blankToNull(row.facebook_page_url),
+    messengerUsername: blankToNull(row.messenger_username),
+    mapUrl: blankToNull(row.map_url),
+    publicOpeningHours: blankToNull(row.public_opening_hours),
+    // Missing means the column has not been migrated yet, which is not the
+    // same as the owner switching the page off.
+    publicPageEnabled: row.public_page_enabled ?? true,
   };
+}
+
+/**
+ * An empty string is the same as nothing here.
+ *
+ * A box the owner opened and left blank must read as "not set", not as an
+ * address of no characters printed on the public page.
+ */
+function blankToNull(value: string | null | undefined): string | null {
+  const trimmed = (value ?? "").trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 // ---------------------------------------------------------------------------
@@ -146,6 +204,14 @@ export function validateSettingsForm(form: {
   receiptPaper: string;
   /** Empty means "no policy", which is a real answer, not zero. */
   apparelDownPaymentPercent: string;
+  shopAddress: string;
+  shopPhone: string;
+  shopEmail: string;
+  facebookPageUrl: string;
+  messengerUsername: string;
+  mapUrl: string;
+  publicOpeningHours: string;
+  publicPageEnabled: boolean;
 }): SettingsValidation {
   const errors: Record<string, string> = {};
 
@@ -249,8 +315,23 @@ export function validateSettingsForm(form: {
       unclaimedUnitDays: unclaimedDays,
       receiptPaper: form.receiptPaper as ReceiptPaper,
       apparelDownPaymentPercent: downPayment,
+
+      shopAddress: blank(form.shopAddress),
+      shopPhone: blank(form.shopPhone),
+      shopEmail: blank(form.shopEmail),
+      facebookPageUrl: blank(form.facebookPageUrl),
+      messengerUsername: blank(form.messengerUsername),
+      mapUrl: blank(form.mapUrl),
+      publicOpeningHours: blank(form.publicOpeningHours),
+      publicPageEnabled: form.publicPageEnabled,
     },
   };
+}
+
+/** A box left empty stays empty - it never becomes "". */
+function blank(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
 }
 
 /** Turns validated settings back into the column names the database uses. */
@@ -268,6 +349,14 @@ export function settingsToRow(settings: AppSettings): SettingsRow {
     unclaimed_unit_days: settings.unclaimedUnitDays,
     receipt_paper: settings.receiptPaper,
     apparel_down_payment_percent: settings.apparelDownPaymentPercent,
+    shop_address: settings.shopAddress,
+    shop_phone: settings.shopPhone,
+    shop_email: settings.shopEmail,
+    facebook_page_url: settings.facebookPageUrl,
+    messenger_username: settings.messengerUsername,
+    map_url: settings.mapUrl,
+    public_opening_hours: settings.publicOpeningHours,
+    public_page_enabled: settings.publicPageEnabled,
   };
 }
 

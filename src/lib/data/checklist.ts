@@ -266,6 +266,34 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
+  /*
+    The shop's own details (Phase 9). These are facts only the owner knows, and
+    the public page leaves out whatever is missing rather than printing a guess
+    - a made-up address on a page a real person might drive to is a different
+    order of mistake from a made-up figure on an internal screen.
+  */
+  const missingPublicDetails = [
+    settings.shopAddress === null ? "Address" : null,
+    settings.shopPhone === null ? "Phone number" : null,
+    settings.publicOpeningHours === null ? "Opening hours" : null,
+    settings.facebookPageUrl === null ? "Facebook page" : null,
+    settings.messengerUsername === null ? "Messenger name" : null,
+  ].filter((label): label is string => label !== null);
+
+  if (missingPublicDetails.length > 0) {
+    items.push({
+      id: "public-page-details",
+      title: `${missingPublicDetails.length} shop detail${
+        missingPublicDetails.length === 1 ? "" : "s"
+      } missing from your public page`,
+      why: "A customer arriving from Facebook is shown only what you have filled in. Nothing here is guessed, so an empty address is simply absent from the page - and the Message us button is missing until the Messenger name is set.",
+      names: missingPublicDetails,
+      href: "/settings",
+      linkLabel: "Open Settings",
+      important: true,
+    });
+  }
+
   if (activeStaff.length === 0) {
     items.push({
       id: "no-staff",

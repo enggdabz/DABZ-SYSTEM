@@ -260,7 +260,7 @@ export async function completeSaleAction(
   revalidatePath("/pos");
   revalidatePath("/sales");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     completed: {

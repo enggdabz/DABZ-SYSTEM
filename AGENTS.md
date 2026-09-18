@@ -319,3 +319,40 @@ round trip is the one thing that must be tried against a real project.
 - **A route handler re-checks the asker.** `/reports/export` calls
   `requireOwnerOrAdmin()` exactly as a screen does - a URL is a public endpoint
   whether or not anyone linked to it.
+
+## Public page rules (built in Phase 9)
+
+- **`/` is the shop's public page; the owner's home is `/overview`.** Anything
+  that used to send a person to `/` sends them to `/overview` instead:
+  `revalidatePath`, the post-sign-in redirect, the `denied=1` redirect in
+  `dal.ts`, and the Home entry in `navigation.ts`. The one thing that still
+  points at `/` is the customer-facing wordmark in `src/app/(public)/layout.tsx`.
+- **The public page never prints what the owner has not said.** Address, phone,
+  opening hours, Facebook page and Messenger name are settings that start null,
+  and the page leaves out whatever is missing. A made-up figure on an internal
+  screen is bad; a made-up address on a page somebody drives to is worse. They
+  appear in `src/lib/data/checklist.ts` like every other owner-only figure.
+- **Nothing on the public page is addressed to the owner.** A customer reading
+  "fill this in under Settings" sees a shop that is not open yet. The gap
+  belongs on the To fill in screen.
+- **`enquiries` has no insert policy, and no delete policy, for anyone.** This
+  is the ONE place a stranger causes a row to exist, so the table stays shut
+  and the single way in is `sendEnquiryAction`, which checks every field, caps
+  every length, silently drops a filled honeypot and refuses more than
+  `ENQUIRY_LIMITS.perHour` from one address before writing with the
+  service-role client. Never answer spam by loosening the policy; the answer is
+  in the action, where it can be read and tested.
+- **This is the second sanctioned use of the service-role key**, alongside
+  sign-in, and for the same reason: nobody is signed in yet. `src/lib/data/public.ts`
+  reads the three price lists with it because a visitor is nobody and RLS would
+  hand them an empty page. It reads and never writes, and it returns only what
+  a customer would read off a wall anyway.
+- **Staff cannot read an enquiry.** A stranger's name and phone number is
+  Owner/Admin material (spec 4.3), so there is no staff policy at all - not
+  even read - and the screen re-checks with `requireOwnerOrAdmin()`.
+- **The system does not send the reply.** It records that the shop answered and
+  what was said. A reply button that quietly failed would leave a customer
+  waiting for something that never left.
+- **A link a customer taps is padded, not bare.** Bare text is a 20px target
+  and the rule is 24px. On the public page and the Messages screen, use
+  `-mx-1 inline-block px-1 py-1` rather than a naked `underline`.

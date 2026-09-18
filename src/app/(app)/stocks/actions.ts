@@ -120,7 +120,7 @@ export async function receiveStockAction(
   revalidatePath("/stocks");
   revalidatePath("/payables");
   revalidatePath("/expenses");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: `Received ${formatQuantity(quantity.value, item?.unit)}.${
@@ -172,7 +172,7 @@ export async function takeStockOutAction(
   });
 
   revalidatePath("/stocks");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `Took out ${formatQuantity(quantity.value, item?.unit)}.` };
 }
@@ -247,7 +247,7 @@ export async function countStockAction(
   });
 
   revalidatePath("/stocks");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success:
@@ -348,7 +348,7 @@ export async function saveStockItemAction(
 
   revalidatePath("/stocks");
   revalidatePath("/checklist");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `"${name}" saved.` };
 }

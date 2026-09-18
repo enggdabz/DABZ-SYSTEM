@@ -40,7 +40,7 @@ function revalidateTicket(ticketId?: string) {
   revalidatePath("/repairs");
   if (ticketId) revalidatePath(`/repairs/${ticketId}`);
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 }
 
 // ---------------------------------------------------------------------------

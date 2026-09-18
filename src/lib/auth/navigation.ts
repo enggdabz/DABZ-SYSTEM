@@ -28,7 +28,7 @@ export const NAV_SECTIONS: NavSection[] = [
     them. The bar scrolls sideways on a narrow screen, so what matters is that
     the counter's daily screens come first and never need scrolling to reach.
   */
-  { href: "/", label: "Home", phase: 1 },
+  { href: "/overview", label: "Home", phase: 1 },
   { href: "/pos", label: "Counter", permission: "add_sales", phase: 4 },
   { href: "/sales", label: "Sales", permission: "add_sales", phase: 4 },
   { href: "/timeclock", label: "Time clock", phase: 3 },
@@ -39,6 +39,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/repairs", label: "Repairs", permission: "dabztech_tickets", phase: 7 },
   { href: "/customers", label: "Customers", phase: 4 },
 
+  { href: "/enquiries", label: "Messages", ownerOrAdminOnly: true, phase: 9 },
   { href: "/bills", label: "Bills", ownerOrAdminOnly: true, phase: 2 },
   { href: "/loans", label: "Loans", ownerOrAdminOnly: true, phase: 2 },
   { href: "/ledger", label: "Money in/out", ownerOrAdminOnly: true, phase: 2 },

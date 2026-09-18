@@ -169,6 +169,94 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
+          <h2 className="text-lg font-semibold tracking-tight">
+            Your public page
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            What customers see at the front of this site. Everything here starts
+            empty and the page simply leaves out whatever you have not filled in
+            &mdash; it will never print a made-up address to somebody who might
+            drive there.
+          </p>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="publicPageEnabled"
+            defaultChecked={settings.publicPageEnabled}
+            className="size-4 rounded border-line"
+          />
+          <span>Show the public page</span>
+        </label>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field label="Address" hint="Where customers should come.">
+            <Input
+              name="shopAddress"
+              defaultValue={settings.shopAddress ?? ""}
+              placeholder="e.g. Lacson Street, Bacolod City"
+            />
+          </Field>
+
+          <Field label="Phone number">
+            <Input
+              name="shopPhone"
+              inputMode="tel"
+              defaultValue={settings.shopPhone ?? ""}
+              placeholder="e.g. 0917 555 0000"
+            />
+          </Field>
+
+          <Field label="Email" hint="Optional.">
+            <Input
+              name="shopEmail"
+              type="email"
+              defaultValue={settings.shopEmail ?? ""}
+            />
+          </Field>
+
+          <Field
+            label="Opening hours, in your own words"
+            hint="Free text, so half-days and holidays can be said properly."
+          >
+            <Input
+              name="publicOpeningHours"
+              defaultValue={settings.publicOpeningHours ?? ""}
+              placeholder="e.g. Mon-Sat 8am-6pm, closed Sunday"
+            />
+          </Field>
+
+          <Field label="Facebook page" hint="The full link to your page.">
+            <Input
+              name="facebookPageUrl"
+              defaultValue={settings.facebookPageUrl ?? ""}
+              placeholder="https://facebook.com/..."
+            />
+          </Field>
+
+          <Field
+            label="Messenger name"
+            hint="The part after m.me/. Adds a Message us button — no Facebook app needed."
+          >
+            <Input
+              name="messengerUsername"
+              defaultValue={settings.messengerUsername ?? ""}
+              placeholder="e.g. dabzprintshoppe"
+            />
+          </Field>
+        </div>
+
+        <Field
+          label="Map link"
+          hint="Optional. Paste a Google Maps link and the page adds a Get directions button."
+        >
+          <Input name="mapUrl" defaultValue={settings.mapUrl ?? ""} />
+        </Field>
+      </section>
+
+      <section className="space-y-5">
+        <div>
           <h2 className="text-lg font-semibold tracking-tight">Dabz Apparel</h2>
           <p className="mt-1 text-sm text-muted">
             How much of a job order you ask for up front. Leaving this empty is

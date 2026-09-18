@@ -274,7 +274,7 @@ export async function markPayrollPaidAction(
   revalidatePath("/payroll");
   revalidatePath("/ledger");
   revalidatePath("/staff");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: "Wages recorded as paid, and the week is locked." };
 }
@@ -316,7 +316,7 @@ export async function unlockWeekAction(
   revalidatePath("/payroll");
   revalidatePath("/ledger");
   revalidatePath("/staff");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success:

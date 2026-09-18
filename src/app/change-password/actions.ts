@@ -68,5 +68,5 @@ export async function changePasswordAction(
     summary: `${user.fullName} changed their own password`,
   });
 
-  redirect("/?password_changed=1");
+  redirect("/overview?password_changed=1");
 }

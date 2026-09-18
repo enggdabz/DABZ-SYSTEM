@@ -997,9 +997,122 @@ No migration to run. Then:
 
 ---
 
-## Phase 9 — Later, and not in the first build
+## Phase 9 — The public page and customer messages ✅
 
-Public website, Messenger integration, Meta Ads tracking, a chatbot and push
-notifications. All of them sit outside the shop's own records, and the shop
-runs without any of them. They wait until the system above has been used for a
-while and earned them.
+**Built**
+
+The front door. Until now every screen needed a sign-in; this phase adds the
+one page a customer sees, and the one thing a stranger may send into the
+system.
+
+*The public page, at `/`*
+- Built from the **same price lists the counter uses** — Products, apparel
+  items and repair services. Change a price on the Products screen and the
+  public page changes with it. It cannot quietly go out of date the way a
+  hand-written page does.
+- Anything you have not priced is still listed, and says **"ask us"** instead
+  of a number.
+- A repair service shows which machine it is for — "Cleaning & repaste
+  (laptop)" and "(desktop pc)" — because the same service can be priced per
+  machine, and two identical lines at two prices look like a mistake.
+- Your address, phone, opening hours, Facebook page and Messenger name are
+  **settings, and all start empty**. Whatever you have not filled in is simply
+  left out. Nothing is invented: a made-up address on a page a real person
+  might drive to is a different order of mistake from a made-up figure on an
+  internal screen. What is missing appears on **To fill in**, not on the page
+  itself — a customer should never read a note addressed to you.
+- A **Show the public page** switch in Settings takes it down without deleting
+  anything. Staff sign-in is unaffected either way.
+- The owner's home moved from `/` to **`/overview`**. Signing in still lands
+  you there.
+
+*Messages from customers*
+- A short form — name, phone or email, what it is about, the message — and
+  one optional question: **how did you hear about us?**
+- A new **Messages** screen, Owner/Admin only, lists what came in, links the
+  phone number so it dials from the counter, and lets you record that you
+  answered and what you said. **The system does not send the reply**: you
+  answer on Messenger, by text or by phone, wherever they wrote from. A system
+  that pretended to send mail from an account the shop has not set up would
+  leave a customer waiting for something that never left.
+- The Overview shows a card the moment anything is waiting.
+
+**What was NOT built, and why**
+
+The Messenger API, Meta Ads tracking and a chatbot all need a **Meta app, a
+page access token and Meta's own app review**. Those are credentials that
+belong to you — they are tied to your Facebook page and your identity — and
+no system should create them on your behalf. So the credential-free half was
+built instead, and it does the same job:
+
+| Asked for | Needs a Meta app | Built instead |
+|---|---|---|
+| Messenger integration | yes | A **Message us** button that opens Messenger at your page |
+| Meta Ads tracking | yes | **"How did you hear about us?"**, counted on the Messages screen |
+| A chatbot | yes | The enquiry form, which reaches a person |
+| Push notifications | a paid service | The Overview card and the Messages count |
+
+The "how did you hear about us" answer is worse than a tracking pixel at
+counting and better at telling the truth — a pixel cannot tell you somebody
+came because their cousin recommended you.
+
+**The one public write in the system**
+
+Every other write in this system starts with somebody signed in. This one
+starts with whoever found the page, so it is fenced deliberately:
+
+- `enquiries` has **no insert policy at all** — not for the public, not for
+  staff, not for the owner. There is no way in from a browser.
+- The one way in is a Server Action that checks every field, caps every
+  length, silently drops anything filling a **honeypot** field no person can
+  see, and refuses more than five messages an hour from one address. Only then
+  does it write, with the service-role key — the same permission sign-in
+  itself uses, for the same reason: nobody is signed in yet.
+- An enquiry carries a stranger's name and phone number, so **staff cannot read
+  one**. It sits with bills and payroll, not behind a staff checkbox.
+- There is no delete policy either. An enquiry is closed, never erased, so "I
+  messaged you last week" can be checked.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Field limits, the honeypot, the rate limit, the counts | `npm test` | 461 tests |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 231 checks |
+| That every table and column the app asks for exists | `npm run check:schema` | 42 tables |
+| Every screen at 390 / 768 / 1024 / 1440, every pop-up on screen | headless browser | 36 screens × 4 sizes |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 461 passed
+```
+
+Run `supabase/migrations/0009_phase9_public.sql` against your project, then:
+
+1. Open **Settings**, scroll to **Your public page**, and fill in your address,
+   phone, opening hours, Facebook page and Messenger name. Save.
+2. Open **/** signed out (a private window). Your details are there, the prices
+   are the ones on your Products screen, and **Message us on Facebook** opens
+   Messenger.
+3. Clear one of those fields and load the page again — it disappears rather
+   than being replaced by a placeholder. Check **To fill in**: it is listed
+   there.
+4. Send yourself a message from the form.
+5. Sign in and open **Messages**. It is waiting, and the Overview says so.
+   Press **Answer this**, write what you told them, and **Mark replied**.
+6. Sign in as a staff member. **Messages** is not in their menu, and opening
+   `/enquiries` by hand sends them back to the Overview.
+7. Untick **Show the public page** in Settings and load **/** again: a short
+   honest page, and staff sign-in still works.
+
+---
+
+## Later, and not in the first build
+
+Push notifications to a phone, and anything that needs a Meta app: the
+Messenger API, Meta Ads tracking and a chatbot. They wait until the system
+above has been used for a while, and until the shop wants to set up the
+accounts they need.

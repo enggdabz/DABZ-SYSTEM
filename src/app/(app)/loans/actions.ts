@@ -133,7 +133,7 @@ export async function recordLoanPaymentAction(
 
   revalidatePath("/loans");
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `Recorded ${formatPesos(amountCentavos)} paid to ${loan.lender}.` };
 }
@@ -208,7 +208,7 @@ export async function updateFromStatementAction(
   });
 
   revalidatePath("/loans");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return {
     success: `${before.lender} now shows ${formatPesos(balanceCentavos)} as of that statement.`,
@@ -289,7 +289,7 @@ export async function saveLoanAction(
     });
 
     revalidatePath("/loans");
-    revalidatePath("/");
+    revalidatePath("/overview");
     return { success: `Added the loan with ${lender}.` };
   }
 
@@ -332,7 +332,7 @@ export async function saveLoanAction(
   });
 
   revalidatePath("/loans");
-  revalidatePath("/");
+  revalidatePath("/overview");
 
   return { success: `Saved the loan with ${lender}.` };
 }

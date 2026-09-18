@@ -44,7 +44,7 @@ function revalidateOrder(orderId?: string) {
   revalidatePath("/apparel");
   if (orderId) revalidatePath(`/apparel/${orderId}`);
   revalidatePath("/ledger");
-  revalidatePath("/");
+  revalidatePath("/overview");
 }
 
 // ---------------------------------------------------------------------------
