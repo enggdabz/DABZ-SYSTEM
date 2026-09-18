@@ -49,6 +49,8 @@ export default async function HomePage({
   const user = await requireUser();
   const settings = await getSettings();
 
+  const comingSoon = NAV_SECTIONS.filter((section) => section.comingSoon);
+
   return (
     <div className="space-y-8">
       <div>
@@ -77,20 +79,28 @@ export default async function HomePage({
 
       {isOwnerOrAdmin(user) ? <OwnerOverview /> : <StaffHome user={user} />}
 
-      <Card
-        title="Still being built"
-        description="These sections appear as each phase is finished."
-      >
-        <ul className="flex flex-wrap gap-2">
-          {NAV_SECTIONS.filter((section) => section.comingSoon).map((section) => (
-            <li key={section.href}>
-              <Tag>
-                {section.label} &middot; Phase {section.phase}
-              </Tag>
-            </li>
-          ))}
-        </ul>
-      </Card>
+      {/*
+        Only while something IS still being built. Every section is finished as
+        of Phase 9, so this card now hides itself rather than sitting on the
+        owner's home screen with an empty list under a heading - which is what
+        it did, and looked like a fault.
+      */}
+      {comingSoon.length > 0 ? (
+        <Card
+          title="Still being built"
+          description="These sections appear as each phase is finished."
+        >
+          <ul className="flex flex-wrap gap-2">
+            {comingSoon.map((section) => (
+              <li key={section.href}>
+                <Tag>
+                  {section.label} &middot; Phase {section.phase}
+                </Tag>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       {!isOwnerOrAdmin(user) ? null : (
         <p className="text-xs text-muted">
