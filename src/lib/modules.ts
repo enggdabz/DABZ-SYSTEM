@@ -70,7 +70,7 @@ export const MODULES: readonly Module[] = [
     short: "Payroll",
     body: "Weekly payroll, attendance entries, cash advances.",
     roles: ["owner", "admin"],
-    ready: false,
+    ready: true,
   },
   {
     key: "reports",
