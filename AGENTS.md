@@ -56,7 +56,16 @@ receiving code.
   component.
 - Red is the brand colour, so **warnings must always carry an icon (⚠) and a
   text label** — never colour alone, or they read as buttons.
-- Must work at the counter on a desktop and on a phone.
+- Must work on a **desktop, a tablet and a phone**. Check at 390px (phone),
+  768px (tablet portrait), 1024px (tablet landscape) and 1440px (desktop) - not
+  just the two extremes, because tablet portrait is where a `sm:`/`lg:`-only
+  layout falls apart. Anything a person taps at the counter needs a touch
+  target of at least 24px, and the primary action must be reachable without
+  scrolling.
+- **A figure only the owner can know is never invented** - a price, a due day,
+  an interest rate, a wage. It stays empty, with a warning and an editable
+  field, AND it must appear in `src/lib/data/checklist.ts` so the To fill in
+  screen lists it. Adding a new such field means adding it there too.
 - Gentle, short motion only; `prefers-reduced-motion` is already respected in
   `globals.css`.
 - Sentence case on buttons and labels ("Mark paid", "Add to sale", "Time in").

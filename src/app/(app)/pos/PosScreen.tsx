@@ -179,7 +179,14 @@ export function PosScreen({
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+    /*
+      Side by side from `lg` up (desktop and tablet landscape). Below that -
+      tablet portrait and phones - the sale panel drops underneath the buttons,
+      and a fixed bar keeps the total and the pay button reachable without
+      scrolling back down. The bottom padding stops that bar covering the last
+      row of buttons.
+    */
+    <div className="grid gap-6 pb-24 lg:grid-cols-[1fr_22rem] lg:pb-0">
       <div className="space-y-6">
         {[...bySection.entries()].map(([section, items]) => (
           <section key={section}>
@@ -225,7 +232,7 @@ export function PosScreen({
       </div>
 
       {/* The sale itself. */}
-      <aside className="space-y-4 lg:sticky lg:top-24 lg:self-start">
+      <aside id="this-sale" className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-surface p-5 shadow-sm ring-1 ring-line/60">
           <div className="flex items-baseline justify-between">
             <h2 className="font-semibold tracking-tight">This sale</h2>
@@ -417,6 +424,27 @@ export function PosScreen({
           </Button>
         </form>
       </aside>
+
+      {lines.length > 0 ? (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-md lg:hidden">
+          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+            <div>
+              <p className="text-xs text-muted">
+                {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}
+              </p>
+              <p className="text-xl font-semibold tracking-tight">
+                {formatPesos(totals.totalCentavos)}
+              </p>
+            </div>
+            <a
+              href="#this-sale"
+              className="rounded-control bg-accent px-5 py-2.5 text-sm font-medium text-on-accent"
+            >
+              Review &amp; pay
+            </a>
+          </div>
+        </div>
+      ) : null}
 
       {pendingProduct ? (
         <AddItemDialog

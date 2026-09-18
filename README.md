@@ -12,6 +12,21 @@ Owner: Eddie boy Garcia · Founded 18 June 2017 · Philippines · Philippine pes
 > sales, receipts, voids and the end-of-day count. Expenses and stocks are
 > Phase 5. See [docs/PHASES.md](docs/PHASES.md).
 
+## Two things worth knowing up front
+
+**You do not have to set everything up before you start.** Every figure only
+you can know — a bill's due day, a loan's interest rate, a staff daily rate, a
+product price — starts empty on purpose, and the system runs anyway. It says
+what it cannot do without each one rather than guessing. The **To fill in**
+screen gathers them all in one place, so you can work through them over weeks
+while the shop is open.
+
+**It runs on a desktop, a tablet and a phone.** The counter puts the sale
+total and the pay button in a fixed bar at the bottom on a tablet or phone, so
+they are always in reach; on a desktop the sale sits beside the buttons. Every
+screen is checked at four sizes — 390px phone, 768px tablet portrait, 1024px
+tablet landscape and 1440px desktop.
+
 ---
 
 ## What the parts are, in plain language

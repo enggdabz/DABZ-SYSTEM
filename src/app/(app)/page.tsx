@@ -7,6 +7,7 @@ import { getSettings, requireUser } from "@/lib/auth/dal";
 import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
 import { PERMISSION_INFO, isOwnerOrAdmin, type Permission } from "@/lib/auth/permissions";
 import { monthTotals } from "@/lib/bills";
+import { getChecklist } from "@/lib/data/checklist";
 import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom } from "@/lib/data/money";
 import {
   getAdvanceBalances,
@@ -100,7 +101,7 @@ async function OwnerOverview() {
   const period = currentPeriod();
   const today = manilaToday();
 
-  const [money, bills, payments, payrollEstimate, staff, balances, weeks] =
+  const [money, bills, payments, payrollEstimate, staff, balances, weeks, checklist] =
     await Promise.all([
       getOverviewMoney(),
       getBills(),
@@ -109,6 +110,7 @@ async function OwnerOverview() {
       getStaff(),
       getAdvanceBalances(),
       getPayrollWeeks({ limit: 200 }),
+      getChecklist(),
     ]);
 
   const billTotals = monthTotals({
@@ -224,6 +226,32 @@ async function OwnerOverview() {
           )}
         </div>
       </Card>
+
+      {checklist.items.length > 0 ? (
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 font-semibold tracking-tight">
+                <span aria-hidden="true" className="text-attention">
+                  {"\u26a0"}
+                </span>
+                {checklist.items.length} thing
+                {checklist.items.length === 1 ? "" : "s"} still to fill in
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Figures only you can know, like bill due days and daily rates.
+                The shop runs without them &mdash; fill them in when you can.
+              </p>
+            </div>
+            <Link
+              href="/checklist"
+              className="shrink-0 rounded-control bg-ink/5 px-4 py-2 text-sm font-medium ring-1 ring-line hover:bg-ink/10"
+            >
+              See the list
+            </Link>
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title={`Bills for ${formatPeriod(period)}`}>

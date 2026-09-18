@@ -531,6 +531,26 @@ With Supabase connected and **all six** migrations run:
 
 ---
 
+## Added after Phase 4, at the owner's request
+
+**Everything is filled in while the system runs.** A new **To fill in** screen
+lists every figure still missing — bill due days, loan interest rates, staff
+daily rates, product prices, staff without a login — with the names, why each
+one matters, and a link straight to the screen that sets it. A quiet strip on
+the Home screen shows how many are left. It also names the things the system
+cannot detect: the rest of the debt, the real shop hours and payday, bulk
+discount rules, what "Magic Payment" and "Forests Lake" are, and the one-colour
+logo files.
+
+**Desktop, tablet and phone.** Every screen is verified at four widths — 390px
+phone, 768px tablet portrait, 1024px tablet landscape, 1440px desktop — with
+an automated check for horizontal overflow and page errors on each of the
+sixteen screens, at each size. The counter gained a fixed bar at the bottom on
+tablet and phone, holding the running total and **Review & pay**, so the two
+things that matter at the till are always in reach without scrolling.
+
+---
+
 ## Phase 5 — Expenses and stocks (next)
 
 Needs, when convenient: your most frequent purchases and suppliers (17.14), and
