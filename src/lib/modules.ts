@@ -79,7 +79,7 @@ export const MODULES: readonly Module[] = [
     short: "Reports",
     body: "Ledger, daily sales, day closing and targets.",
     roles: ["owner", "admin"],
-    ready: false,
+    ready: true,
   },
   {
     key: "settings",

@@ -39,6 +39,19 @@ src/
     types/database.ts    Generated from the live schema — do not edit
 ```
 
+## Modules
+
+| Module | What it covers |
+| --- | --- |
+| Sales | Point of sale, price tiers, discounts, voids and void requests |
+| DabzTech repairs | Tickets through their status flow, services, parts from stock, payments |
+| Apparel job orders | Orders, per-player name and size lists, options, down payments |
+| Inventory | Stock levels from movements, receiving, suppliers, payables, customers |
+| Expenses & bills | Expense capture and approval, recurring bills, loans |
+| Payroll & attendance | Staff, attendance, weekly payroll, cash advances |
+| Reports | Ledger, takings per day, day closing against a cash count |
+| Settings & users | Accounts, permissions, shop settings, audit log |
+
 ## Database
 
 The Supabase project holds the full schema already: sales, repair tickets,
