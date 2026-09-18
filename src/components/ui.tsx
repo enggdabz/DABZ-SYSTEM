@@ -218,7 +218,7 @@ export function Wordmark({ subtitle = "PRINTSHOPPE" }: { subtitle?: string }) {
         aria-hidden="true"
         width={512}
         height={512}
-        priority
+        loading="eager"
         className="h-12 w-auto"
       />
       <span className="flex flex-col leading-none">
