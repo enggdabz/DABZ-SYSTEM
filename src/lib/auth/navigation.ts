@@ -23,18 +23,29 @@ export interface NavSection {
 }
 
 export const NAV_SECTIONS: NavSection[] = [
+  /*
+    Ordered by how often the shop actually opens them, not by which phase built
+    them. The bar scrolls sideways on a narrow screen, so what matters is that
+    the counter's daily screens come first and never need scrolling to reach.
+  */
   { href: "/", label: "Home", phase: 1 },
-  { href: "/accounts", label: "Accounts", ownerOrAdminOnly: true, phase: 1 },
-  { href: "/staff", label: "Staff", ownerOrAdminOnly: true, phase: 3 },
+  { href: "/pos", label: "Counter", permission: "add_sales", phase: 4 },
+  { href: "/sales", label: "Sales", permission: "add_sales", phase: 4 },
   { href: "/timeclock", label: "Time clock", phase: 3 },
-  { href: "/payroll", label: "Payroll", ownerOrAdminOnly: true, phase: 3 },
-  { href: "/activity", label: "Activity", ownerOrAdminOnly: true, phase: 1 },
-  { href: "/settings", label: "Settings", ownerOrAdminOnly: true, phase: 1 },
+  { href: "/closing", label: "End of day", permission: "add_sales", phase: 4 },
+  { href: "/customers", label: "Customers", phase: 4 },
 
   { href: "/bills", label: "Bills", ownerOrAdminOnly: true, phase: 2 },
   { href: "/loans", label: "Loans", ownerOrAdminOnly: true, phase: 2 },
   { href: "/ledger", label: "Money in/out", ownerOrAdminOnly: true, phase: 2 },
-  { href: "/pos", label: "POS", permission: "add_sales", phase: 4, comingSoon: true },
+  { href: "/payroll", label: "Payroll", ownerOrAdminOnly: true, phase: 3 },
+  { href: "/staff", label: "Staff", ownerOrAdminOnly: true, phase: 3 },
+
+  { href: "/products", label: "Products", ownerOrAdminOnly: true, phase: 4 },
+  { href: "/accounts", label: "Accounts", ownerOrAdminOnly: true, phase: 1 },
+  { href: "/activity", label: "Activity", ownerOrAdminOnly: true, phase: 1 },
+  { href: "/settings", label: "Settings", ownerOrAdminOnly: true, phase: 1 },
+
   { href: "/stocks", label: "Stocks", permission: "stock_in_out", phase: 5, comingSoon: true },
 ];
 

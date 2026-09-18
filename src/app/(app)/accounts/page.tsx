@@ -10,7 +10,7 @@ import {
   type Permission,
   type Role,
 } from "@/lib/auth/permissions";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { getAccounts } from "@/lib/data/staff";
 
 import {
   CreateAccountForm,
@@ -22,43 +22,18 @@ import {
 
 export const metadata = { title: "Staff · Dabz System" };
 
-interface AccountRow {
-  id: string;
-  username: string;
-  full_name: string;
-  role: Role;
-  status: "active" | "inactive";
-  must_change_password: boolean;
-  created_at: string;
-}
-
 export default async function StaffPage() {
   await connection();
 
   // Owner/Admin only, and never grantable to staff (spec 4.3).
   const actor = await requireOwnerOrAdmin();
-  const supabase = await createSupabaseServerClient();
+  // Read through the data layer, which tolerates a failed query rather than
+  // erroring the whole screen.
+  const { accounts: rows, error } = await getAccounts();
 
-  // Read with the ordinary client so Row Level Security still applies - if the
-  // policies were wrong, this screen would come back empty rather than leaking.
-  const { data: accounts, error } = await supabase
-    .from("profiles")
-    .select("id, username, full_name, role, status, must_change_password, created_at")
-    .order("role")
-    .order("username");
-
-  const { data: permissionRows } = await supabase
-    .from("user_permissions")
-    .select("user_id, permission");
-
-  const permissionsByUser = new Map<string, Permission[]>();
-  for (const row of permissionRows ?? []) {
-    const list = permissionsByUser.get(row.user_id) ?? [];
-    list.push(row.permission as Permission);
-    permissionsByUser.set(row.user_id, list);
-  }
-
-  const rows = (accounts ?? []) as AccountRow[];
+  const permissionsByUser = new Map<string, Permission[]>(
+    rows.map((account) => [account.id, account.permissions as Permission[]]),
+  );
 
   return (
     <div className="space-y-8">
@@ -74,7 +49,7 @@ export default async function StaffPage() {
 
       {error ? (
         <Notice tone="attention" title="Could not load the accounts">
-          <p>{error.message}</p>
+          <p>{error}</p>
         </Notice>
       ) : null}
 
@@ -91,7 +66,7 @@ export default async function StaffPage() {
         </h2>
 
         {rows.map((account) => {
-          const editable = canEditAccount(actor, { role: account.role });
+          const editable = canEditAccount(actor, { role: account.role as Role });
           const granted = permissionsByUser.get(account.id) ?? [];
 
           return (
@@ -99,11 +74,11 @@ export default async function StaffPage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-semibold tracking-tight">
-                    {account.full_name}
+                    {account.fullName}
                   </h3>
                   <p className="text-sm text-muted">
                     {account.username} &middot; added{" "}
-                    {formatManilaDate(account.created_at)}
+                    {formatManilaDate(account.createdAt)}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -117,7 +92,7 @@ export default async function StaffPage() {
                   <Tag tone={account.status === "active" ? "success" : "attention"}>
                     {account.status === "active" ? "Active" : "Deactivated"}
                   </Tag>
-                  {account.must_change_password ? (
+                  {account.mustChangePassword ? (
                     <Tag tone="attention">{"⚠"} Temporary password</Tag>
                   ) : null}
                   {account.id === actor.id ? <Tag>This is you</Tag> : null}
@@ -133,7 +108,7 @@ export default async function StaffPage() {
               ) : (
                 <div className="mt-6 grid gap-8 lg:grid-cols-2">
                   <div className="space-y-6">
-                    <RenameForm userId={account.id} fullName={account.full_name} />
+                    <RenameForm userId={account.id} fullName={account.fullName} />
                     <ResetPasswordForm
                       userId={account.id}
                       username={account.username}

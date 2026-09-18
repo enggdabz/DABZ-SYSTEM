@@ -50,6 +50,8 @@ Repeat step 2 for each remaining migration file, **in number order**:
 | `0001_phase1_foundation.sql` | Accounts, permissions, settings, the audit log, sign-in history |
 | `0002_phase2_money.sql` | Bills, loans and the money in/out ledger — **and seeds your eleven real bills and six loans** |
 | `0003_phase3_staff.sql` | Staff records, the time clock, weekly payroll and cash advances |
+| `0004_timeclock_own_login.sql` | Tightens the time clock so each person clocks only themselves in |
+| `0005_phase4_pos.sql` | Customers, products, sales and the end-of-day count — **and seeds the counter buttons** |
 
 Every table gets Row Level Security switched on.
 

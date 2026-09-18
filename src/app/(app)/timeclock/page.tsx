@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 
 import { Card, Notice, Tag } from "@/components/ui";
@@ -54,6 +55,14 @@ export default async function TimeClockPage() {
   const perDay = scheduledHours(settings.workDayStart, settings.workDayEnd);
   const active = staff.filter((member) => member.status === "active");
 
+  // Since open decision 17.2 was answered, you clock only yourself in - so the
+  // card that matters is your own. Owner/Admin still see everyone, because they
+  // are the ones who record a missed tap.
+  const me = active.find((member) => member.profileId === user.id) ?? null;
+  const others = active.filter((member) => member.id !== me?.id);
+  const canRecordForOthers = isOwnerOrAdmin(user);
+  const noLogins = active.filter((member) => member.profileId === null);
+
   const rows = active.map((member) => {
     const entry = attendance.find((row) => row.staffId === member.id);
     const described = describeAttendance({
@@ -85,9 +94,33 @@ export default async function TimeClockPage() {
       <Notice tone="info" title="This is separate from signing in">
         <p>
           Signing in gets you into the system; timing in starts your working
-          day. Tap your own name when you arrive and when you leave.
+          day. You can only time <strong>yourself</strong> in and out
+          {canRecordForOthers
+            ? " - as owner or admin you can also record a day for someone who forgot, which is written to Activity."
+            : ". If you forgot to tap, ask the owner to correct it."}
         </p>
       </Notice>
+
+      {canRecordForOthers && noLogins.length > 0 ? (
+        <Notice
+          tone="attention"
+          title={`${noLogins.length} staff ${noLogins.length === 1 ? "member has" : "members have"} no login, so they cannot use the time clock`}
+        >
+          <p>
+            {noLogins.map((member) => member.fullName).join(", ")} can no longer
+            tap in, because each person now clocks only themselves. Either create
+            them an account on{" "}
+            <Link href="/accounts" className="underline">
+              Accounts
+            </Link>{" "}
+            and link it on{" "}
+            <Link href="/staff" className="underline">
+              Staff
+            </Link>
+            , or record their days here yourself.
+          </p>
+        </Notice>
+      ) : null}
 
       {active.length === 0 ? (
         <Notice tone="attention" title="No active staff yet">
@@ -120,30 +153,71 @@ export default async function TimeClockPage() {
             ) : null}
           </Card>
 
-          <section>
-            <h2 className="text-xl font-semibold tracking-tight">
-              Tap your name
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              {notInYet.length} of {active.length} have not timed in yet.
-            </p>
+          {me ? (
+            <section>
+              <h2 className="text-xl font-semibold tracking-tight">Your day</h2>
+              <div className="mt-5 max-w-sm">
+                {rows
+                  .filter(({ member }) => member.id === me.id)
+                  .map(({ member, entry }) => (
+                    <ClockCard
+                      key={member.id}
+                      staffId={member.id}
+                      fullName={member.fullName}
+                      position={member.position}
+                      entryId={entry?.id ?? null}
+                      timeInLabel={clockTime(entry?.timeIn ?? null)}
+                      timeOutLabel={clockTime(entry?.timeOut ?? null)}
+                      isIn={!!entry?.timeIn && !entry.timeOut}
+                      isDone={!!entry?.timeIn && !!entry.timeOut}
+                    />
+                  ))}
+              </div>
+            </section>
+          ) : (
+            <Notice
+              tone="attention"
+              title="Your account is not linked to a staff record"
+            >
+              <p>
+                {canRecordForOthers
+                  ? "You can record days for other people below, but you cannot time yourself in until your own staff record is linked to this account on the Staff screen."
+                  : "Ask the owner to link your account to your staff record, then you will be able to time in here."}
+              </p>
+            </Notice>
+          )}
 
-            <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {rows.map(({ member, entry }) => (
-                <ClockCard
-                  key={member.id}
-                  staffId={member.id}
-                  fullName={member.fullName}
-                  position={member.position}
-                  entryId={entry?.id ?? null}
-                  timeInLabel={clockTime(entry?.timeIn ?? null)}
-                  timeOutLabel={clockTime(entry?.timeOut ?? null)}
-                  isIn={!!entry?.timeIn && !entry.timeOut}
-                  isDone={!!entry?.timeIn && !!entry.timeOut}
-                />
-              ))}
-            </div>
-          </section>
+          {canRecordForOthers && others.length > 0 ? (
+            <section>
+              <h2 className="text-xl font-semibold tracking-tight">
+                Record for someone else
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Only you and admins can do this. Use it when somebody forgot to
+                tap &mdash; it is written to Activity with your name on it.{" "}
+                {notInYet.length} of {active.length} have not timed in yet.
+              </p>
+
+              <div className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {rows
+                  .filter(({ member }) => member.id !== me?.id)
+                  .map(({ member, entry }) => (
+                    <ClockCard
+                      key={member.id}
+                      staffId={member.id}
+                      fullName={member.fullName}
+                      position={member.position}
+                      entryId={entry?.id ?? null}
+                      timeInLabel={clockTime(entry?.timeIn ?? null)}
+                      timeOutLabel={clockTime(entry?.timeOut ?? null)}
+                      isIn={!!entry?.timeIn && !entry.timeOut}
+                      isDone={!!entry?.timeIn && !!entry.timeOut}
+                      onBehalf
+                    />
+                  ))}
+              </div>
+            </section>
+          ) : null}
 
           <Card
             title="Today's log"

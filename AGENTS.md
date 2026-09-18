@@ -22,8 +22,15 @@ receiving code.
   a phase until the owner confirms the previous one works.
 - Before a phase: explain in plain language what will be built and why.
   After a phase: explain what was built, how to run it, how to test it.
-- When something is not covered, or an open decision in `docs/DECISIONS.md`
-  blocks the work, **ask the owner** — do not guess. Record the answer there.
+- **The owner has asked me to keep building rather than stop for questions**
+  (18 Sep 2026): "just decide which is best and then we will revise it later if
+  necessary." So when something is not covered, make the best call, build it,
+  and **record it as an assumption in `docs/DECISIONS.md`** with a note on how
+  to change it. Do not block on an open decision.
+- That does **not** override the rule below about missing figures. Deciding how
+  something should work is mine to do; inventing a number only the owner can
+  know — a price, a due day, an interest rate, a wage — is not. Those stay
+  empty, with a warning and an editable field.
 - Prefer simple, readable code. Comment the **why**, not the what.
 
 ## Non-negotiable technical rules
@@ -148,3 +155,27 @@ round trip is the one thing that must be tried against a real project.
   show the disagreement.
 - Print styles must target `body > header` / `body > footer`, never bare
   `header`, or a document's own heading disappears from the page.
+
+## Counter rules (built in Phase 4)
+
+- **A sale always starts blank** (spec 6). Nothing is added by tapping a preset
+  alone: the quantity, and the price where there is no fixed one, is confirmed
+  first.
+- **The server re-derives every total.** `completeSaleAction` never trusts the
+  figures the browser sends; it rebuilds them with `src/lib/pos.ts` and writes
+  those. The screen's totals are a preview, not the record.
+- **`complete_sale` is `SECURITY DEFINER`** and checks `has_permission('add_sales')`
+  itself. The ledger is Owner/Admin only, so this is the one sanctioned path by
+  which a staff member's sale reaches it. Do not open the ledger to staff
+  instead.
+- **A discount is split across divisions by `totalsByDivision`**, which makes
+  the parts add back up to the total exactly. Never allocate a discount in SQL
+  or by rounding each share independently - that leaves a centavo hole in the
+  daily figures.
+- **A sale is voided, never deleted** - the customer may hold the receipt. Its
+  ledger entries are voided with it, or the day keeps counting money that was
+  handed back.
+- **Staff add sales; only Owner/Admin void them.** Staff raise a void request.
+- **A printed document adds up its own rows** - receipts as well as payslips.
+- **A missing price is a real state.** A product with no price makes the counter
+  ask for the amount; that is the answer for anything the owner has not priced.

@@ -440,3 +440,70 @@ export const getAccountOptions = cache(
     }
   },
 );
+
+/**
+ * Login accounts with their permissions, for the Accounts screen.
+ *
+ * Tolerant of failure like the rest of this file: a screen should show what it
+ * can rather than erroring out completely if one query fails.
+ */
+export interface AccountRow {
+  id: string;
+  username: string;
+  fullName: string;
+  role: string;
+  status: "active" | "inactive";
+  mustChangePassword: boolean;
+  createdAt: string;
+  permissions: string[];
+}
+
+export const getAccounts = cache(
+  async (): Promise<{ accounts: AccountRow[]; error: string | null }> => {
+    try {
+      const supabase = await createSupabaseServerClient();
+
+      const [{ data, error }, { data: permissionRows }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, username, full_name, role, status, must_change_password, created_at")
+          .order("role")
+          .order("username"),
+        supabase.from("user_permissions").select("user_id, permission"),
+      ]);
+
+      if (error || !data) {
+        return { accounts: [], error: error?.message ?? "Could not load the accounts." };
+      }
+
+      const byUser = new Map<string, string[]>();
+      for (const row of permissionRows ?? []) {
+        const list = byUser.get(row.user_id) ?? [];
+        list.push(row.permission);
+        byUser.set(row.user_id, list);
+      }
+
+      return {
+        accounts: data.map((row) => ({
+          id: row.id,
+          username: row.username,
+          fullName: row.full_name,
+          role: row.role,
+          status: row.status === "inactive" ? "inactive" : "active",
+          mustChangePassword: row.must_change_password,
+          createdAt: row.created_at,
+          permissions: byUser.get(row.id) ?? [],
+        })),
+        error: null,
+      };
+    } catch (caught) {
+      return {
+        accounts: [],
+        error:
+          caught instanceof Error
+            ? caught.message
+            : "Could not reach the database.",
+      };
+    }
+  },
+);

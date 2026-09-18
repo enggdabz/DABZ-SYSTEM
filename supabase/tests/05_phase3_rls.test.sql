@@ -133,51 +133,88 @@ begin
 end;
 $$;
 
--- ---- The time clock on a shared computer --------------------------------
+-- ---- The time clock: each person clocks only themselves ----------------
+-- Open decision 17.2, answered: a staff member may clock themselves in and
+-- nobody else. Owner/Admin can still record for anyone, as a logged correction.
 do $$
 declare
   v_recorded_by uuid;
+  v_own_entry uuid;
 begin
   raise notice '--- phase 3: the time clock ---';
 
-  -- Spec 13.2: whoever is at the counter taps the button for whoever arrives,
-  -- so a signed-in staff member may record attendance for a colleague. The
-  -- guard is that who pressed it is stored.
-  insert into public.attendance_entries (staff_id, work_date, time_in, recorded_by)
-  values ('aaaaaaaa-0000-0000-0000-000000000002', date '2026-09-14',
-          '2026-09-14T00:05:00Z', auth.uid());
-  raise notice 'PASS: the shared time clock can record a colleague arriving';
+  -- Clocking a COLLEAGUE in is refused.
+  begin
+    insert into public.attendance_entries (staff_id, work_date, time_in, recorded_by)
+    values ('aaaaaaaa-0000-0000-0000-000000000002', date '2026-09-14',
+            '2026-09-14T00:05:00Z', auth.uid());
+    raise exception 'FAIL: a staff member clocked in a colleague';
+  exception when insufficient_privilege then
+    raise notice 'PASS: a staff member cannot clock in a colleague';
+  end;
 
-  select recorded_by into v_recorded_by
-    from public.attendance_entries
-   where staff_id = 'aaaaaaaa-0000-0000-0000-000000000002' and work_date = date '2026-09-14';
-
-  if v_recorded_by <> auth.uid() then
-    raise exception 'FAIL: who pressed the button was not recorded';
-  end if;
-  raise notice 'PASS: every entry records who pressed the button';
-
-  -- Timing out an open shift is allowed...
+  -- Their own shift already exists from the structure tests above; timing out
+  -- their OWN open shift is allowed.
   update public.attendance_entries
      set time_out = '2026-09-14T09:00:00Z'
-   where staff_id = 'aaaaaaaa-0000-0000-0000-000000000002' and work_date = date '2026-09-14';
-  raise notice 'PASS: an open shift can be timed out';
+   where staff_id = public.my_staff_id() and work_date = date '2026-09-14';
 
-  -- ...but a finished shift cannot be quietly rewritten by staff.
+  if (select time_out from public.attendance_entries
+       where staff_id = public.my_staff_id()
+         and work_date = date '2026-09-14') is null then
+    raise exception 'FAIL: a staff member could not time out their own shift';
+  end if;
+  raise notice 'PASS: a staff member can time out their own open shift';
+
+  -- ...but a finished shift cannot be reopened and stretched.
   update public.attendance_entries
      set time_out = '2026-09-14T14:00:00Z'
-   where staff_id = 'aaaaaaaa-0000-0000-0000-000000000002' and work_date = date '2026-09-14';
+   where staff_id = public.my_staff_id() and work_date = date '2026-09-14';
   if (select time_out from public.attendance_entries
-       where staff_id = 'aaaaaaaa-0000-0000-0000-000000000002'
+       where staff_id = public.my_staff_id()
          and work_date = date '2026-09-14') <> '2026-09-14T09:00:00Z'::timestamptz then
     raise exception 'FAIL: staff rewrote a finished shift to add hours';
   end if;
   raise notice 'PASS: staff cannot rewrite a finished shift to add hours';
 
-  -- And cannot clock in someone who no longer works here.
-  update public.staff set status = 'inactive' where id = 'aaaaaaaa-0000-0000-0000-000000000003';
+  -- Clocking THEMSELVES in on a new day is allowed, and records who did it.
+  insert into public.attendance_entries (staff_id, work_date, time_in, recorded_by)
+  values (public.my_staff_id(), date '2026-09-19', '2026-09-19T00:00:00Z', auth.uid())
+  returning id into v_own_entry;
+  raise notice 'PASS: a staff member can clock themselves in';
+
+  select recorded_by into v_recorded_by
+    from public.attendance_entries where id = v_own_entry;
+  if v_recorded_by <> auth.uid() then
+    raise exception 'FAIL: who pressed the button was not recorded';
+  end if;
+  raise notice 'PASS: every entry records who pressed the button';
 end;
 $$;
+
+-- Owner/Admin may still record a day for someone else - the correction path.
+set test.user_id = '22222222-2222-2222-2222-222222222222';
+do $$
+begin
+  insert into public.attendance_entries (staff_id, work_date, time_in, recorded_by)
+  values ('aaaaaaaa-0000-0000-0000-000000000002', date '2026-09-14',
+          '2026-09-14T00:05:00Z', auth.uid());
+  raise notice 'PASS: an admin can still record a shift for someone else';
+
+  -- And can correct a finished shift, which staff cannot.
+  update public.attendance_entries
+     set time_out = '2026-09-14T09:00:00Z', corrected_by = auth.uid()
+   where staff_id = 'aaaaaaaa-0000-0000-0000-000000000002' and work_date = date '2026-09-14';
+  if (select time_out from public.attendance_entries
+       where staff_id = 'aaaaaaaa-0000-0000-0000-000000000002'
+         and work_date = date '2026-09-14') is null then
+    raise exception 'FAIL: an admin could not correct a shift';
+  end if;
+  raise notice 'PASS: an admin can correct a finished shift';
+end;
+$$;
+
+set test.user_id = '33333333-3333-3333-3333-333333333333';
 
 -- ---- Maria (admin) ------------------------------------------------------
 set test.user_id = '22222222-2222-2222-2222-222222222222';

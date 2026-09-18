@@ -19,7 +19,29 @@ export interface AppSettings {
   staffDiscountLimitCentavos: Centavos;
   defaultWarrantyDays: number;
   unclaimedUnitDays: number;
+  /** Which paper receipts print on (open decision 17.3). */
+  receiptPaper: ReceiptPaper;
 }
+
+/**
+ * 58mm thermal is the default, being the common choice for a shop this size.
+ * The other two are supported because the owner may already own a printer.
+ */
+export const RECEIPT_PAPERS = ["thermal_58", "thermal_80", "bond_short"] as const;
+export type ReceiptPaper = (typeof RECEIPT_PAPERS)[number];
+
+export const RECEIPT_PAPER_LABELS: Record<ReceiptPaper, string> = {
+  thermal_58: "58mm thermal roll",
+  thermal_80: "80mm thermal roll",
+  bond_short: "Short bond paper (regular printer)",
+};
+
+/** How wide the printed receipt should be, in millimetres. */
+export const RECEIPT_WIDTH_MM: Record<ReceiptPaper, number> = {
+  thermal_58: 48, // 58mm roll, less the printer's margins
+  thermal_80: 72,
+  bond_short: 180,
+};
 
 /**
  * The defaults from the specification. Used before the owner has changed
@@ -36,6 +58,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   staffDiscountLimitCentavos: 10_000, // PHP 100 (spec 17.8 example)
   defaultWarrantyDays: 30, // spec 9.3
   unclaimedUnitDays: 30, // spec 9.4
+  receiptPaper: "thermal_58", // open decision 17.3, decided
 };
 
 /** Shape of the settings row as it comes back from PostgreSQL. */
@@ -50,6 +73,7 @@ export interface SettingsRow {
   staff_discount_limit_centavos: number;
   default_warranty_days: number;
   unclaimed_unit_days: number;
+  receipt_paper?: string;
 }
 
 export function settingsFromRow(row: SettingsRow): AppSettings {
@@ -66,6 +90,11 @@ export function settingsFromRow(row: SettingsRow): AppSettings {
     staffDiscountLimitCentavos: row.staff_discount_limit_centavos,
     defaultWarrantyDays: row.default_warranty_days,
     unclaimedUnitDays: row.unclaimed_unit_days,
+    receiptPaper: (RECEIPT_PAPERS as readonly string[]).includes(
+      row.receipt_paper ?? "",
+    )
+      ? (row.receipt_paper as ReceiptPaper)
+      : "thermal_58",
   };
 }
 
@@ -97,6 +126,7 @@ export function validateSettingsForm(form: {
   staffDiscountLimitPesos: string;
   defaultWarrantyDays: string;
   unclaimedUnitDays: string;
+  receiptPaper: string;
 }): SettingsValidation {
   const errors: Record<string, string> = {};
 
@@ -165,6 +195,10 @@ export function validateSettingsForm(form: {
     errors.unclaimedUnitDays = "Enter a whole number of days.";
   }
 
+  if (!(RECEIPT_PAPERS as readonly string[]).includes(form.receiptPaper)) {
+    errors.receiptPaper = "Choose which paper receipts print on.";
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -182,6 +216,7 @@ export function validateSettingsForm(form: {
       staffDiscountLimitCentavos: discountAmount,
       defaultWarrantyDays: warrantyDays,
       unclaimedUnitDays: unclaimedDays,
+      receiptPaper: form.receiptPaper as ReceiptPaper,
     },
   };
 }
@@ -199,6 +234,7 @@ export function settingsToRow(settings: AppSettings): SettingsRow {
     staff_discount_limit_centavos: settings.staffDiscountLimitCentavos,
     default_warranty_days: settings.defaultWarrantyDays,
     unclaimed_unit_days: settings.unclaimedUnitDays,
+    receipt_paper: settings.receiptPaper,
   };
 }
 

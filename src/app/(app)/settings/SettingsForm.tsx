@@ -4,7 +4,11 @@ import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
 import { centavosToDecimalString } from "@/lib/money";
-import type { AppSettings } from "@/lib/settings";
+import {
+  RECEIPT_PAPERS,
+  RECEIPT_PAPER_LABELS,
+  type AppSettings,
+} from "@/lib/settings";
 
 import { saveSettingsAction, type SettingsFormState } from "./actions";
 
@@ -141,6 +145,26 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
             />
           </Field>
         </div>
+      </section>
+
+      <section className="space-y-5">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">Receipts</h2>
+          <p className="mt-1 text-sm text-muted">
+            Which paper the counter prints receipts on. Change this if you get a
+            different printer.
+          </p>
+        </div>
+
+        <Field label="Receipt paper" error={errors.receiptPaper}>
+          <Select name="receiptPaper" defaultValue={settings.receiptPaper}>
+            {RECEIPT_PAPERS.map((paper) => (
+              <option key={paper} value={paper}>
+                {RECEIPT_PAPER_LABELS[paper]}
+              </option>
+            ))}
+          </Select>
+        </Field>
       </section>
 
       <section className="space-y-5">

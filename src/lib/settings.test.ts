@@ -21,6 +21,7 @@ const goodForm = {
   staffDiscountLimitPesos: "100",
   defaultWarrantyDays: "30",
   unclaimedUnitDays: "30",
+  receiptPaper: "thermal_58",
 };
 
 describe("validateSettingsForm", () => {
@@ -121,6 +122,7 @@ describe("reading and writing the settings row", () => {
     staff_discount_limit_centavos: 10000,
     default_warranty_days: 30,
     unclaimed_unit_days: 30,
+    receipt_paper: "thermal_58",
   };
 
   it("reads a database row into the shape screens use", () => {
@@ -134,6 +136,22 @@ describe("reading and writing the settings row", () => {
 
   it("falls back to Monday for an unexpected week start", () => {
     expect(settingsFromRow({ ...row, week_starts_on: "tuesday" }).weekStartsOn).toBe("monday");
+  });
+
+  it("falls back to 58mm thermal for an unexpected receipt paper", () => {
+    expect(settingsFromRow({ ...row, receipt_paper: "papyrus" }).receiptPaper).toBe(
+      "thermal_58",
+    );
+    // And for a database that predates the setting existing.
+    expect(settingsFromRow({ ...row, receipt_paper: undefined }).receiptPaper).toBe(
+      "thermal_58",
+    );
+  });
+
+  it("refuses an unknown receipt paper on the form", () => {
+    const result = validateSettingsForm({ ...goodForm, receiptPaper: "papyrus" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors).toHaveProperty("receiptPaper");
   });
 });
 

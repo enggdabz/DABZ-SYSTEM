@@ -6,10 +6,10 @@
  * Logging in is not timing in (spec 4.1). This is the separate, deliberate act
  * of starting and ending a shift.
  *
- * On one shared counter computer, whoever is signed in taps the button for
- * whoever is arriving - so any signed-in, active person may clock any active
- * staff member. Every entry records who pressed it, and the screen shows that,
- * which is the guard against clocking in an absent colleague.
+ * EACH PERSON CLOCKS ONLY THEMSELVES (open decision 17.2, answered). The
+ * database enforces it; these actions just give a clear message when it says
+ * no. Owner and Admin can still record or correct a shift for anyone, which is
+ * the only way to fix a forgotten tap - and every one of those is logged.
  */
 import { revalidatePath } from "next/cache";
 
@@ -55,9 +55,11 @@ export async function timeInAction(
     if (error.code === "23505") {
       return { error: `${name} has already timed in today.` };
     }
+    // Since open decision 17.2 was answered, the database only accepts your own
+    // staff record here - or an Owner/Admin recording for someone else.
     return {
       error:
-        "Could not time in. The staff member may be deactivated, or you may not have permission.",
+        "Could not time in. You can only time yourself in, and only while your account is linked to an active staff record. Ask the owner if that is not set up.",
     };
   }
 

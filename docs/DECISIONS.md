@@ -3,6 +3,19 @@
 Section 17 of the specification lists what still needs the owner's answer. I ask
 for each one **before the phase that needs it**, rather than all at once.
 
+## How decisions are made now
+
+On 18 September 2026 the owner said: *"just decide which is best and then we
+will revise it later if necessary."*
+
+So from Phase 4 onward I make the call, build it, and record it here as an
+assumption with a note on how to change it — rather than stopping to ask.
+
+The one exception is a **figure only the owner can know**: a price, a due day,
+an interest rate, a wage. Those are never invented. They stay empty, with a
+warning and a box to type them into, because a confident wrong number gets
+trusted.
+
 ## Answered
 
 | # | Question | Answer | Date |
@@ -10,6 +23,7 @@ for each one **before the phase that needs it**, rather than all at once.
 | 17.1 | Technology and hosting | **Approved:** Next.js + TypeScript + Supabase + Vercel, as in spec section 2 | 18 Sep 2026 |
 | 17.4 | Default theme | **Dark mode**, with a light/dark switch available | 18 Sep 2026 |
 | 17.6 | Half days | **Half the daily rate.** A ₱500 daily rate pays ₱250 for a half day | 18 Sep 2026 |
+| 17.2 | Devices / time clock | **Each person clocks only themselves in**, which means every staff member needs a login. Owner and Admin can still record a shift for anyone, as a logged correction | 18 Sep 2026 |
 
 Still open from 17.1: **is there a monthly hosting budget limit?** The free
 tiers cover the shop for now (see [SETUP.md](SETUP.md#what-this-costs)), so this
@@ -55,15 +69,27 @@ warnings — worse than no warning at all, because you would start trusting them
 |---|---|---|
 | — | **Each staff member's daily rate** | **Staff** screen. Until a rate is set, payroll will not guess a wage, and the daily target says it is short |
 | 17.5 | The real **shop hours** and which day is **payday** | **Settings**. Shop hours decide who is marked late and how overtime hours are counted, so the 8:00–17:00 default is worth correcting |
-| 17.2 | **Devices** — one shared computer, or each person's own phone? | Affects the time clock. It is built for the shared case: anyone signed in can tap a colleague in, and who pressed the button is recorded. If each person should only clock themselves in, say so and I will tighten it (that needs every staff member to have a login) |
 
-## Needed for Phase 4 — POS and receipts
+## Decided for Phase 4 — POS and receipts
 
-| # | Question |
-|---|---|
-| 17.3 | **Receipt printer:** thermal (58mm or 80mm) or a regular printer on short bond paper? And are one-colour black logo files available for printing? |
-| 17.9 | **Printshoppe prices:** what each colour tier (₱5 / ₱8 / ₱10 / ₱15) is for; lamination, sticker and other product prices; and the bulk discount rules |
-| 17.12 | **Payment methods:** Cash, GCash and Bank are in. Also Maya, or anything else? |
+Made by me, per the owner's instruction to decide and revise later. Each one
+says how to change it.
+
+| # | Question | What I decided | How to change it |
+|---|---|---|---|
+| 17.3 | Receipt printer | **58mm thermal by default**, the common choice for a shop this size. 80mm thermal and short bond paper are also supported | **Settings → Receipt paper**. No code change |
+| 17.9 | What the colour tiers are for | Labelled by **ink coverage**: ₱5 light, ₱8 medium, ₱10 heavy, ₱15 full page / photo. That is the usual reason a print shop tiers colour | Rename them on the **Products** screen |
+| 17.9 | Bulk discount rules | Built the **mechanism** — per-product quantity tiers, e.g. "50 pages or more: ₱2.50 each" — and seeded **no rules at all** | Add tiers per product on **Products** |
+| 17.12 | Payment methods | **Added Maya** alongside Cash, GCash and Bank. An unused method costs nothing; a missing one costs a sale | It is a fixed list in the code; tell me to add another |
+
+**Prices I did not invent.** Lamination, stickers, mugs, souvenirs and DTF
+prints are seeded as products with **no price**, so the POS asks for the amount
+each time until the owner sets one. Same rule as bill due days and daily rates:
+a price is a figure only the owner can know.
+
+Still worth sending when convenient: **one-colour black logo files** for
+receipts. Until they arrive, receipts print a plain text wordmark, because a
+white crest on white paper is invisible (spec 3.3).
 
 ## Needed for Phase 5 — Expenses and stocks
 

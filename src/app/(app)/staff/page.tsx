@@ -31,6 +31,8 @@ export default async function StaffPage() {
   const active = staff.filter((member) => member.status === "active");
   const inactive = staff.filter((member) => member.status !== "active");
   const missingRates = active.filter((member) => member.dailyRateCentavos === null);
+  // Since open decision 17.2 was answered, no login means no time clock.
+  const noLogins = active.filter((member) => member.profileId === null);
   const today = civilDateToISO(manilaToday());
 
   const totalOutstandingAdvances = sumCentavos(
@@ -58,6 +60,24 @@ export default async function StaffPage() {
             Add each person below with their daily rate. Once at least one
             person has a rate, payroll can be worked out and the daily target on
             the Home screen will include wages.
+          </p>
+        </Notice>
+      ) : null}
+
+      {noLogins.length > 0 ? (
+        <Notice
+          tone="attention"
+          title={`${noLogins.length} staff ${noLogins.length === 1 ? "member has" : "members have"} no login, so ${noLogins.length === 1 ? "they cannot" : "they cannot"} use the time clock`}
+        >
+          <p>
+            Each person now clocks only themselves in, so{" "}
+            {noLogins.map((member) => member.fullName).join(", ")} cannot tap in
+            without an account. Create one on{" "}
+            <Link href="/accounts" className="underline">
+              Accounts
+            </Link>{" "}
+            and link it below &mdash; or leave it, and record their days
+            yourself on the time clock.
           </p>
         </Notice>
       ) : null}
@@ -125,7 +145,7 @@ export default async function StaffPage() {
                     {member.profileId ? (
                       <Tag tone="accent">Has a login</Tag>
                     ) : (
-                      <Tag>Time clock only</Tag>
+                      <Tag tone="attention">{"\u26a0"} No login, no time clock</Tag>
                     )}
                     {member.dailyRateCentavos === null ? (
                       <Tag tone="attention">{"⚠"} No daily rate</Tag>

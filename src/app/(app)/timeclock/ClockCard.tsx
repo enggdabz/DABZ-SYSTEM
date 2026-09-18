@@ -37,6 +37,7 @@ export function ClockCard({
   timeOutLabel,
   isIn,
   isDone,
+  onBehalf = false,
 }: {
   staffId: string;
   fullName: string;
@@ -46,6 +47,8 @@ export function ClockCard({
   timeOutLabel: string | null;
   isIn: boolean;
   isDone: boolean;
+  /** True when an Owner/Admin is recording for someone else, not clocking in. */
+  onBehalf?: boolean;
 }) {
   const [inState, submitIn, inPending] = useActionState<ClockState, FormData>(
     timeInAction,
@@ -95,7 +98,9 @@ export function ClockCard({
             <form action={submitOut} className="space-y-2">
               <input type="hidden" name="entryId" value={entryId} />
               <p className="text-sm">
-                Time out {fullName.split(" ")[0]} now?
+                {onBehalf
+                  ? `Record ${fullName.split(" ")[0]} timing out now? This is logged as your correction.`
+                  : `Time out now?`}
               </p>
               <div className="flex gap-2">
                 <Button type="submit" disabled={outPending}>
@@ -123,7 +128,11 @@ export function ClockCard({
         ) : confirming === "in" ? (
           <form action={submitIn} className="space-y-2">
             <input type="hidden" name="staffId" value={staffId} />
-            <p className="text-sm">Time in {fullName.split(" ")[0]} now?</p>
+            <p className="text-sm">
+              {onBehalf
+                ? `Record ${fullName.split(" ")[0]} timing in now? This is logged as your correction.`
+                : `Time in now?`}
+            </p>
             <div className="flex gap-2">
               <Button type="submit" disabled={inPending}>
                 {inPending ? "Saving…" : "Yes, time in"}
@@ -143,7 +152,7 @@ export function ClockCard({
             className="w-full"
             onClick={() => setConfirming("in")}
           >
-            Time in
+            {onBehalf ? `Record time in` : "Time in"}
           </Button>
         )}
       </div>

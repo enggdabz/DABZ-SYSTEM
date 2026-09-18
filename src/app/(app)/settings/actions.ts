@@ -42,6 +42,7 @@ export async function saveSettingsAction(
     staffDiscountLimitPesos: String(formData.get("staffDiscountLimitPesos") ?? ""),
     defaultWarrantyDays: String(formData.get("defaultWarrantyDays") ?? ""),
     unclaimedUnitDays: String(formData.get("unclaimedUnitDays") ?? ""),
+    receiptPaper: String(formData.get("receiptPaper") ?? ""),
   });
 
   if (!result.ok) {

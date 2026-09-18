@@ -10,9 +10,9 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 0 | Setup & learning | ✅ Done |
 | 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ Done |
 | 2 | Bills, loans, ledger, Overview (the money side) | ✅ Done |
-| 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ **Done — waiting on owner to confirm** |
-| 4 | Customers + Dabz Printshoppe POS | Next |
-| 5 | Expenses pop-up and stocks | Not started |
+| 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ Done |
+| 4 | Customers + Dabz Printshoppe POS | ✅ **Done — waiting on owner to confirm** |
+| 5 | Expenses pop-up and stocks | Next |
 | 6 | Dabz Apparel job orders | Not started |
 | 7 | DabzTech Solutions job tickets | Not started |
 | 8 | Reports | Not started |
@@ -398,16 +398,147 @@ With Supabase connected and **all four** migrations run:
 
 ---
 
-## Phase 4 — Customers and the Dabz Printshoppe POS (next)
+## Phase 4 — Customers and the Dabz Printshoppe POS ✅
 
-Needs the answers marked **needed for Phase 4** in [DECISIONS.md](DECISIONS.md):
-the receipt printer (17.3), the Printshoppe prices behind each colour tier and
-the bulk discount rules (17.9), and whether to add Maya alongside Cash, GCash
-and Bank (17.12).
+Also in this phase: the time clock was tightened so **each person clocks only
+themselves in** (open decision 17.2, answered).
 
-- Customers, shared across all three divisions.
-- The POS rules from spec 6: always starts blank, quantity confirmed before a
-  line is added, discounts within the limits already in Settings, change
-  computed instantly.
-- Printshoppe presets, the tarpaulin calculator, and the new-product box.
-- Receipts, void requests, and end-of-day closing.
+**Built**
+
+*The counter (spec 6, 7)*
+- Preset buttons for everything the owner priced: black & white ₱3, the four
+  colour tiers, photocopy ₱3.
+- **A sale always starts blank.** Tapping a button opens a small box to confirm
+  the quantity — and the price, where there is not a fixed one — before
+  anything is added.
+- The **tarpaulin calculator** beside the counter: width × height, a rate of
+  ₱30 / ₱25 / ₱20 / ₱15, and **Add to sale**. It also works as a quote on its
+  own, without adding anything.
+- **+ New product** for something not on a button, with "save this to my
+  product list".
+- Discount as **₱ or %** on the whole sale, inside the limits already in
+  Settings. Staff without the discount permission do not see it.
+- Cash / GCash / **Maya** / Bank, with a reference number for the non-cash ones
+  and change worked out as you type.
+- **Complete sale & print** → the screen clears and offers the receipt.
+
+*Customers (spec 5)*
+- One shared list for all three divisions, with purchase history.
+- The customer pop-up at the counter: search, add new, or **skip — walk-in**.
+
+*Receipts*
+- Printable, narrow, black on white. The paper is a **setting** — 58mm thermal
+  by default, with 80mm and short bond also supported.
+- Every figure is added up from the lines printed on it, so a customer can
+  check it by hand.
+
+*Voids (spec 4.4)*
+- Staff can **add** a sale but never edit or delete one. They ask; the owner or
+  an admin decides. Approving voids the sale **and** its takings, so the day's
+  figures stop counting money that was handed back. The sale row stays, marked
+  — the customer may still be holding the receipt.
+
+*End of day (spec 15.2)*
+- Cash sales less cash paid out = what should be in the drawer; staff count it;
+  the difference is shown with a ⚠ if it is not zero. GCash, Maya and bank
+  totals, and whether the target was reached.
+
+*Products*
+- Prices, groups and **bulk discounts** — quantity tiers like "from 50 up,
+  ₱2.50 each". The mechanism is built; **no rules were invented**.
+
+**What I decided, and how to change it**
+
+The owner asked me to decide rather than ask, so these are my calls — all
+recorded in [DECISIONS.md](DECISIONS.md) with how to change each one:
+
+| Decision | Change it |
+|---|---|
+| 58mm thermal receipts by default | **Settings → Receipt paper** |
+| Colour tiers named by ink coverage (light / medium / heavy / full page) | Rename on **Products** |
+| Maya added as a payment method | Tell me to add another |
+| Bulk pricing mechanism, no rules | Add tiers per product on **Products** |
+
+**Prices I did not invent.** Lamination, stickers, mugs, souvenirs and DTF
+prints have **no price** — the counter asks for the amount each time, and both
+the counter and the Products screen say why. A wrong price on a real sale is
+worse than a question.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Money, dates, payroll, POS pricing, the closing | `npm test` | 270 tests |
+| Security and money guarantees against a real PostgreSQL | `npm run test:rls` | 140 checks |
+| Every table and column the app asks for exists | `npm run check:schema` | 24 tables, 440 columns |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+What the database checks prove:
+
+- A staff member can ring up a sale but **cannot edit, delete or void one** —
+  they ask, and the owner decides.
+- A staff member without the selling permission cannot ring one up at all, and
+  sees only the sales they made themselves.
+- Staff can save a new product from the counter but cannot **change a price** or
+  remove a product.
+- Voiding marks the sale and voids its takings; it never deletes either, and a
+  sale cannot be voided twice.
+- The database refuses figures that do not add up: a total that is not subtotal
+  less discount, a line total that is not price × quantity, or change recorded
+  on a non-cash sale.
+- A day can only be closed once.
+- Each person clocks only themselves in; an admin can still record for someone
+  else, as a logged correction.
+
+**Two bugs these checks caught**
+
+1. **Selling could not reach the ledger.** The ledger is Owner/Admin only and
+   should stay that way — but every sale has to record its takings there.
+   `complete_sale` is now `SECURITY DEFINER` and checks the selling permission
+   itself, making it the one sanctioned path rather than opening the ledger to
+   staff.
+2. The time-clock policy's "is this person active?" check failed for exactly
+   the people it was meant to allow, because a policy sub-query is subject to
+   RLS too.
+
+Plus two found by looking at the rendered pages: the receipt printed "Cash"
+twice, and the navigation bar had grown to fifteen items in build order rather
+than daily-use order.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 270 passed
+npm run dev
+```
+
+With Supabase connected and **all six** migrations run:
+
+1. Open **Counter**. Tap *Print, black & white*, enter 12, add it. Tap
+   *Print, colored - full page*, enter 3. Use the tarpaulin calculator for
+   3 × 5 ft and add that. The subtotal should read **₱531.00**.
+2. Give 10% discount → **₱477.90**. Enter ₱500 given → change **₱22.10**.
+3. Complete the sale, then print the receipt and check the arithmetic by hand.
+4. Open **Money in/out**: the takings should already be there, split by
+   division.
+5. Sign in as a staff member without the void permission, ring up a sale, and
+   try to undo it — you should only be able to *ask*. Approve it as yourself
+   and check the takings disappear from the day.
+6. Open **End of day**, count the drawer, and see the difference.
+7. Set a price for **Lamination** on Products and watch it become a fixed
+   button.
+
+---
+
+## Phase 5 — Expenses and stocks (next)
+
+Needs, when convenient: your most frequent purchases and suppliers (17.14), and
+your main materials with their units and reorder levels (17.15). As before, I
+will build the machinery and you fill in the figures.
+
+- The expenses pop-up, aimed at under ten seconds per entry, with quick picks.
+- Stock items with photos, stock in/out, history, low-stock alerts and counts.
+- Supplier payables for anything received but not yet paid for.
+- Once material costs are tracked, the daily target can finally compare against
+  **profit** rather than sales.

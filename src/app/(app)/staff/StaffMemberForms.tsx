@@ -181,7 +181,7 @@ export function LinkAccountForm({
       <input type="hidden" name="staffId" value={staffId} />
       <Field
         label="Login account"
-        hint="Optional. Someone who only uses the time clock does not need one. With an account they can see their own attendance and payslips."
+        hint="Needed for the time clock, because each person clocks only themselves in. It also lets them see their own attendance and payslips. Without one, you record their days for them."
       >
         <Select name="profileId" defaultValue={currentProfileId ?? ""}>
           <option value="">No login</option>
