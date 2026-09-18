@@ -61,7 +61,7 @@ export const MODULES: readonly Module[] = [
     short: "Expenses",
     body: "Expense capture and approval, recurring bills, loans.",
     roles: ["owner", "admin", "staff"],
-    ready: false,
+    ready: true,
   },
   {
     key: "payroll",
