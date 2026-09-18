@@ -290,3 +290,32 @@ round trip is the one thing that must be tried against a real project.
 - The same service can be priced **per machine or for any machine**
   (`unit_kind`). That is how open decision 17.11 - "does a laptop cost the same
   as a desktop?" - is left open in the shape of the data rather than answered.
+
+## Report rules (built in Phase 8)
+
+- **Reports store nothing.** There is no report table and no nightly job:
+  `src/lib/reports.ts` takes ledger entries and a date range and adds them up,
+  and the screen computes it fresh every time it is opened. The cost is one
+  read per visit; the benefit is that a report can never fall out of step with
+  the screens it was built from. Phase 8 added **no migration at all**.
+- **A period is compared with the same LENGTH of time immediately before it**,
+  not with "last month". Eleven days of this month against the eleven days
+  before them - otherwise a half month always looks like a collapse.
+- **A percentage against zero is never given.** "Up 100%" from nothing is
+  meaningless and "up ∞%" is worse, so `compareTo()` returns `percent: null`
+  and says "nothing to compare with".
+- **Share percentages are not forced to add up to 100.** Forcing them would
+  mean printing a share the money does not actually make. The amounts are the
+  truth; a test asserts the amounts add back up exactly, and the screen says
+  the percentages may not.
+- **Real money never reads as "0%".** A category rounding below half a percent
+  shows `<1%` - a zero beside money that was actually spent reads as a bug in
+  the report. The CSV keeps the plain number, because a spreadsheet has to read
+  that column as a number.
+- **What is owed is kept out of the period figures.** Money owed to the shop
+  was already counted as income when the work was done; adding it to a month's
+  income would count it twice. It lives in a separate "as of today" block that
+  says so.
+- **A route handler re-checks the asker.** `/reports/export` calls
+  `requireOwnerOrAdmin()` exactly as a screen does - a URL is a public endpoint
+  whether or not anyone linked to it.

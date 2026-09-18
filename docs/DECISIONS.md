@@ -220,3 +220,12 @@ to ask:
   it arrived. A repair that took three weeks is not an abandoned unit.
 - Removing a part from a repair charge **does not put it back on the shelf**.
   The part did leave; putting it back is a delivery somebody records on Stocks.
+- A report period is compared with the **same length of time immediately
+  before** it, not with the previous calendar month — eleven days against
+  eleven days, so a half month never looks like a collapse.
+- A percentage change against **zero is not given at all**. "Up 100%" from
+  nothing is meaningless, so the report says "nothing to compare with".
+- **Share percentages are not forced to total 100.** The amounts are exact; the
+  percentages are a reading aid and the screen says so.
+- Reports are **computed on the spot, never stored**. Nothing to rebuild,
+  nothing to fall out of step.

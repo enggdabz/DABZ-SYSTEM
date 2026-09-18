@@ -15,7 +15,7 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — waiting on owner to confirm** |
 | 6 | Dabz Apparel job orders | ✅ **Done — waiting on owner to confirm** |
 | 7 | DabzTech Solutions job tickets | ✅ **Done — waiting on owner to confirm** |
-| 8 | Reports | Next |
+| 8 | Reports | ✅ **Done — waiting on owner to confirm** |
 | 9 | Later: public website, Messenger, Meta Ads, chatbot, notifications | Not in first build |
 
 ---
@@ -902,9 +902,104 @@ first. Then:
 
 ---
 
-## Phase 8 — Reports (next)
+## Phase 8 — Reports ✅
 
-Everything the shop records now has somewhere to be summed: daily and monthly
-sales per division, income by category, expenses, profit, payroll cost, stock
-value and what is owed. Nothing new needs deciding — reports read what the
-earlier phases already write, which is why they come last.
+**Built**
+
+Reports come last because they invent nothing. Every figure is a sum over rows
+the earlier phases already write, which is why this phase added **no database
+migration at all** — there is no report table, no nightly job and nothing to
+rebuild. A report is computed the moment you open it, so it can never fall out
+of step with the screens it came from.
+
+*The period*
+- Today, this week, this month, last month, this year.
+- The week honours your **week start** setting; "this month" ends **today**,
+  not at month end, so half a month is not shown as a whole one.
+
+*The money*
+- Income, shop expenses and **profit**, each compared with the **same length of
+  time immediately before** — eleven days of this month against the eleven days
+  before them. Comparing eleven days with a whole month would make every month
+  look like a collapse until the last day.
+- A percentage against zero is **never given**: "up 100%" from nothing is
+  meaningless, so it says "nothing to compare with" instead.
+- Borrowed money, owner capital and owner withdrawals are shown **separately
+  and out of the profit figure**, with a line saying why. A month where
+  ₱100,000 was borrowed is not a month where ₱100,000 was earned.
+
+*Where it came from and where it went*
+- Income split by division, and each division split into its own categories,
+  biggest first, with a bar for the share.
+- Expenses by category, and underneath, how much of it was the **cost of doing
+  the work** — materials, fuel, meals — as opposed to the bills and wages your
+  daily target already exists to cover.
+- Percentages are rounded and **not forced to total 100**, because forcing them
+  would mean printing a share the money does not make. A test asserts the
+  amounts add back up exactly, and the screen says so in plain words.
+- A category rounding below half a percent shows **&lt;1%**, never "0%" — a
+  zero beside money that was actually spent reads as a bug in the report.
+
+*Where the shop stands today*
+- Owed **to** you: unpaid apparel job orders and repair tickets.
+- Owed **by** you: bills left this month, loans, suppliers.
+- Materials on the shelves, with anything unpriced counted and left out rather
+  than valued at zero.
+- Deliberately outside the period figures, with a line saying why: money you
+  are owed was already counted as income when the work was done, so adding it
+  to a month's income would count it twice.
+
+*Taking it away*
+- **Print** — black on white, laid out for A4, for an accountant or a folder.
+- **Download as a spreadsheet** — a CSV with plain numbers, no peso signs and
+  no thousands separators, so a spreadsheet reads them as numbers. Every field
+  is quoted, so a comma in a label cannot split a row.
+- The download is a route handler, and it **re-checks who is asking** exactly
+  as a screen does: a URL is a public endpoint whether or not anyone linked
+  to it.
+
+*Who can see it*
+- Full reports are **Owner/Admin only** and cannot be granted to staff
+  (spec 4.3). A staff member's own day's takings are already on the Sales
+  screen, where Row Level Security decides which sales they see.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Ranges, comparisons, shares, CSV escaping, profit rules | `npm test` | 444 tests |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 218 checks |
+| That every table and column the app asks for exists | `npm run check:schema` | 41 tables |
+| Every screen at 390 / 768 / 1024 / 1440, every pop-up on screen | headless browser | 36 screens × 4 sizes |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+No new security tests were needed, and that is the point: reports read the
+ledger, and the ledger's rules were proved in Phase 2. Nothing new was opened.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 444 passed
+npm run dev
+```
+
+No migration to run. Then:
+
+1. Open **Reports**. It starts on this month.
+2. Try **Last month** and **This year** — the comparison line under each figure
+   changes with the period.
+3. Check that borrowed money is in its own box and **not** in the profit.
+4. Press **Download as a spreadsheet** and open the file. The amounts should be
+   numbers your spreadsheet can add up, not text.
+5. Press **Print** and check the sheet against the screen — they are built from
+   the same sums.
+
+---
+
+## Phase 9 — Later, and not in the first build
+
+Public website, Messenger integration, Meta Ads tracking, a chatbot and push
+notifications. All of them sit outside the shop's own records, and the shop
+runs without any of them. They wait until the system above has been used for a
+while and earned them.

@@ -46,6 +46,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/payroll", label: "Payroll", ownerOrAdminOnly: true, phase: 3 },
   { href: "/staff", label: "Staff", ownerOrAdminOnly: true, phase: 3 },
 
+  { href: "/reports", label: "Reports", ownerOrAdminOnly: true, phase: 8 },
   { href: "/products", label: "Products", ownerOrAdminOnly: true, phase: 4 },
   { href: "/accounts", label: "Accounts", ownerOrAdminOnly: true, phase: 1 },
   { href: "/activity", label: "Activity", ownerOrAdminOnly: true, phase: 1 },
