@@ -12,15 +12,17 @@ function SubmitButton() {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-700 disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200"
+      className="label-caps w-full rounded-lg bg-brand px-4 py-3 text-white transition hover:bg-brand-strong disabled:opacity-60"
     >
       {pending ? "Signing in…" : "Sign in"}
     </button>
   );
 }
 
+// The card is always white, so these inputs are styled for a light surface
+// rather than following the app's light/dark tokens.
 const inputClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:focus:border-slate-400";
+  "w-full rounded-lg border border-zinc-300 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/20";
 
 export function SignInForm({ next }: { next?: string }) {
   const [state, formAction] = useActionState(signIn, emptyAuthState);
@@ -30,9 +32,7 @@ export function SignInForm({ next }: { next?: string }) {
       {next ? <input type="hidden" name="next" value={next} /> : null}
 
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Username
-        </span>
+        <span className="label-caps text-zinc-600">Username</span>
         <input
           name="username"
           type="text"
@@ -45,9 +45,7 @@ export function SignInForm({ next }: { next?: string }) {
       </label>
 
       <label className="block space-y-1.5">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
-          Password
-        </span>
+        <span className="label-caps text-zinc-600">Password</span>
         <input
           name="password"
           type="password"
@@ -60,7 +58,7 @@ export function SignInForm({ next }: { next?: string }) {
       {state.error ? (
         <p
           role="alert"
-          className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-950 dark:text-red-300"
+          className="rounded-lg border-l-2 border-brand bg-brand-soft px-3 py-2 text-sm text-brand-strong"
         >
           {state.error}
         </p>
@@ -68,7 +66,7 @@ export function SignInForm({ next }: { next?: string }) {
 
       <SubmitButton />
 
-      <p className="text-center text-sm text-slate-500 dark:text-slate-400">
+      <p className="text-center text-xs text-zinc-500">
         Accounts are created by the owner or an admin.
       </p>
     </form>

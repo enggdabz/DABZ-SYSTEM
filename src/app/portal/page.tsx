@@ -27,62 +27,63 @@ export default async function PortalPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-        My account
-      </h1>
-
       {profile.must_change_password ? (
         <p
           role="alert"
-          className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+          className="rounded-xl border-l-2 border-brand bg-brand-soft px-4 py-3 text-sm text-brand-strong"
         >
           You still need to change your password.
         </p>
       ) : null}
 
-      <dl className="grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-2 dark:border-slate-800 dark:bg-slate-800">
-        {details.map((item) => (
-          <div key={item.label} className="bg-white p-5 dark:bg-slate-950">
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400">
-              {item.label}
-            </dt>
-            <dd className="mt-1.5 text-sm text-slate-900 dark:text-white">{item.value}</dd>
-          </div>
-        ))}
-      </dl>
+      <section>
+        <h2 className="label-caps mb-4 text-fg-subtle">Details</h2>
+        <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {details.map((item) => (
+            <div
+              key={item.label}
+              className="relative overflow-hidden rounded-xl border border-line bg-card p-5"
+            >
+              <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-brand" />
+              <dt className="label-caps text-fg-subtle">{item.label}</dt>
+              <dd className="mt-2 text-sm font-medium text-fg">{item.value}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
 
       <section>
-        <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-white">
-          Permissions
-        </h2>
+        <h2 className="label-caps mb-4 text-fg-subtle">Permissions</h2>
         {bypassesPermissions ? (
-          <p className="text-sm text-slate-600 dark:text-slate-400">
-            {role === "owner" ? "Owners" : "Admins"} have full access and are not limited
-            by individual permissions.
+          <p className="rounded-xl border border-line bg-card p-5 text-sm text-fg-muted">
+            {role === "owner" ? "Owners" : "Admins"} have full access and are not
+            limited by individual permissions.
           </p>
         ) : (
-          <ul className="grid gap-2 sm:grid-cols-2">
-            {PERMISSIONS.map((permission) => (
-              <li
-                key={permission}
-                className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm dark:border-slate-800"
-              >
-                <span
-                  aria-hidden
-                  className={
-                    grantedSet.has(permission)
-                      ? "size-2 rounded-full bg-emerald-500"
-                      : "size-2 rounded-full bg-slate-300 dark:bg-slate-700"
-                  }
-                />
-                <span className="text-slate-700 dark:text-slate-300">
-                  {permission.replaceAll("_", " ")}
-                </span>
-                <span className="sr-only">
-                  {grantedSet.has(permission) ? "granted" : "not granted"}
-                </span>
-              </li>
-            ))}
+          <ul className="grid gap-3 sm:grid-cols-2">
+            {PERMISSIONS.map((permission) => {
+              const on = grantedSet.has(permission);
+              return (
+                <li
+                  key={permission}
+                  className="flex items-center gap-3 rounded-xl border border-line bg-card px-4 py-3 text-sm"
+                >
+                  <span
+                    aria-hidden
+                    className={`size-2 shrink-0 rounded-full ${
+                      on ? "bg-brand" : "bg-line"
+                    }`}
+                  />
+                  <span className={on ? "text-fg" : "text-fg-subtle"}>
+                    {permission.replaceAll("_", " ")}
+                  </span>
+                  {/* Identity is never colour alone. */}
+                  <span className="label-caps ml-auto text-fg-subtle">
+                    {on ? "Granted" : "No"}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

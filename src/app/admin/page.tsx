@@ -2,131 +2,119 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { requireUser } from "@/lib/auth";
-import type { AppRole } from "@/lib/types/app";
+import { modulesFor } from "@/lib/modules";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Dashboard" };
 
-/**
- * The modules backed by the existing database schema. `ready` flips to true as
- * each one is built; until then the card is inert rather than a link, so it
- * cannot lead to a 404.
- */
-const MODULES: {
-  href: string;
-  title: string;
-  body: string;
-  roles: readonly AppRole[];
-  ready: boolean;
-}[] = [
-  {
-    href: "/admin/sales",
-    title: "Sales",
-    body: "Point of sale, sale lines, discounts and void requests.",
-    roles: ["owner", "admin", "staff"],
-    ready: false,
-  },
-  {
-    href: "/admin/repairs",
-    title: "DabzTech repairs",
-    body: "Repair tickets, services, parts fitted and repair payments.",
-    roles: ["owner", "admin", "staff"],
-    ready: false,
-  },
-  {
-    href: "/admin/apparel",
-    title: "Apparel job orders",
-    body: "Orders, name lists, fabric and collar options, down payments.",
-    roles: ["owner", "admin", "staff"],
-    ready: false,
-  },
-  {
-    href: "/admin/inventory",
-    title: "Inventory",
-    body: "Stock items, stock movements, suppliers and payables.",
-    roles: ["owner", "admin", "staff"],
-    ready: false,
-  },
-  {
-    href: "/admin/expenses",
-    title: "Expenses & bills",
-    body: "Expense capture and approval, recurring bills, loans.",
-    roles: ["owner", "admin", "staff"],
-    ready: false,
-  },
-  {
-    href: "/admin/payroll",
-    title: "Payroll & attendance",
-    body: "Weekly payroll, attendance entries, cash advances.",
-    roles: ["owner", "admin"],
-    ready: false,
-  },
-  {
-    href: "/admin/reports",
-    title: "Reports & day closing",
-    body: "Ledger, daily sales, day closing and targets.",
-    roles: ["owner", "admin"],
-    ready: false,
-  },
-  {
-    href: "/admin/settings",
-    title: "Settings & users",
-    body: "Shop settings, staff accounts, permissions and audit log.",
-    roles: ["owner", "admin"],
-    ready: false,
-  },
-];
+/** Reference tables whose contents the shop maintains directly. */
+const COUNTED = [
+  { table: "products", label: "Products" },
+  { table: "repair_services", label: "Repair services" },
+  { table: "apparel_products", label: "Apparel products" },
+  { table: "bills", label: "Recurring bills" },
+  { table: "loans", label: "Active loans" },
+  { table: "suppliers", label: "Suppliers" },
+  { table: "customers", label: "Customers" },
+  { table: "staff", label: "Staff" },
+] as const;
+
+async function counts() {
+  const supabase = await createClient();
+  const results = await Promise.all(
+    COUNTED.map(async ({ table, label }) => {
+      const { count, error } = await supabase
+        .from(table)
+        .select("*", { count: "exact", head: true });
+      return { label, count: error ? null : (count ?? 0) };
+    }),
+  );
+  return results;
+}
 
 export default async function AdminDashboard() {
   const { role, profile } = await requireUser();
-  const visible = MODULES.filter((m) => m.roles.includes(role));
+  const [tiles, modules] = await Promise.all([
+    counts(),
+    Promise.resolve(modulesFor(role)),
+  ]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-          Dashboard
-        </h1>
-        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-          Signed in as {profile.full_name} ({role}).
+        <p className="label-caps text-brand">Overview</p>
+        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-fg">
+          Welcome back, {profile.full_name}
+        </h2>
+        <p className="mt-1 text-sm text-fg-muted">
+          Reference data currently held in the system.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {visible.map((module) => {
-          const heading = (
-            <>
-              <div className="flex items-start justify-between gap-3">
-                <h2 className="text-sm font-semibold text-slate-900 dark:text-white">
-                  {module.title}
-                </h2>
-                {module.ready ? null : (
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                    Not built yet
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">{module.body}</p>
-            </>
-          );
-
-          return module.ready ? (
-            <Link
-              key={module.href}
-              href={module.href}
-              className="rounded-xl border border-slate-200 p-5 transition hover:border-slate-400 hover:bg-slate-50 dark:border-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-900"
-            >
-              {heading}
-            </Link>
-          ) : (
+      <section aria-labelledby="totals">
+        <h3 id="totals" className="sr-only">
+          Record totals
+        </h3>
+        <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {tiles.map((tile) => (
             <div
-              key={module.href}
-              className="rounded-xl border border-dashed border-slate-200 p-5 opacity-70 dark:border-slate-800"
+              key={tile.label}
+              className="relative overflow-hidden rounded-xl border border-line bg-card p-5"
             >
-              {heading}
+              {/* A thin red rule anchors the tile without turning it into a red field. */}
+              <span aria-hidden className="absolute inset-x-0 top-0 h-0.5 bg-brand" />
+              <dt className="label-caps text-fg-subtle">{tile.label}</dt>
+              <dd className="mt-2 text-3xl font-semibold tabular-nums text-fg">
+                {tile.count === null ? "—" : tile.count}
+              </dd>
             </div>
-          );
-        })}
-      </div>
+          ))}
+        </dl>
+        <p className="mt-3 text-xs text-fg-subtle">
+          Sales, repair tickets and apparel orders have no records yet, so no
+          trends are shown.
+        </p>
+      </section>
+
+      <section aria-labelledby="modules">
+        <h3 id="modules" className="label-caps mb-4 text-fg-subtle">
+          Modules
+        </h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {modules.map((module) => {
+            const inner = (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <h4 className="text-sm font-semibold text-fg">{module.title}</h4>
+                  {module.ready ? null : (
+                    <span className="shrink-0 rounded-full bg-canvas px-2 py-0.5 text-[0.6875rem] font-medium text-fg-subtle">
+                      Not built yet
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-sm text-fg-muted">{module.body}</p>
+              </>
+            );
+
+            return module.ready ? (
+              <Link
+                key={module.key}
+                href={module.href}
+                className="rounded-xl border border-line bg-card p-5 transition hover:border-brand"
+              >
+                {inner}
+              </Link>
+            ) : (
+              <div
+                key={module.key}
+                className="rounded-xl border border-dashed border-line bg-card p-5 opacity-70"
+              >
+                {inner}
+              </div>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

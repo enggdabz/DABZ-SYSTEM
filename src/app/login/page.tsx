@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { Brand } from "@/components/brand";
 import { SignInForm } from "@/components/auth-form";
 
 export const metadata: Metadata = { title: "Sign in" };
@@ -15,24 +16,32 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const message = errorKey ? (MESSAGES[errorKey] ?? null) : null;
 
   return (
-    <main className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
-      <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
-        DABZ System
-      </h1>
-      <p className="mt-2 mb-8 text-sm text-slate-600 dark:text-slate-400">
-        Sign in to continue.
-      </p>
+    // The brand mark carries white text, so it sits on the near-black field
+    // above the card rather than on the white panel itself.
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-ink px-6 py-12">
+      <div className="mb-8">
+        <Brand />
+      </div>
 
-      {message ? (
-        <p
-          role="alert"
-          className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-        >
-          {message}
+      <div className="w-full max-w-sm rounded-2xl bg-white p-7 shadow-xl">
+        <h1 className="text-lg font-semibold tracking-tight text-zinc-900">Sign in</h1>
+        <p className="mt-1 mb-6 text-sm text-zinc-500">
+          Staff accounts only.
         </p>
-      ) : null}
 
-      <SignInForm next={next} />
-    </main>
+        {message ? (
+          <p
+            role="alert"
+            className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800"
+          >
+            {message}
+          </p>
+        ) : null}
+
+        <SignInForm next={next} />
+      </div>
+
+      <p className="mt-8 text-xs text-zinc-500">DABZ Printshoppe</p>
+    </div>
   );
 }

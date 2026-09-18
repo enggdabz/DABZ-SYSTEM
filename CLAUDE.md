@@ -32,3 +32,30 @@ rules. **It predates this codebase and must not be recreated or reset.**
 - Route protection lives in `src/proxy.ts` (Next.js 16 renamed `middleware` to `proxy`).
 - Use `createClient()` from `src/lib/supabase/server.ts` in server code. Reach for
   `createAdminClient()` only when RLS genuinely cannot express the operation.
+
+## Design system
+
+Black, red and white are dominant. Tokens live in `src/app/globals.css`; use the
+utilities, never raw hex in components.
+
+- `bg-ink` — near-black. The sidebar and the login field, in both themes.
+- `bg-canvas` / `bg-card` / `border-line` — page, card and border surfaces, which
+  flip with the colour scheme.
+- `text-fg` / `text-fg-muted` / `text-fg-subtle` — the only colours text wears.
+- `bg-brand` / `text-brand` — red, reserved for emphasis, action and the active
+  nav marker. **Red is an accent, not a surface**: large red fields make real
+  warnings invisible.
+- `.label-caps` — the tight uppercase label used throughout the reference design.
+
+Charts use `--color-chart-1` … `-5`, assigned in fixed order and never cycled.
+That palette was checked with the dataviz validator against both the light and
+dark card surfaces and passes in both, so there is no separate dark variant.
+Re-run the validator before changing it.
+
+`src/lib/modules.ts` is the single source for the module list; the sidebar and
+the dashboard grid both read it. Flip a module's `ready` to true when its route
+exists — until then it renders inert in both places rather than 404ing.
+
+The logo is a dark-background asset (white "PRINTSHOPPE" text), so it belongs on
+`bg-ink`, never on a white card. `src/components/brand.tsx` has a single flag to
+switch from the typographic stand-in to the real file.

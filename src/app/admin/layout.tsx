@@ -5,7 +5,12 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const { profile, role } = await requireUser();
 
   return (
-    <AppShell role={role} username={profile.username} fullName={profile.full_name}>
+    <AppShell
+      title="Dashboard"
+      role={role}
+      username={profile.username}
+      fullName={profile.full_name}
+    >
       {children}
     </AppShell>
   );
