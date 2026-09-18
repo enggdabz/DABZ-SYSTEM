@@ -34,7 +34,7 @@ export const MODULES: readonly Module[] = [
     short: "Repairs",
     body: "Repair tickets, services, parts fitted and repair payments.",
     roles: ["owner", "admin", "staff"],
-    ready: false,
+    ready: true,
   },
   {
     key: "apparel",
