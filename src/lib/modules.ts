@@ -43,7 +43,7 @@ export const MODULES: readonly Module[] = [
     short: "Apparel",
     body: "Orders, name lists, fabric and collar options, down payments.",
     roles: ["owner", "admin", "staff"],
-    ready: false,
+    ready: true,
   },
   {
     key: "inventory",
