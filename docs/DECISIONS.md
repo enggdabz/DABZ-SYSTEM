@@ -289,3 +289,15 @@ to ask:
 - `py-1.5` rather than `py-1` because an inline box is sized by the **font**,
   not by the `line-height` class: a `text-xs` link with `py-1` comes out at
   23px, one pixel short of the rule.
+- **The Supabase CLI is run through `npx`, not installed as a dependency.** The
+  `supabase` npm package downloads a platform binary in its postinstall, and a
+  devDependency would pull that into every `npm install` - including the Vercel
+  build, where it is never used and could only slow a deploy down or break it.
+  Verified against CLI 2.117.0. To pin the version instead, add it to
+  `devDependencies` and drop the `npx` from the two `db:` scripts.
+- **`supabase/config.toml` closes public sign-up** (`enable_signup = false`,
+  spec 4.1). Accounts are created by the owner or an admin through Supabase's
+  admin API, which that switch does not govern, so `/setup` and the Accounts
+  screen are unaffected. Its password floor is 8 to match
+  `MIN_PASSWORD_LENGTH`: if the two disagree, one accepts a password the other
+  refuses and the person hitting it cannot tell which.

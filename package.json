@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "check:schema": "node scripts/check-schema-usage.mjs",
-    "test:rls": "./supabase/tests/run.sh"
+    "test:rls": "./supabase/tests/run.sh",
+    "db:push": "npx supabase db push",
+    "db:migrations": "npx supabase migration list"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.7",

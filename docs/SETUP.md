@@ -25,35 +25,51 @@ Two jobs, about 30 minutes total. Do them in order. Nothing here costs money.
      Philippines, which makes every screen faster.
 4. Click **Create new project** and wait about two minutes.
 
-### 2. Create the first table
+### 2. Create the tables — one command
 
-1. In the left sidebar click **SQL Editor**, then **New query**.
-2. Open the file `supabase/migrations/0000_phase0_hello.sql` from this project,
-   copy everything in it, and paste it into the editor.
-3. Click **Run**.
+The ten files in `supabase/migrations/` are the whole database. The Supabase
+CLI runs them all, in order, and remembers which ones it has already run, so it
+can never apply one twice.
 
-You should see *Success. No rows returned*. That is correct — the file creates a
-table rather than reading one.
+You need your **project ref**: in Supabase, **Project Settings** → **General**,
+the *Reference ID*. It looks like `abcdefghijklmnopqrst`.
 
-> **What you just did:** created a one-row table whose only purpose is to prove
-> the app can reach the database, and switched on **Row Level Security** for it.
-> RLS means the database itself refuses to hand out rows unless a rule says it
-> may. Every table in this system will have it on, so a mistake in the app can
-> never leak staff salaries or customer records.
+```bash
+npx supabase login                      # opens your browser, once per computer
+npx supabase link --project-ref <your-ref>
+npm run db:push
+```
 
-### 3. Create the rest of the tables
+`link` asks for your **database password** — the one you chose when you created
+the project. If you have lost it, **Project Settings** → **Database** →
+*Reset database password*.
 
-Repeat step 2 for each remaining migration file, **in number order**:
+You should see all ten applied:
+
+```
+Applying migration 0000_phase0_hello.sql...
+Applying migration 0001_phase1_foundation.sql...
+...
+Applying migration 0009_phase9_public.sql...
+Finished supabase db push.
+```
 
 | File | What it creates |
 |---|---|
+| `0000_phase0_hello.sql` | One table whose only job is to prove the app can reach the database |
 | `0001_phase1_foundation.sql` | Accounts, permissions, settings, the audit log, sign-in history |
 | `0002_phase2_money.sql` | Bills, loans and the money in/out ledger — **and seeds your eleven real bills and six loans** |
 | `0003_phase3_staff.sql` | Staff records, the time clock, weekly payroll and cash advances |
 | `0004_timeclock_own_login.sql` | Tightens the time clock so each person clocks only themselves in |
 | `0005_phase4_pos.sql` | Customers, products, sales and the end-of-day count — **and seeds the counter buttons** |
+| `0006_phase5_expenses_stocks.sql` | Expenses, materials and their movements, suppliers and what you owe them |
+| `0007_phase6_apparel.sql` | Dabz Apparel job orders, rosters, sizes and payments |
+| `0008_phase7_repairs.sql` | DabzTech tickets, services, parts fitted and payments |
+| `0009_phase9_public.sql` | Your public page's details, and messages customers send |
 
-Every table gets Row Level Security switched on.
+Every table gets **Row Level Security** switched on. RLS means the database
+itself refuses to hand out rows unless a rule says it may — so a mistake in the
+app can never leak staff salaries or customer records.
 
 After `0002` runs, your bills and loans are already in the system: ₱141,127.00
 of monthly bills and ₱1,336,264.00 of debt, taken from what you told me. Two
@@ -61,9 +77,26 @@ things are deliberately left blank, because a guess would be worse than a
 gap — every bill's **due day**, and every loan's **interest rate**. The screens
 ask you for them.
 
+To see what has been applied at any time:
+
+```bash
+npm run db:migrations
+```
+
+### 3. Or create them by hand, without the CLI
+
+If you would rather not install anything, the same ten files can be pasted in:
+
+1. In the left sidebar click **SQL Editor**, then **New query**.
+2. Open `supabase/migrations/0000_phase0_hello.sql`, copy everything in it,
+   paste it into the editor, and click **Run**. You should see *Success. No rows
+   returned* — the file creates a table rather than reading one.
+3. Repeat for each remaining file, **in number order**, using the table above.
+
 > **Run the migration files in number order, and only once each.** They are the
 > written history of the database. Never edit one that you have already run;
-> later changes arrive as new numbered files.
+> later changes arrive as new numbered files. The CLI enforces this for you;
+> by hand, you have to keep track.
 
 ### 4. Copy the three settings into the project
 
@@ -234,5 +267,26 @@ An account row exists without you remembering it. Open Supabase →
 **I am locked out after five wrong passwords**
 Wait 15 minutes and try again. If it is the owner account and you have
 forgotten the password, reset it from Supabase → **Authentication** → **Users**.
+
+**`supabase link` says the password is wrong**
+It wants the **database** password, not your Supabase account password. Reset it
+at **Project Settings** → **Database** → *Reset database password*, then link
+again.
+
+**`npm run db:push` says a migration is already applied**
+Then it is, and it will not run twice — that is the point of the CLI keeping a
+record. `npm run db:migrations` shows you the list.
+
+**`npm run db:push` says my local and remote histories differ**
+That happens if some files were pasted into the SQL Editor by hand and others
+pushed, so the CLI's record does not match what actually ran.
+`npx supabase migration repair --status applied <version>` tells it a file has
+already been run — for example `0000`. Do that for each one you pasted by hand,
+then push the rest.
+
+**`supabase test db` fails with strange errors**
+It is not our test command. That one expects pgTAP tests, and the files in
+`supabase/tests/` are plain psql scripts that happen to end in `.test.sql`. Use
+`npm run test:rls`.
 
 **Anything else** — tell me what the screen says and I will work it out with you.

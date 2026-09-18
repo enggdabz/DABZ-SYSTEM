@@ -124,9 +124,13 @@ server-only, so the build fails rather than leaking it by accident.
 | `npm run build` | Makes the fast version used on the internet | To confirm it will deploy |
 | `npm run test:rls` | Proves the security rules against a real database | After changing anything in `supabase/` |
 | `npm run check:schema` | Confirms every column the app asks for exists | After changing a query or a migration |
+| `npm run db:push` | Applies any migration your database has not run yet | After adding a migration file |
+| `npm run db:migrations` | Lists which migrations your database has run | To check what state it is in |
 
-The last two need PostgreSQL on the machine, so they are for whoever is
-developing, not for the shop. Everything else runs anywhere.
+`test:rls` and `check:schema` need PostgreSQL on the machine, so they are for
+whoever is developing, not for the shop. The two `db:` commands talk to your
+real Supabase project and need `npx supabase link` done once first — see
+[docs/SETUP.md](docs/SETUP.md). Everything else runs anywhere.
 
 ### What a passing test run looks like
 
@@ -182,8 +186,12 @@ src/
       dal.ts          "Who is asking?" - checked by every screen
     supabase/         Database connections (browser, server, admin)
 supabase/
+  config.toml         Settings the Supabase CLI reads - notably that there is
+                      no public sign-up, and the password floor
   migrations/         Database changes, in order, as .sql files
-  tests/              Security tests for the rules above (optional)
+  tests/              Security tests for the rules above (optional). These are
+                      plain psql scripts run by `npm run test:rls`, NOT the
+                      pgTAP tests `supabase test db` expects
 scripts/
   check-schema-usage.mjs   Catches a misspelled column before you do
 docs/

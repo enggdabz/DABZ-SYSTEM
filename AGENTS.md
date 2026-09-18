@@ -48,6 +48,16 @@ receiving code.
   reason, written to the audit log with before/after values.
 - Database changes are new numbered files in `supabase/migrations/`, never edits
   to an already-applied migration.
+- **Migrations reach a real database through `npm run db:push`** (the Supabase
+  CLI), which applies them in order and records each in
+  `supabase_migrations.schema_migrations` so none can run twice. The `0000`-
+  style four-digit prefixes are accepted as versions and sort before any later
+  `supabase migration new` timestamp, so both naming styles can coexist. Verified
+  by pushing all ten to a throwaway PostgreSQL and then running the whole RLS
+  suite against the result: 42 tables, 231 checks, identical to `run.sh`.
+- **`supabase test db` is NOT our test command.** It expects pgTAP tests in
+  `supabase/tests/`, and ours are plain psql scripts with the same `.test.sql`
+  suffix, so it fails confusingly. Use `npm run test:rls`.
 
 ## Design rules
 
