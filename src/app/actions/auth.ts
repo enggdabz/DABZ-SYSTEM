@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 
-import type { AuthState } from "@/lib/auth-state";
+import type { ActionState } from "@/lib/action-state";
 import { usernameEmailDomain } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
@@ -17,9 +17,9 @@ function safeNext(value: FormDataEntryValue | null): string {
 }
 
 export async function signIn(
-  _prev: AuthState,
+  _prev: ActionState,
   formData: FormData,
-): Promise<AuthState> {
+): Promise<ActionState> {
   const username = String(formData.get("username") ?? "")
     .trim()
     .toLowerCase();
@@ -27,10 +27,10 @@ export async function signIn(
   const next = safeNext(formData.get("next"));
 
   if (!username || !password) {
-    return { error: "Enter your username and password." };
+    return { error: "Enter your username and password.", notice: null };
   }
   if (!USERNAME_PATTERN.test(username)) {
-    return { error: "That username is not valid." };
+    return { error: "That username is not valid.", notice: null };
   }
 
   const supabase = await createClient();
@@ -43,7 +43,7 @@ export async function signIn(
 
   // Deliberately vague: distinguishing "no such user" from "wrong password"
   // would let anyone enumerate staff usernames.
-  if (error) return { error: "Incorrect username or password." };
+  if (error) return { error: "Incorrect username or password.", notice: null };
 
   revalidatePath("/", "layout");
   redirect(next);

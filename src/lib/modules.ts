@@ -88,7 +88,7 @@ export const MODULES: readonly Module[] = [
     short: "Settings",
     body: "Shop settings, staff accounts, permissions and audit log.",
     roles: ["owner", "admin"],
-    ready: false,
+    ready: true,
   },
 ];
 
