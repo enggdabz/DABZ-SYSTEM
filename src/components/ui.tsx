@@ -5,6 +5,7 @@
  * the house style is one edit rather than fifty. All colours come from the
  * tokens in globals.css - no hex values in components.
  */
+import Image from "next/image";
 import type { ComponentProps, ReactNode } from "react";
 
 export function Card({
@@ -190,11 +191,36 @@ export function Tag({
   );
 }
 
-/** The red Dabz mark plus wordmark, for the top bar and the login screen. */
+/**
+ * The Dabz crest plus wordmark, for the top bar and the login screen.
+ *
+ * The crest rather than the full lockup: public/logo/README.md puts the
+ * lockup's legible floor at 56px and the crest's at 48px, and the chrome this
+ * sits in is 64px tall including its padding. The wordmark stays live text so
+ * it renders crisply at this size instead of as a downscaled raster, and so
+ * the subtitle can vary.
+ *
+ * Every caller places this on a dark ground (bg-topbar, bg-sidebar, or a
+ * bg-black card), which the artwork requires: the tagline is near-white and
+ * scores 1.15:1 on white.
+ */
 export function Wordmark({ subtitle = "PRINTSHOPPE" }: { subtitle?: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span aria-hidden="true" className="h-7 w-2 rounded-full bg-accent" />
+      {/*
+        Decorative: the name is already beside it as text, so the crest is
+        hidden from screen readers rather than repeating it. Height only,
+        never both dimensions, or the artwork stretches.
+      */}
+      <Image
+        src="/logo/logo-mark.png"
+        alt=""
+        aria-hidden="true"
+        width={512}
+        height={512}
+        loading="eager"
+        className="h-12 w-auto"
+      />
       <span className="flex flex-col leading-none">
         <span className="text-base font-semibold tracking-tight">DABZ</span>
         <span className="text-[10px] font-medium tracking-[0.18em] opacity-60">
