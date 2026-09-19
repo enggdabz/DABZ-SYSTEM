@@ -21,17 +21,27 @@ import { formatPesos } from "@/lib/money";
  */
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
-  const settings = await getSettings();
 
-  // Staff never see the bills at all (spec 4.3), so the reminder is not even
-  // fetched for them - the database would refuse it anyway.
-  const billsDueSoon = isOwnerOrAdmin(user) ? await getBillsDueSoon() : [];
+  /*
+    Everything below needs to know WHO is asking, so it waits for the line
+    above - but none of it needs the others, so it is all asked for at once.
+    One after another, these were three more round trips to Supabase stacked
+    on top of the sign-in check before a screen could start rendering.
 
-  // The expense pop-up is in the top bar so a purchase can be recorded from
-  // wherever the person is standing - under ten seconds is the whole point
-  // (spec 11). Only fetched for those who may use it.
-  const mayRecordExpenses = can(user, "record_expenses");
-  const expensePresets = mayRecordExpenses ? await getExpensePresets() : null;
+    A `loading.tsx` cannot cover for this: a Suspense boundary sits INSIDE the
+    layout, so a slow layout still blocks the navigation. That is why the frame
+    has to be quick rather than merely have something to show.
+  */
+  const [settings, billsDueSoon, expensePresets] = await Promise.all([
+    getSettings(),
+    // Staff never see the bills at all (spec 4.3), so the reminder is not even
+    // fetched for them - the database would refuse it anyway.
+    isOwnerOrAdmin(user) ? getBillsDueSoon() : Promise.resolve([]),
+    // The expense pop-up is in the top bar so a purchase can be recorded from
+    // wherever the person is standing - under ten seconds is the whole point
+    // (spec 11). Only fetched for those who may use it.
+    can(user, "record_expenses") ? getExpensePresets() : Promise.resolve(null),
+  ]);
 
   return (
     /*
