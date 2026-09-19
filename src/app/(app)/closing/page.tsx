@@ -110,23 +110,35 @@ export default async function ClosingPage() {
         </dl>
 
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-line/60 pt-5">
-          <span className="text-sm text-muted">
-            Target {formatPesos(target.targetCentavos)}
-          </span>
-          {expected.targetReached ? (
-            <Tag tone="success">{"✓"} Target reached</Tag>
+          {/*
+            A target of zero means nothing has been entered for it to cover,
+            not that the day cleared it. Without this the tag would read
+            "-PHP 500.00 short", which is worse than saying nothing.
+          */}
+          {target.targetCentavos <= 0 ? (
+            <Tag tone="attention">{"⚠"} No target set</Tag>
           ) : (
-            <Tag tone="attention">
-              {"⚠"}{" "}
-              {formatPesos(target.targetCentavos - expected.totalSalesCentavos)} short
-            </Tag>
+            <>
+              <span className="text-sm text-muted">
+                Target {formatPesos(target.targetCentavos)}
+              </span>
+              {expected.targetReached ? (
+                <Tag tone="success">{"✓"} Target reached</Tag>
+              ) : (
+                <Tag tone="attention">
+                  {"⚠"}{" "}
+                  {formatPesos(target.targetCentavos - expected.totalSalesCentavos)} short
+                </Tag>
+              )}
+            </>
           )}
         </div>
 
         <p className="mt-4 text-xs text-muted">
-          The target compares against sales, not profit &mdash; material costs
-          are not tracked until Phase 5.
-          {payroll.centavos === null
+          {target.targetCentavos <= 0
+            ? "There is no daily target until the monthly bills and the staff daily rates are entered, so today is recorded without one."
+            : "The target compares against sales, not profit — material costs are not tracked until Phase 5."}
+          {payroll.centavos === null && target.targetCentavos > 0
             ? " It also covers bills only, because no staff daily rates are set yet."
             : ""}
         </p>

@@ -61,6 +61,26 @@ describe("computeClosing", () => {
     ).toBe(false);
   });
 
+  /*
+    A shop with no bills entered has a target of zero, and closing the day
+    would otherwise write "target reached" into the permanent record of every
+    one of those days - a row nobody would ever go back and correct. Zero means
+    not known, so the answer is no.
+  */
+  it("does not record a day as reaching a target that was never set", () => {
+    expect(computeClosing({ ...base, targetCentavos: 0 }).targetReached).toBe(false);
+    expect(
+      computeClosing({
+        ...base,
+        targetCentavos: 0,
+        cashSalesCentavos: 0,
+        gcashCentavos: 0,
+        mayaCentavos: 0,
+        bankCentavos: 0,
+      }).targetReached,
+    ).toBe(false);
+  });
+
   it("handles a day where more left the drawer than came in", () => {
     // A quiet morning plus a cash advance: the drawer is legitimately negative
     // against the float, and the figure has to say so rather than clamp to zero.

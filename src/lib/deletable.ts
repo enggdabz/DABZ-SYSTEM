@@ -1,0 +1,98 @@
+/**
+ * What may be deleted, and what may only be stopped.
+ *
+ * The owner types the bills, the loans and the products in by hand, so a row
+ * entered wrongly has to be removable - "stop counting it" is the right answer
+ * for a bill the shop really paid for two years and an odd one for a typo five
+ * seconds old, which would then sit under "no longer counted" forever.
+ *
+ * The line is money. Once a bill has been marked paid, a loan paid down or a
+ * product sold, there are payment rows hanging off it and ledger entries
+ * pointing at those. Those foreign keys cascade, so deleting the parent would
+ * take the payments with it and leave the ledger describing money that moved
+ * against a bill that no longer exists - the same silent hole the void rules
+ * exist to prevent. A row like that is stopped, which keeps every figure and
+ * only takes it out of the running totals.
+ *
+ * The database enforces this (the delete policies in migration 0011). This
+ * file is the wording, kept in one place so the button, the refusal and the
+ * explanation on screen cannot drift apart - and so the sentences can be
+ * tested, since they are the part the owner actually reads.
+ */
+
+export type CatalogueKind = "bill" | "loan" | "product";
+
+interface Rule {
+  noun: string;
+  /** Why this row has to stay, in the owner's words. */
+  because: string;
+  /** The honest alternative, named as the button that does it. */
+  instead: string;
+}
+
+const RULES: Record<CatalogueKind, Rule> = {
+  bill: {
+    noun: "bill",
+    because: "it has already been marked paid",
+    instead:
+      "Stop counting it instead: it keeps its payment history and drops out of the monthly total.",
+  },
+  loan: {
+    noun: "loan",
+    because: "payments have been recorded against it",
+    instead:
+      "Stop counting it instead: it keeps its payment history and drops out of the total owed.",
+  },
+  product: {
+    noun: "product",
+    because: "it has already been sold",
+    instead:
+      "Hide it from the counter instead: the button goes away and old sales still read correctly.",
+  },
+};
+
+/** Whether the Delete button should be offered at all. */
+export function canDelete(hasHistory: boolean): boolean {
+  return !hasHistory;
+}
+
+/**
+ * The sentence shown when a delete is refused, or null when it is allowed.
+ *
+ * Both the Server Action and the screen call this, so a row the screen offers
+ * to delete is one the action will delete, and a refusal reads the same
+ * wherever it appears.
+ */
+export function deleteRefusal(
+  kind: CatalogueKind,
+  hasHistory: boolean,
+): string | null {
+  if (!hasHistory) return null;
+  const rule = RULES[kind];
+  return `This ${rule.noun} cannot be deleted because ${rule.because}. ${rule.instead}`;
+}
+
+/**
+ * What the confirmation step says before anything is removed.
+ *
+ * Deliberately names the row. "Are you sure?" beside eleven identical cards is
+ * a question about nothing in particular, and the counter is a place where
+ * people tap quickly.
+ */
+export function deleteConfirmation(kind: CatalogueKind, name: string): string {
+  return `Delete ${name} permanently? This ${RULES[kind].noun} has no history, so nothing else is affected.`;
+}
+
+/**
+ * The refusal used when the database turns a delete down but this file thought
+ * it was allowed.
+ *
+ * A DELETE whose policy does not match removes no rows and raises no error, so
+ * without this the owner would be told something was deleted when it was not.
+ * In practice it means the row gained history between the screen rendering and
+ * the button being pressed.
+ */
+export function deleteVanished(kind: CatalogueKind): string {
+  const rule = RULES[kind];
+  return `Nothing was deleted: this ${rule.noun} now has history behind it. ${rule.instead}`;
+}

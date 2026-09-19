@@ -9,6 +9,7 @@ import { centavosToDecimalString } from "@/lib/money";
 import {
   recordLoanPaymentAction,
   saveLoanAction,
+  setLoanActiveAction,
   updateFromStatementAction,
   type LoanActionState,
 } from "./actions";
@@ -241,5 +242,45 @@ export function LoanEditForm({
         {pending ? "Saving…" : loan ? "Save changes" : "Add loan"}
       </Button>
     </form>
+  );
+}
+
+/**
+ * Stop counting a loan, or start again.
+ *
+ * The same shape as the bills screen has always had. A debt that is settled,
+ * or entered twice, needs somewhere to go that is not deletion - its payments
+ * are real and the ledger refers to them.
+ */
+export function LoanActiveForm({
+  loanId,
+  lender,
+  active,
+}: {
+  loanId: string;
+  lender: string;
+  active: boolean;
+}) {
+  const [state, submit, pending] = useActionState<LoanActionState, FormData>(
+    setLoanActiveAction,
+    {},
+  );
+
+  return (
+    <div className="space-y-2">
+      <form action={submit}>
+        <input type="hidden" name="loanId" value={loanId} />
+        <input type="hidden" name="active" value={active ? "false" : "true"} />
+        <Button type="submit" variant={active ? "danger" : "secondary"} disabled={pending}>
+          {pending
+            ? "Saving…"
+            : active
+              ? `Stop counting ${lender}`
+              : `Count ${lender} again`}
+        </Button>
+      </form>
+      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {state.success ? <Notice tone="success" title={state.success} /> : null}
+    </div>
   );
 }

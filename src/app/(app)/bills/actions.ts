@@ -1,7 +1,7 @@
 "use server";
 
 /**
- * Bills: marking paid, undoing, and editing (spec 12.1).
+ * Bills: marking paid, undoing, editing and deleting (spec 12.1).
  *
  * Owner/Admin only, re-checked in every action - a Server Action is a public
  * endpoint, not a button.
@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
+import { deleteRefusal, deleteVanished } from "@/lib/deletable";
 import { MONEY_SOURCES, type MoneySource } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
 import {
@@ -351,4 +352,75 @@ export async function setBillActiveAction(
       ? `${bill.name} is back in the monthly bills.`
       : `${bill.name} is no longer counted in the monthly bills. Its history is kept.`,
   };
+}
+
+/**
+ * Removes a bill entirely (the owner's own request, 19 Sep 2026).
+ *
+ * Only ever a bill with nothing behind it. One that has been marked paid has
+ * payment rows and ledger entries hanging off it, and the foreign key
+ * cascades, so deleting it would take real money records with it. That one is
+ * stopped instead, which keeps every figure.
+ *
+ * The delete policy in migration 0011 is what actually refuses; this checks
+ * first only so the owner gets a sentence rather than a button that appears to
+ * do nothing.
+ */
+export async function deleteBillAction(
+  _previous: BillActionState,
+  formData: FormData,
+): Promise<BillActionState> {
+  const actor = await requireOwnerOrAdmin();
+
+  const billId = String(formData.get("billId") ?? "");
+  const supabase = await createSupabaseServerClient();
+
+  // Everything about the row, because the audit log is where it survives once
+  // the row itself is gone.
+  const { data: bill } = await supabase
+    .from("bills")
+    .select("name, amount_centavos, due_day, type, loan_id, active, note")
+    .eq("id", billId)
+    .maybeSingle();
+
+  if (!bill) return { error: "That bill no longer exists." };
+
+  const { data: hasHistory, error: historyError } = await supabase.rpc(
+    "bill_has_history",
+    { p_bill_id: billId },
+  );
+
+  if (historyError) {
+    return { error: `Could not check the bill's history: ${historyError.message}` };
+  }
+
+  const refusal = deleteRefusal("bill", hasHistory === true);
+  if (refusal) return { error: refusal };
+
+  // `.select()` so the refusal case can be told apart from the success case: a
+  // delete the policy does not match removes no rows and raises no error.
+  const { data: removed, error } = await supabase
+    .from("bills")
+    .delete()
+    .eq("id", billId)
+    .select("id");
+
+  if (error) return { error: `Could not delete it: ${error.message}` };
+  if (!removed || removed.length === 0) return { error: deleteVanished("bill") };
+
+  await recordAudit({
+    actorId: actor.id,
+    actorUsername: actor.username,
+    action: "delete",
+    entity: "bills",
+    entityId: billId,
+    summary: `Deleted the bill "${bill.name}" of ${formatPesos(Number(bill.amount_centavos))} a month`,
+    before: bill,
+  });
+
+  revalidatePath("/bills");
+  revalidatePath("/overview");
+  revalidatePath("/checklist");
+
+  return { success: `Deleted ${bill.name}.` };
 }

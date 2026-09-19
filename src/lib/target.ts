@@ -59,6 +59,12 @@ export interface TargetProgress {
   percent: number;
   reached: boolean;
   shortfallCentavos: Centavos;
+  /**
+   * True when there is no target to measure against - no bills entered and no
+   * wages known - so `reached` means nothing and the screen must say so
+   * instead of showing a figure.
+   */
+  unknown: boolean;
 }
 
 export function targetProgress(options: {
@@ -67,13 +73,22 @@ export function targetProgress(options: {
 }): TargetProgress {
   const { achievedCentavos, targetCentavos } = options;
 
+  /*
+    A target of zero is not a target that has been met. It is what a shop that
+    has entered no bills and no wages looks like, which since the catalogue was
+    cleared is every shop on its first day. Reporting "✓ Reached" there would
+    be the most confidently wrong thing on the screen - green, at the top of
+    the Overview, before a single sale. So it reports "not known yet", and the
+    screen says what is missing.
+  */
   if (targetCentavos <= 0) {
     return {
       achievedCentavos,
       targetCentavos,
-      percent: 100,
-      reached: true,
+      percent: 0,
+      reached: false,
       shortfallCentavos: 0,
+      unknown: true,
     };
   }
 
@@ -88,5 +103,6 @@ export function targetProgress(options: {
     percent,
     reached: achievedCentavos >= targetCentavos,
     shortfallCentavos: Math.max(0, targetCentavos - achievedCentavos),
+    unknown: false,
   };
 }

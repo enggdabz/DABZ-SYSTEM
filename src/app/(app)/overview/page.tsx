@@ -225,7 +225,9 @@ async function OwnerOverview() {
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-muted">Today&apos;s target</h2>
-          {progress.reached ? (
+          {progress.unknown ? (
+            <Tag tone="attention">{"⚠"} No target yet</Tag>
+          ) : progress.reached ? (
             <Tag tone="success">{"✓"} Reached</Tag>
           ) : (
             <Tag>{formatPesos(progress.shortfallCentavos)} to go</Tag>
@@ -234,10 +236,17 @@ async function OwnerOverview() {
 
         <p className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
           {formatPesos(money.todayTowardTargetCentavos)}
-          <span className="text-2xl font-medium text-muted">
-            {" "}
-            of {formatPesos(target.targetCentavos)}
-          </span>
+          {/*
+            With no bills and no wages entered the target is zero, and "of ₱0"
+            would read as a target that has been met. It is not one - it is a
+            question nobody has answered yet, so the figure is left off.
+          */}
+          {progress.unknown ? null : (
+            <span className="text-2xl font-medium text-muted">
+              {" "}
+              of {formatPesos(target.targetCentavos)}
+            </span>
+          )}
         </p>
 
         <p className="mt-2 text-sm text-muted">
@@ -275,7 +284,27 @@ async function OwnerOverview() {
         </p>
 
         <div className="mt-4">
-          {payrollEstimate.centavos === null ? (
+          {progress.unknown ? (
+            <Notice
+              tone="attention"
+              title="There is no target yet, because nothing has been entered to cover"
+            >
+              <p>
+                The target is the shop&apos;s monthly bills and wages divided
+                across its working days, and neither is known yet - so this is
+                not a target that has been reached, it is one that has not been
+                set. Add what the shop pays every month on the{" "}
+                <Link href="/bills" className={`underline ${TAP_AREA}`}>
+                  Bills
+                </Link>{" "}
+                screen, and the daily rates on the{" "}
+                <Link href="/staff" className={`underline ${TAP_AREA}`}>
+                  Staff
+                </Link>{" "}
+                screen.
+              </p>
+            </Notice>
+          ) : payrollEstimate.centavos === null ? (
             <Notice
               tone="attention"
               title="This target covers bills only, so it is too low"

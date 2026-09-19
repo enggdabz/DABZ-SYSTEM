@@ -78,35 +78,45 @@ declare
 begin
   raise notice '--- phase 2: admin (Maria) ---';
 
+  /*
+    The rows come from 01_catalogue_fixtures.sql. What these two counts prove
+    is the other half of the rule tested above: where a staff account saw
+    NOTHING, an admin sees EVERYTHING. A wrong number here means a policy is
+    filtering an admin's own reads.
+  */
   select count(*), sum(amount_centavos) into bill_count, total_bills from public.bills;
   if bill_count <> 11 then
-    raise exception 'FAIL: admin saw % bills, expected the 11 seeded ones', bill_count;
+    raise exception 'FAIL: admin saw % of the 11 fixture bills', bill_count;
   end if;
   raise notice 'PASS: admin sees all 11 bills';
 
-  -- The owner's own figure from spec 12.1. If the seed drifts, this catches it.
   if total_bills <> 14112700 then
-    raise exception 'FAIL: seeded bills total % centavos, expected 14112700', total_bills;
+    raise exception 'FAIL: admin read % centavos of bills, expected 14112700', total_bills;
   end if;
-  raise notice 'PASS: the seeded bills add up to PHP 141,127.00';
+  raise notice 'PASS: admin reads every bill amount, totalling PHP 141,127.00';
 
   select count(*), sum(statement_balance_centavos) into loan_count, total_debt from public.loans;
   if loan_count <> 6 then
-    raise exception 'FAIL: admin saw % loans, expected 6', loan_count;
+    raise exception 'FAIL: admin saw % of the 6 fixture loans', loan_count;
   end if;
   if total_debt <> 133626400 then
-    raise exception 'FAIL: seeded debt is % centavos, expected 133626400', total_debt;
+    raise exception 'FAIL: admin read % centavos of debt, expected 133626400', total_debt;
   end if;
-  raise notice 'PASS: the seeded loans add up to PHP 1,336,264.00';
+  raise notice 'PASS: admin reads every balance, totalling PHP 1,336,264.00';
 
-  -- Nothing was invented where the owner has not answered yet (spec 17.13).
+  /*
+    A null due day and a null interest rate are REAL states the screens have to
+    handle - the owner fills them in from a statement - so the fixtures leave
+    every one of them empty and this proves nothing along the way quietly
+    substituted a default.
+  */
   if (select count(due_day) from public.bills) <> 0 then
-    raise exception 'FAIL: a due day was invented for a bill';
+    raise exception 'FAIL: a due day appeared on a bill that has none';
   end if;
   if (select count(interest_percent_per_month) from public.loans) <> 0 then
-    raise exception 'FAIL: an interest rate was invented for a loan';
+    raise exception 'FAIL: an interest rate appeared on a loan that has none';
   end if;
-  raise notice 'PASS: no due day or interest rate was invented';
+  raise notice 'PASS: a missing due day and a missing interest rate stay missing';
 
   -- The three installment bills point at their loans (spec 12.1).
   if (select count(loan_id) from public.bills) <> 3 then
