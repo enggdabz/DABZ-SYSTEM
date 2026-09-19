@@ -301,8 +301,33 @@ to ask:
   screen are unaffected. Its password floor is 8 to match
   `MIN_PASSWORD_LENGTH`: if the two disagree, one accepts a password the other
   refuses and the person hitting it cannot tell which.
+- **One loading outline serves every screen** (`src/app/(app)/loading.tsx`)
+  rather than twenty-three tailored ones. Every screen in the system is a
+  heading over a stack of cards, and bespoke outlines drift out of step with the
+  screens they imitate. It also earns its keep twice over: without a loading
+  boundary Next.js does not prefetch a dynamic screen at all, so adding the file
+  is what lets a section be fetched as its link comes into view. If one screen
+  ever needs its own, add a `loading.tsx` beside that page.
+- **A screen already visited is reused for 30 seconds** when the person comes
+  back to it (`staleTimes.dynamic` in `next.config.ts`). Every screen here is
+  dynamic, and the default for those is zero - nothing kept at all - so darting
+  between two sections while serving one customer re-fetched each of them from
+  scratch every time. It cannot show a figure the shop itself just changed: a
+  Server Action that writes anything calls `revalidatePath` for the screens it
+  affects, which throws the held copy away. What the window can hold back is a
+  change made on ANOTHER machine in the last half minute, and a screen sitting
+  open is already staler than that. To turn it off, set `dynamic: 0`.
+- **The system runs in Singapore (`sin1`), pinned in `vercel.json`.** Vercel's
+  default is Washington, D.C., and the Supabase project is in Singapore
+  (SETUP.md Part 1), so every database query was crossing the Pacific twice -
+  read off the live deployment, which reported `"regions": ["iad1"]`. Cutting
+  the NUMBER of round trips per screen only goes so far while each one is that
+  long. It lives in the repository rather than in the Vercel dashboard so it
+  is reviewable, and so re-importing the project cannot silently lose it. If
+  the Supabase project ever moves region, change this to match - the two
+  belong in the same place, whichever place that is.
 - **Nobody may update their own profile row, and that stays true.** The fix for
-  the sign-in loop (below) could have been a "you may edit yourself" policy on
+  the sign-in loop (written up in [PHASES.md](PHASES.md)) could have been a "you may edit yourself" policy on
   `profiles`, and that would have been a mistake: a policy cannot say WHICH
   COLUMNS an update may touch, so a policy wide enough to let a staff member
   clear their own password flag is wide enough to let them set their own role
