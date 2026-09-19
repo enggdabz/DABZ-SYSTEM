@@ -333,5 +333,103 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- The forced password change (spec 4.1) - the sign-in loop
+-- ---------------------------------------------------------------------------
+-- A staff member and a NEW ADMIN are both created with must_change_password
+-- true, and neither is matched by any update policy on their own profile row:
+-- the owner policy needs is_owner(), and the admin policy needs the row being
+-- edited to be a STAFF row, which an admin's own row is not. An update that
+-- matches no policy changes nothing WITHOUT raising, so the flag survived the
+-- password change and the person was sent back to /change-password forever.
+--
+-- These tests pin both halves: the table stays shut to self-updates, and
+-- finish_password_change() is the one way to clear the flag.
+
+reset role;
+update public.profiles set must_change_password = true
+ where username in ('eddie', 'maria', 'juan');
+set role authenticated;
+
+-- ---- Juan (staff) ---------------------------------------------------------
+set test.user_id = '33333333-3333-3333-3333-333333333333';
+do $$
+begin
+  raise notice '--- forced password change ---';
+
+  -- The table itself must stay shut, or the fix would be a way to self-promote.
+  update public.profiles set must_change_password = false where id = auth.uid();
+  if not (select must_change_password from public.profiles where id = auth.uid()) then
+    raise exception 'FAIL: staff cleared the flag by updating profiles directly';
+  end if;
+  raise notice 'PASS: staff still cannot update their own profile row';
+
+  perform public.finish_password_change();
+  if (select must_change_password from public.profiles where id = auth.uid()) then
+    raise exception 'FAIL: staff could not finish their forced password change';
+  end if;
+  raise notice 'PASS: staff can finish their forced password change';
+
+  -- It clears the flag and nothing else.
+  if (select role from public.profiles where id = auth.uid()) <> 'staff'
+     or (select status from public.profiles where id = auth.uid()) <> 'active' then
+    raise exception 'FAIL: finish_password_change changed more than the flag';
+  end if;
+  raise notice 'PASS: finish_password_change touches nothing but the flag';
+end;
+$$;
+
+-- ---- Maria (admin) - the half that was never covered ----------------------
+set test.user_id = '22222222-2222-2222-2222-222222222222';
+do $$
+begin
+  update public.profiles set must_change_password = false where id = auth.uid();
+  if not (select must_change_password from public.profiles where id = auth.uid()) then
+    raise exception 'FAIL: an admin cleared their own flag by updating profiles';
+  end if;
+  raise notice 'PASS: an admin still cannot update their own profile row';
+
+  perform public.finish_password_change();
+  if (select must_change_password from public.profiles where id = auth.uid()) then
+    raise exception 'FAIL: a new admin could not finish their forced password change';
+  end if;
+  raise notice 'PASS: a new admin can finish their forced password change';
+end;
+$$;
+
+-- ---- Eddie (owner) - one caller, one row ----------------------------------
+set test.user_id = '11111111-1111-1111-1111-111111111111';
+do $$
+declare
+  v_reached boolean := false;
+begin
+  -- Juan and Maria cleared their own flags above; the owner's is untouched,
+  -- because the function can only ever name the caller.
+  if not (select must_change_password from public.profiles where username = 'eddie') then
+    raise exception 'FAIL: somebody else''s call cleared the owner''s flag';
+  end if;
+  raise notice 'PASS: the flag is only ever cleared for the caller';
+
+  perform public.finish_password_change();
+  if (select must_change_password from public.profiles where id = auth.uid()) then
+    raise exception 'FAIL: the owner could not finish a forced password change';
+  end if;
+  raise notice 'PASS: the owner can finish a forced password change';
+
+  -- Nobody is signed in: the function refuses rather than picking a row.
+  set local test.user_id = '';
+  begin
+    perform public.finish_password_change();
+    v_reached := true;
+  exception when others then
+    null;
+  end;
+  if v_reached then
+    raise exception 'FAIL: a signed-out visitor could finish a password change';
+  end if;
+  raise notice 'PASS: a signed-out visitor cannot finish a password change';
+end;
+$$;
+
 reset role;
 \echo 'ALL SECURITY TESTS PASSED'
