@@ -27,7 +27,7 @@ Two jobs, about 30 minutes total. Do them in order. Nothing here costs money.
 
 ### 2. Create the tables — one command
 
-The ten files in `supabase/migrations/` are the whole database. The Supabase
+The eleven files in `supabase/migrations/` are the whole database. The Supabase
 CLI runs them all, in order, and remembers which ones it has already run, so it
 can never apply one twice.
 
@@ -44,13 +44,14 @@ npm run db:push
 the project. If you have lost it, **Project Settings** → **Database** →
 *Reset database password*.
 
-You should see all ten applied:
+You should see all eleven applied:
 
 ```
 Applying migration 0000_phase0_hello.sql...
 Applying migration 0001_phase1_foundation.sql...
 ...
 Applying migration 0009_phase9_public.sql...
+Applying migration 0010_finish_password_change.sql...
 Finished supabase db push.
 ```
 
@@ -66,6 +67,7 @@ Finished supabase db push.
 | `0007_phase6_apparel.sql` | Dabz Apparel job orders, rosters, sizes and payments |
 | `0008_phase7_repairs.sql` | DabzTech tickets, services, parts fitted and payments |
 | `0009_phase9_public.sql` | Your public page's details, and messages customers send |
+| `0010_finish_password_change.sql` | Lets a person finish the forced password change on their first sign-in |
 
 Every table gets **Row Level Security** switched on. RLS means the database
 itself refuses to hand out rows unless a rule says it may — so a mistake in the
@@ -85,7 +87,7 @@ npm run db:migrations
 
 ### 3. Or create them by hand, without the CLI
 
-If you would rather not install anything, the same ten files can be pasted in:
+If you would rather not install anything, the same eleven files can be pasted in:
 
 1. In the left sidebar click **SQL Editor**, then **New query**.
 2. Open `supabase/migrations/0000_phase0_hello.sql`, copy everything in it,

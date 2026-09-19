@@ -1160,6 +1160,7 @@ loop.
 ```bash
 npm install
 npm test          # expect: 463 passed
+npm run test:rls  # expect: 239 checks (231 before this fix, plus its 8)
 npm run db:push   # applies 0010_finish_password_change.sql
 ```
 
