@@ -317,3 +317,12 @@ to ask:
   affects, which throws the held copy away. What the window can hold back is a
   change made on ANOTHER machine in the last half minute, and a screen sitting
   open is already staler than that. To turn it off, set `dynamic: 0`.
+- **The system runs in Singapore (`sin1`), pinned in `vercel.json`.** Vercel's
+  default is Washington, D.C., and the Supabase project is in Singapore
+  (SETUP.md Part 1), so every database query was crossing the Pacific twice -
+  read off the live deployment, which reported `"regions": ["iad1"]`. Cutting
+  the NUMBER of round trips per screen only goes so far while each one is that
+  long. It lives in the repository rather than in the Vercel dashboard so it
+  is reviewable, and so re-importing the project cannot silently lose it. If
+  the Supabase project ever moves region, change this to match - the two
+  belong in the same place, whichever place that is.
