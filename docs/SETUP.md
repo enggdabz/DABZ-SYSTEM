@@ -206,6 +206,14 @@ by itself.
 > you can point your own domain (for example `system.dabzprintshoppe.com`) at it
 > from Vercel's Domains tab.
 
+> **Note on where the system runs:** `vercel.json` in the repository pins it to
+> **Singapore (`sin1`)**, the same place as the database. Vercel's own default
+> is Washington, D.C., which put every single database query on a round trip
+> across the Pacific and back — the shop felt this as a pause on every screen.
+> Because it is a file in the repository rather than a dashboard setting, it
+> survives the project ever being deleted and re-imported. If you ever move the
+> Supabase project to another region, change this to match it.
+
 ---
 
 ## What this costs
