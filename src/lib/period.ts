@@ -2,8 +2,8 @@
  * Months and dates, in the shop's own timezone.
  *
  * WHY THIS FILE IS CAREFUL
- * "Is this bill overdue?" is a question about the calendar in Bacolod, not
- * about UTC. At 7am on the 1st in Manila it is still 11pm on the last day of
+ * "Is this bill overdue?" is a question about the calendar in San Carlos
+ * City, not about UTC. At 7am on the 1st in Manila it is still 11pm on the last day of
  * the previous month in UTC. A bill checked against the UTC date would look
  * overdue a day early, every month.
  *

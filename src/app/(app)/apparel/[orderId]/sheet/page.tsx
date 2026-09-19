@@ -222,8 +222,9 @@ export default async function JobOrderSheetPage({
         </footer>
 
         <p className="mt-4 text-center text-[10px]">
-          Dabz Apparel &middot; Bacolod City &middot; Sizes and spellings are as
-          written above. Please check before production starts.
+          Dabz Apparel &middot; San Carlos City, Pangasinan &middot; Sizes and
+          spellings are as written above. Please check before production
+          starts.
         </p>
       </article>
     </div>

@@ -77,7 +77,8 @@ export default async function PrintReportPage({
             <div>
               <p className="text-lg font-bold tracking-tight">DABZ PRINTSHOPPE</p>
               <p className="text-xs">
-                Dabz Apparel &middot; DabzTech Solutions &middot; Bacolod City
+                Dabz Apparel &middot; DabzTech Solutions &middot; San Carlos
+                City, Pangasinan
               </p>
             </div>
             <div className="text-right">

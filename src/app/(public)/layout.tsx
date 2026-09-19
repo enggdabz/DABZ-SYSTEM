@@ -52,7 +52,7 @@ export default function PublicLayout({ children }: { children: ReactNode }) {
           <p>
             Dabz Printshoppe &middot; Dabz Apparel &middot; DabzTech Solutions
             <span className="block text-xs">
-              Bacolod City, Philippines &middot; since 18 June 2017
+              San Carlos City, Pangasinan &middot; since 18 June 2017
             </span>
           </p>
           {/* Small and at the bottom: this door is for staff, not customers. */}

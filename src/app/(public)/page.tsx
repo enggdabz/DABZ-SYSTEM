@@ -11,9 +11,9 @@ import { settingsFromRow, type SettingsRow } from "@/lib/settings";
 import { EnquiryForm } from "./EnquiryForm";
 
 export const metadata: Metadata = {
-  title: "Dabz Printshoppe · Printing, jerseys and repairs in Bacolod",
+  title: "Dabz Printshoppe · Printing, jerseys and repairs in San Carlos City",
   description:
-    "Printing, photocopying, tarpaulins and mugs; sublimation jerseys and shirts; Epson printer, laptop and desktop repairs. Bacolod City, since 2017.",
+    "Printing, photocopying, tarpaulins and mugs; sublimation jerseys and shirts; Epson printer, laptop and desktop repairs. San Carlos City, Pangasinan, since 2017.",
 };
 
 /**
@@ -76,7 +76,7 @@ export default async function PublicHomePage() {
       {/* ---- Hero -------------------------------------------------------- */}
       <section className="mx-auto max-w-5xl px-4 pt-16 pb-12 sm:px-6 sm:pt-24">
         <p className="text-sm font-medium text-accent">
-          Bacolod City &middot; since 2017
+          San Carlos City, Pangasinan &middot; since 2017
         </p>
         <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
           Printing, jerseys and repairs,

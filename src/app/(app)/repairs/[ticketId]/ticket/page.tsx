@@ -218,9 +218,9 @@ export default async function ClaimStubPage({
         </footer>
 
         <p className="mt-4 text-center text-[10px]">
-          DabzTech Solutions &middot; Bacolod City &middot; Units not collected
-          after {settings.unclaimedUnitDays} days will be followed up. Please
-          keep this slip.
+          DabzTech Solutions &middot; San Carlos City, Pangasinan &middot; Units
+          not collected after {settings.unclaimedUnitDays} days will be followed
+          up. Please keep this slip.
         </p>
       </article>
     </div>

@@ -233,8 +233,8 @@ The checks worth knowing about:
 - **Staff see nothing of the money.** Not the bills, not the loans, not the
   ledger, not even a row count — tested from a staff account, a deactivated
   account and a signed-out visitor.
-- **Dates are Manila dates.** At 01:30 on 1 October in Bacolod it is still
-  17:30 on 30 September in UTC. A bill checked against the UTC date would look
+- **Dates are Manila dates.** At 01:30 on 1 October in San Carlos City it is
+  still 17:30 on 30 September in UTC. A bill checked against the UTC date would look
   overdue a day early, every month. Tested directly.
 - **A bill due on the 31st still falls due in February**, landing on the 28th
   (or the 29th in a leap year) rather than being skipped.
