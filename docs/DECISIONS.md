@@ -301,3 +301,19 @@ to ask:
   screen are unaffected. Its password floor is 8 to match
   `MIN_PASSWORD_LENGTH`: if the two disagree, one accepts a password the other
   refuses and the person hitting it cannot tell which.
+- **One loading outline serves every screen** (`src/app/(app)/loading.tsx`)
+  rather than twenty-three tailored ones. Every screen in the system is a
+  heading over a stack of cards, and bespoke outlines drift out of step with the
+  screens they imitate. It also earns its keep twice over: without a loading
+  boundary Next.js does not prefetch a dynamic screen at all, so adding the file
+  is what lets a section be fetched as its link comes into view. If one screen
+  ever needs its own, add a `loading.tsx` beside that page.
+- **A screen already visited is reused for 30 seconds** when the person comes
+  back to it (`staleTimes.dynamic` in `next.config.ts`). Every screen here is
+  dynamic, and the default for those is zero - nothing kept at all - so darting
+  between two sections while serving one customer re-fetched each of them from
+  scratch every time. It cannot show a figure the shop itself just changed: a
+  Server Action that writes anything calls `revalidatePath` for the screens it
+  affects, which throws the held copy away. What the window can hold back is a
+  change made on ANOTHER machine in the last half minute, and a screen sitting
+  open is already staler than that. To turn it off, set `dynamic: 0`.

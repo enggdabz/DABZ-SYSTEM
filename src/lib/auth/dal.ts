@@ -53,20 +53,28 @@ export const getSignedInUser = cache(async (): Promise<SignedInUser | null> => {
 
   if (error || !user) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("id, username, full_name, role, status, must_change_password")
-    .eq("id", user.id)
-    .maybeSingle();
+  /*
+    Both rows are asked for at once rather than one after the other.
+    Supabase is a network call away, so every `await` in a row is another
+    round trip added to EVERY screen before it can start on its own figures -
+    that is most of what made tapping a section feel dead.
+
+    Asking for the permissions before knowing the profile exists costs one
+    wasted query in the rare case below, which is worth a round trip saved on
+    every ordinary page view.
+  */
+  const [{ data: profile }, { data: permissionRows }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, username, full_name, role, status, must_change_password")
+      .eq("id", user.id)
+      .maybeSingle(),
+    supabase.from("user_permissions").select("permission").eq("user_id", user.id),
+  ]);
 
   // A signed-in Auth user with no profile row cannot use the system: the
   // profile is what grants a role. Treat it as not signed in.
   if (!profile) return null;
-
-  const { data: permissionRows } = await supabase
-    .from("user_permissions")
-    .select("permission")
-    .eq("user_id", user.id);
 
   return {
     id: profile.id,
