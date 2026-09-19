@@ -27,7 +27,7 @@ Two jobs, about 30 minutes total. Do them in order. Nothing here costs money.
 
 ### 2. Create the tables — one command
 
-The twelve files in `supabase/migrations/` are the whole database. The Supabase
+The thirteen files in `supabase/migrations/` are the whole database. The Supabase
 CLI runs them all, in order, and remembers which ones it has already run, so it
 can never apply one twice.
 
@@ -44,7 +44,7 @@ npm run db:push
 the project. If you have lost it, **Project Settings** → **Database** →
 *Reset database password*.
 
-You should see all twelve applied:
+You should see all thirteen applied:
 
 ```
 Applying migration 0000_phase0_hello.sql...
@@ -52,6 +52,7 @@ Applying migration 0001_phase1_foundation.sql...
 ...
 Applying migration 0010_finish_password_change.sql...
 Applying migration 0011_clear_catalogue_and_allow_delete.sql...
+Applying migration 0012_clear_apparel_and_repair_prices.sql...
 Finished supabase db push.
 ```
 
@@ -69,18 +70,23 @@ Finished supabase db push.
 | `0009_phase9_public.sql` | Your public page's details, and messages customers send |
 | `0010_finish_password_change.sql` | Lets a person finish the forced password change on their first sign-in |
 | `0011_clear_catalogue_and_allow_delete.sql` | Empties the bills, loans and products, so you enter your own — **and lets you delete one you entered wrongly** |
+| `0012_clear_apparel_and_repair_prices.sql` | The same for the apparel items and the repair services, and lets you say which service is the checking fee |
 
 Every table gets **Row Level Security** switched on. RLS means the database
 itself refuses to hand out rows unless a rule says it may — so a mistake in the
 app can never leak staff salaries or customer records.
 
-**The bills, the loans and the products start empty**, because you asked to
-enter them yourself (19 September 2026). `0002` and `0005` used to put in the
-figures from the specification, and `0011` takes them back out — it prints how
-many rows it removed, and how many it kept because they had already been used.
-The **Bills**, **Loans** and **Products** screens each have an *Add* form at
-the bottom, and the **To fill in** screen lists all three until they have
-something in them.
+**Every list starts empty**, because you asked to enter them yourself
+(19 September 2026). `0002`, `0005`, `0007` and `0008` used to put in figures
+and names from the specification; `0011` and `0012` take them back out. Each
+prints how many rows it removed, and how many it kept because they had already
+been used. The **Bills**, **Loans**, **Products**, **Apparel prices** and
+**Repair prices** screens each have an *Add* form, and the **To fill in**
+screen lists every empty one until it has something in it.
+
+The one list that stays is the apparel **size ladder**, XS to 5XL. Those are
+not prices — they are the sizes a roster can use, and the add-on beside each
+one is already blank and waiting for you.
 
 Nothing is ever guessed for you. A bill's **due day** and a loan's **interest
 rate** stay blank until you type them, because a made-up warning gets trusted.
@@ -93,7 +99,7 @@ npm run db:migrations
 
 ### 3. Or create them by hand, without the CLI
 
-If you would rather not install anything, the same twelve files can be pasted in:
+If you would rather not install anything, the same thirteen files can be pasted in:
 
 1. In the left sidebar click **SQL Editor**, then **New query**.
 2. Open `supabase/migrations/0000_phase0_hello.sql`, copy everything in it,

@@ -100,6 +100,26 @@ export const getRepairServices = cache(async (): Promise<RepairService[]> => {
   }));
 });
 
+/**
+ * Which repair services have already been charged on a ticket, so the price
+ * screen knows which ones may still be deleted (see `src/lib/deletable.ts`).
+ *
+ * One call for the whole list, counting distinct services rather than lines.
+ * An empty set on failure is the safe direction: the screen offers a Delete,
+ * the policy refuses it, and the owner is told nothing was removed.
+ */
+export const getRepairServicesWithTickets = cache(
+  async (): Promise<Set<string>> => {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("repair_services_with_tickets");
+
+    if (error || !data) return new Set();
+    return new Set(
+      (data as { repair_service_id: string }[]).map((row) => row.repair_service_id),
+    );
+  },
+);
+
 const TICKET_COLUMNS =
   "id, ticket_number, received_on, customer_id, customer_name, contact_number, unit_kind, brand, model, serial_number, accessories, condition_note, problem, diagnosis, unlock_method, status, promised_on, ready_on, released_on, warranty_days, decline_reason, note";
 

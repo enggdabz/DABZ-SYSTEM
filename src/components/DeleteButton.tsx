@@ -90,12 +90,21 @@ export function DeleteButton({
 
   return (
     <div className="space-y-3">
-      {/* Notice carries the ⚠ and a word of its own, never colour alone. */}
-      <Notice tone="attention" title={deleteConfirmation(kind, name)}>
-        {consequence ? <p>{consequence}</p> : null}
-      </Notice>
-
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {/*
+        The question and the refusal are never shown together. Leaving both up
+        put "has no history, so nothing else is affected" directly above
+        "Nothing was deleted: this bill now has history behind it" - two
+        sentences contradicting each other, with no way to tell which was the
+        current one.
+      */}
+      {state.error ? (
+        <Notice tone="attention" title={state.error} />
+      ) : (
+        /* Notice carries the ⚠ and a word of its own, never colour alone. */
+        <Notice tone="attention" title={deleteConfirmation(kind, name)}>
+          {consequence ? <p>{consequence}</p> : null}
+        </Notice>
+      )}
 
       <form action={submit} className="flex flex-wrap gap-2">
         <input type="hidden" name={idField} value={id} />

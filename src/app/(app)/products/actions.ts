@@ -273,11 +273,24 @@ export async function deleteProductAction(
 
   const { data: product } = await supabase
     .from("products")
-    .select("name, division, price_centavos, manual_price, unit, section, income_category, active")
+    .select(
+      "name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active",
+    )
     .eq("id", productId)
     .maybeSingle();
 
   if (!product) return { error: "That product no longer exists." };
+
+  /*
+    The bulk price rules go with the product - they cascade. They are the
+    owner's own rules rather than a record of money, so taking them is right,
+    but they have to be written down first: after the delete there is nothing
+    left to reconstruct them from.
+  */
+  const { data: tiers } = await supabase
+    .from("product_price_tiers")
+    .select("min_quantity, unit_price_centavos")
+    .eq("product_id", productId);
 
   const { data: hasHistory, error: historyError } = await supabase.rpc(
     "product_has_history",
@@ -306,8 +319,12 @@ export async function deleteProductAction(
     action: "delete",
     entity: "products",
     entityId: productId,
-    summary: `Deleted the product "${product.name}"`,
-    before: product,
+    summary: `Deleted the product "${product.name}"${
+      tiers && tiers.length > 0
+        ? ` and its ${tiers.length} bulk price rule${tiers.length === 1 ? "" : "s"}`
+        : ""
+    }`,
+    before: { ...product, price_tiers: tiers ?? [] },
   });
 
   revalidatePath("/products");

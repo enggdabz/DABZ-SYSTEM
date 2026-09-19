@@ -296,6 +296,14 @@ export interface OverviewData {
   monthlyBillsCentavos: Centavos;
   totalDebtCentavos: Centavos;
   growingLoans: LoanSummary[];
+  /**
+   * How many loans are being counted, and how many of those still have no
+   * interest rate. The Overview needs both to tell "nothing is growing" apart
+   * from "there is nothing to check" - with no loans entered at all, a total
+   * of zero and no warnings would read as a shop with no debt.
+   */
+  activeLoanCount: number;
+  loansWithoutRateCount: number;
 }
 
 export const getOverviewMoney = cache(async (): Promise<OverviewData> => {
@@ -339,5 +347,10 @@ export const getOverviewMoney = cache(async (): Promise<OverviewData> => {
     growingLoans: summaries.filter(
       (summary) => summary.loan.active && summary.balanceGrowing,
     ),
+    activeLoanCount: summaries.filter((summary) => summary.loan.active).length,
+    loansWithoutRateCount: summaries.filter(
+      (summary) =>
+        summary.loan.active && summary.loan.interestPercentPerMonth === null,
+    ).length,
   };
 });

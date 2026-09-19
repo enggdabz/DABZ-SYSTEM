@@ -237,8 +237,21 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
-  const apparelWithoutPrice = apparelItems.filter(
-    (item) => item.active && item.basePriceCentavos === null,
+  const activeApparel = apparelItems.filter((item) => item.active);
+  if (activeApparel.length === 0) {
+    items.push({
+      id: "no-apparel-items",
+      title: "No apparel items added yet",
+      why: "A job order still works - whoever writes one is asked for the item and the price - but two people will quote the same jersey differently until the list exists.",
+      names: [],
+      href: "/apparel/prices",
+      linkLabel: "Open apparel prices",
+      important: true,
+    });
+  }
+
+  const apparelWithoutPrice = activeApparel.filter(
+    (item) => item.basePriceCentavos === null,
   );
   if (apparelWithoutPrice.length > 0) {
     items.push({
@@ -269,8 +282,37 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
+  const activeRepairServices = repairServices.filter((service) => service.active);
+  if (activeRepairServices.length === 0) {
+    items.push({
+      id: "no-repair-services",
+      title: "No repair services added yet",
+      why: "A ticket still works - whoever writes one is asked for the price - but two technicians will charge differently for the same job until the list exists. Start with the checking fee.",
+      names: [],
+      href: "/repairs/prices",
+      linkLabel: "Open repair prices",
+      important: true,
+    });
+  }
+
+  /*
+    Two different gaps, and they used to be one. `find` returns undefined when
+    NO service is marked as the checking fee, which silently produced no
+    checklist item at all - fine while a seeded row always carried the flag,
+    wrong now that the list starts empty and the flag is the owner's to set.
+  */
   const checkingFee = repairServices.find((service) => service.isCheckingFee);
-  if (checkingFee && checkingFee.priceCentavos === null) {
+  if (activeRepairServices.length > 0 && !checkingFee) {
+    items.push({
+      id: "repair-checking-fee-missing",
+      title: "No service is marked as the checking fee",
+      why: "Nothing is charged when a customer decides not to go ahead, and a ticket's totals have no separate line for it. Tick the box on whichever service it should be.",
+      names: [],
+      href: "/repairs/prices",
+      linkLabel: "Open repair prices",
+      important: true,
+    });
+  } else if (checkingFee && checkingFee.priceCentavos === null) {
     items.push({
       id: "repair-checking-fee",
       title: "No checking fee set",
@@ -282,8 +324,8 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
-  const repairsWithoutPrice = repairServices.filter(
-    (service) => service.active && !service.isCheckingFee && service.priceCentavos === null,
+  const repairsWithoutPrice = activeRepairServices.filter(
+    (service) => !service.isCheckingFee && service.priceCentavos === null,
   );
   if (repairsWithoutPrice.length > 0) {
     items.push({

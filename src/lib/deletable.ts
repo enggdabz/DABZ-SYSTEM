@@ -20,7 +20,12 @@
  * tested, since they are the part the owner actually reads.
  */
 
-export type CatalogueKind = "bill" | "loan" | "product";
+export type CatalogueKind =
+  | "bill"
+  | "loan"
+  | "product"
+  | "apparel item"
+  | "repair service";
 
 interface Rule {
   noun: string;
@@ -48,6 +53,18 @@ const RULES: Record<CatalogueKind, Rule> = {
     because: "it has already been sold",
     instead:
       "Hide it from the counter instead: the button goes away and old sales still read correctly.",
+  },
+  "apparel item": {
+    noun: "item",
+    because: "it is already on a job order",
+    instead:
+      "Stop offering it instead: it disappears from new orders and the ones already written still read correctly.",
+  },
+  "repair service": {
+    noun: "service",
+    because: "it has already been charged on a ticket",
+    instead:
+      "Stop offering it instead: it disappears from new tickets and the ones already written still read correctly.",
   },
 };
 

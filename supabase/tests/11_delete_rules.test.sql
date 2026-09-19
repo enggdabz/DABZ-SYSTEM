@@ -1,4 +1,4 @@
--- What may be deleted, and what may only be stopped (migration 0011).
+-- What may be deleted, and what may only be stopped (migrations 0011, 0012).
 --
 -- The owner types the bills, the loans and the products in by hand, so a row
 -- entered wrongly has to be removable. But deleting one that money has moved
@@ -262,6 +262,75 @@ begin
 end;
 $$;
 
+-- ---- A bill typed in by hand still pays its loan down --------------------
+-- Not a delete rule, but it only became testable here: until the seeded bills
+-- were cleared, every installment bill in the system arrived with its
+-- `loan_id` already set by a migration, and nothing proved that a bill created
+-- the way the app creates one behaves the same.
+--
+-- It does not, unless the link is chosen on the form. A bill marked
+-- "loan_installment" with a null `loan_id` is paid every month, writes its
+-- money-out entry, and reduces nothing - silently, which is the whole problem.
+set test.user_id = '11111111-1111-1111-1111-111111111111';
+do $$
+declare
+  v_loan uuid;
+  v_linked uuid;
+  v_orphan uuid;
+begin
+  raise notice '--- a hand-entered installment bill ---';
+
+  insert into public.loans (lender, statement_balance_centavos, statement_date)
+  values ('Typed lender', 30000000, current_date)
+  returning id into v_loan;
+
+  -- Exactly what saveBillAction writes when the owner picks the loan.
+  insert into public.bills (name, amount_centavos, type, loan_id)
+  values ('Typed installment', 3325000, 'loan_installment', v_loan)
+  returning id into v_linked;
+
+  -- And what it writes when they do not - a real state, and the one the
+  -- screen now warns about.
+  insert into public.bills (name, amount_centavos, type, loan_id)
+  values ('Unlinked installment', 100000, 'loan_installment', null)
+  returning id into v_orphan;
+
+  perform public.mark_bill_paid(
+    v_linked, date '2026-11-01', 3325000, current_date, 'bank', null
+  );
+
+  if (select count(*) from public.loan_payments where loan_id = v_loan) <> 1 then
+    raise exception 'FAIL: paying a linked installment bill did not pay the loan down';
+  end if;
+  if (select amount_centavos from public.loan_payments where loan_id = v_loan)
+     <> 3325000 then
+    raise exception 'FAIL: the loan payment was not for the amount the bill was paid';
+  end if;
+  raise notice 'PASS: paying a hand-entered installment bill pays its loan down';
+
+  perform public.mark_bill_paid(
+    v_orphan, date '2026-11-01', 100000, current_date, 'bank', null
+  );
+
+  if (select count(*) from public.loan_payments where loan_id = v_loan) <> 1 then
+    raise exception 'FAIL: an unlinked bill paid down a loan it was not tied to';
+  end if;
+  raise notice 'PASS: an unlinked installment bill reduces nothing - the screen must say so';
+
+  -- Undoing takes the loan payment back with it, or the balance would keep a
+  -- reduction for money that was returned.
+  perform public.undo_bill_payment(v_linked, date '2026-11-01', 'Entered by mistake');
+  if (select count(*) from public.loan_payments where loan_id = v_loan) <> 0 then
+    raise exception 'FAIL: undoing the bill payment left the loan payment behind';
+  end if;
+  raise notice 'PASS: undoing it takes the loan payment back too';
+
+  -- Tidy up, so the delete checks below are not reading these.
+  delete from public.bills where id in (v_linked, v_orphan);
+  delete from public.loans where id = v_loan;
+end;
+$$;
+
 -- ---- The owner, on the same rules ----------------------------------------
 -- Being the owner is not a way round this. The rule protects the books, not a
 -- rank.
@@ -314,6 +383,152 @@ begin
   end if;
   raise notice 'PASS: a deleted product takes its bulk price rules with it';
 
+  raise notice 'PASS: a deleted product takes its bulk price rules with it';
+end;
+$$;
+
+-- ---- The two price lists (migration 0012) --------------------------------
+-- Apparel items and repair services follow the same rule, with a milder
+-- reason: their keys are `on delete set null` and each job line copies the
+-- name, so nothing would be DESTROYED - but a job would lose the link back to
+-- what it was charging for, and work the shop has actually done is history.
+do $$
+declare
+  v_item_clean uuid;
+  v_item_used uuid;
+  v_service_clean uuid;
+  v_service_used uuid;
+  v_order uuid;
+  v_ticket uuid;
+begin
+  raise notice '--- delete rules: apparel items and repair services ---';
+
+  insert into public.apparel_products (name, income_category)
+  values ('Typo item', 'shirts') returning id into v_item_clean;
+  insert into public.apparel_products (name, income_category)
+  values ('Real item', 'shirts') returning id into v_item_used;
+
+  insert into public.repair_services (name, unit_kind, income_category)
+  values ('Typo service', 'laptop', 'laptop_repair') returning id into v_service_clean;
+  insert into public.repair_services (name, unit_kind, income_category)
+  values ('Real service', 'laptop', 'laptop_repair') returning id into v_service_used;
+
+  -- Put the "real" ones on a real job.
+  insert into public.apparel_orders (order_number, ordered_on, team_name)
+  values ('A-261105-001', current_date, 'Test team') returning id into v_order;
+  insert into public.apparel_order_lines
+    (order_id, name, apparel_product_id, unit_price_centavos, quantity, income_category)
+  values (v_order, 'Real item', v_item_used, 50000, 1, 'shirts');
+
+  insert into public.repair_tickets (ticket_number, customer_name, unit_kind, problem)
+  values ('R-261105-001', 'Test customer', 'laptop', 'Will not boot')
+  returning id into v_ticket;
+  insert into public.repair_lines
+    (ticket_id, kind, name, repair_service_id, unit_price_centavos, quantity, income_category)
+  values (v_ticket, 'service', 'Real service', v_service_used, 80000, 1, 'laptop_repair');
+
+  if public.apparel_product_has_history(v_item_clean) then
+    raise exception 'FAIL: an apparel item never ordered was reported as having history';
+  end if;
+  if not public.apparel_product_has_history(v_item_used) then
+    raise exception 'FAIL: an apparel item on a job order was reported as clean';
+  end if;
+  if public.repair_service_has_history(v_service_clean) then
+    raise exception 'FAIL: a repair service never charged was reported as having history';
+  end if;
+  if not public.repair_service_has_history(v_service_used) then
+    raise exception 'FAIL: a repair service on a ticket was reported as clean';
+  end if;
+  raise notice 'PASS: both history helpers answer correctly';
+
+  if not exists (
+    select 1 from public.apparel_products_with_orders()
+     where apparel_product_id = v_item_used
+  ) or exists (
+    select 1 from public.apparel_products_with_orders()
+     where apparel_product_id = v_item_clean
+  ) then
+    raise exception 'FAIL: apparel_products_with_orders disagrees with the row helper';
+  end if;
+  if not exists (
+    select 1 from public.repair_services_with_tickets()
+     where repair_service_id = v_service_used
+  ) or exists (
+    select 1 from public.repair_services_with_tickets()
+     where repair_service_id = v_service_clean
+  ) then
+    raise exception 'FAIL: repair_services_with_tickets disagrees with the row helper';
+  end if;
+  raise notice 'PASS: the whole-list versions agree with the row-by-row ones';
+
+  -- Unused goes.
+  delete from public.apparel_products where id = v_item_clean;
+  if exists (select 1 from public.apparel_products where id = v_item_clean) then
+    raise exception 'FAIL: an apparel item never ordered could not be deleted';
+  end if;
+  delete from public.repair_services where id = v_service_clean;
+  if exists (select 1 from public.repair_services where id = v_service_clean) then
+    raise exception 'FAIL: a repair service never charged could not be deleted';
+  end if;
+  raise notice 'PASS: an unused item and an unused service can both be deleted';
+
+  -- Used stays, and its job line keeps pointing at it.
+  delete from public.apparel_products where id = v_item_used;
+  if not exists (select 1 from public.apparel_products where id = v_item_used) then
+    raise exception 'FAIL: an apparel item on a job order was deleted';
+  end if;
+  delete from public.repair_services where id = v_service_used;
+  if not exists (select 1 from public.repair_services where id = v_service_used) then
+    raise exception 'FAIL: a repair service on a ticket was deleted';
+  end if;
+  if (select apparel_product_id from public.apparel_order_lines
+       where order_id = v_order) is null then
+    raise exception 'FAIL: the job order line lost its link to the item';
+  end if;
+  raise notice 'PASS: an item on a job and a service on a ticket both stay, with their links';
+end;
+$$;
+
+-- ---- Juan (staff), on the two price lists --------------------------------
+-- They may READ both - the counter and the ticket screen need them - but
+-- removing one is the owner's (spec 7.2).
+set test.user_id = '33333333-3333-3333-3333-333333333333';
+do $$
+begin
+  if (select count(*) from public.apparel_products) = 0 then
+    raise exception 'FAIL: staff cannot read the apparel price list';
+  end if;
+
+  delete from public.apparel_products where name = 'Real item';
+  if not exists (select 1 from public.apparel_products where name = 'Real item') then
+    raise exception 'FAIL: a staff member deleted an apparel item';
+  end if;
+
+  delete from public.repair_services where name = 'Real service';
+  if not exists (select 1 from public.repair_services where name = 'Real service') then
+    raise exception 'FAIL: a staff member deleted a repair service';
+  end if;
+  raise notice 'PASS: staff read both price lists but cannot delete from either';
+
+  /*
+    And the history helpers do not answer them. Spec 4.3 gives staff no policy
+    on bills and loans at all, "not even read", so a SECURITY DEFINER function
+    that told them whether a bill had ever been paid would be a way round that
+    - one bit at a time. Null, not false: the question is not theirs to ask.
+  */
+  if public.bill_has_history(gen_random_uuid()) is not null then
+    raise exception 'FAIL: bill_has_history answered a staff member';
+  end if;
+  if public.loan_has_history(gen_random_uuid()) is not null then
+    raise exception 'FAIL: loan_has_history answered a staff member';
+  end if;
+  raise notice 'PASS: the history helpers say nothing to staff';
+end;
+$$;
+
+set test.user_id = '11111111-1111-1111-1111-111111111111';
+do $$
+begin
   raise notice 'ALL DELETE RULE TESTS PASSED';
 end;
 $$;

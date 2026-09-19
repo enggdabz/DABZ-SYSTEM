@@ -51,14 +51,28 @@ begin
   raise notice '--- phase 7: structure ---';
 
   if (select count(*) from public.repair_services) <> 12 then
-    raise exception 'FAIL: expected the 12 seeded services';
+    raise exception 'FAIL: expected the 12 fixture services';
   end if;
-  raise notice 'PASS: the repair services are seeded';
+  raise notice 'PASS: everyone signed in reads the repair price list';
 
   if (select count(price_centavos) from public.repair_services) <> 0 then
-    raise exception 'FAIL: a repair price was invented';
+    raise exception 'FAIL: a price appeared on a repair service that has none';
   end if;
-  raise notice 'PASS: no repair price was invented, not even the checking fee';
+  raise notice 'PASS: a service with no price keeps having no price';
+
+  -- Exactly one service is THE checking fee - the charge that applies even
+  -- when the customer says no. The app asks for it by that flag, so two would
+  -- make the answer arbitrary; a partial unique index (0012) enforces it.
+  if (select count(*) from public.repair_services where is_checking_fee) <> 1 then
+    raise exception 'FAIL: expected exactly one checking fee';
+  end if;
+  begin
+    insert into public.repair_services (name, unit_kind, income_category, is_checking_fee)
+    values ('A second checking fee', 'any', 'checking_fee', true);
+    raise exception 'FAIL: a second checking fee was allowed';
+  exception when unique_violation then
+    raise notice 'PASS: only one service can be the checking fee';
+  end;
 
   -- Laptop and desktop cleaning exist separately, so the owner can price them
   -- the same or differently. That is open decision 17.11, left open.

@@ -38,9 +38,11 @@ quiet "$HERE/../migrations/0008_phase7_repairs.sql"
 quiet "$HERE/../migrations/0009_phase9_public.sql"
 quiet "$HERE/../migrations/0010_finish_password_change.sql"
 quiet "$HERE/../migrations/0011_clear_catalogue_and_allow_delete.sql"
+quiet "$HERE/../migrations/0012_clear_apparel_and_repair_prices.sql"
 
-# 0011 empties the bills, loans and products the earlier migrations seeded, so
-# the tests that need a catalogue to read now bring their own.
+# 0011 and 0012 empty the bills, loans, products, apparel items and repair
+# services the earlier migrations seeded, so the tests that need a catalogue to
+# read now bring their own.
 quiet "$HERE/01_catalogue_fixtures.sql"
 quiet "$HERE/02_grants.sql"
 run "$HERE/03_rls.test.sql"

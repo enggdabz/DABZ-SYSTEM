@@ -15,8 +15,12 @@
 -- the tests, as the migration role, so Row Level Security does not apply to
 -- the inserts themselves.
 --
+-- Migration 0012 does the same for the apparel items and the repair services,
+-- so those move here too (08 and 09 read them).
+--
 -- Keep it in step with the counts the tests assert: 11 bills, 6 loans, 11
--- products, of which 6 have a price. Every due day and every interest rate is
+-- products of which 6 have a price, 5 apparel items and 12 repair services.
+-- Every due day, every interest rate and every apparel and repair price is
 -- deliberately null - the tests check that too, because a null there is a real
 -- state the screens have to handle, not an oversight.
 
@@ -73,3 +77,41 @@ values
   ('Lamination',                  'printshoppe', null::bigint, true,  'piece', 'other',     90::smallint, 'lamination'),
   ('Sticker',                     'printshoppe', null::bigint, true,  'piece', 'other',    100::smallint, 'stickers'),
   ('DTF print',                   'apparel',     null::bigint, true,  'piece', 'other',    110::smallint, 'dtf_prints');
+
+-- ---- Apparel items -------------------------------------------------------
+-- Migration 0012 clears these too. 08 counts five of them, all unpriced.
+-- The SIZE LADDER is not here: 0012 deliberately leaves `apparel_size_prices`
+-- alone, because those nine rows are where a per-size surcharge is typed in
+-- rather than a list the owner invents.
+
+insert into public.apparel_products (name, base_price_centavos, income_category, sort_order)
+values
+  ('Sublimation jersey set', null::bigint, 'sublimation_jerseys', 10::smallint),
+  ('Shirt',                  null::bigint, 'shirts',              20::smallint),
+  ('Jacket',                 null::bigint, 'jackets',             30::smallint),
+  ('Long sleeves',           null::bigint, 'long_sleeves',        40::smallint),
+  ('DTF process print',      null::bigint, 'dtf_prints',          50::smallint);
+
+-- ---- Repair services -----------------------------------------------------
+-- Twelve, all unpriced, with exactly one carrying `is_checking_fee` - 09
+-- checks all three of those facts, and a partial unique index added in 0012
+-- enforces the "exactly one" from here on.
+--
+-- "Cleaning & repaste" appears twice, once for a laptop and once for a
+-- desktop, because 09 checks that the same service CAN be priced per machine.
+
+insert into public.repair_services
+  (name, unit_kind, price_centavos, income_category, is_checking_fee, sort_order)
+values
+  ('Checking / diagnostic fee', 'any',           null::bigint, 'checking_fee',         true,   10::smallint),
+  ('Head cleaning',             'epson_printer', null::bigint, 'epson_printer_repair', false,  20::smallint),
+  ('Ink system repair',         'epson_printer', null::bigint, 'epson_printer_repair', false,  30::smallint),
+  ('Printer general service',   'epson_printer', null::bigint, 'epson_printer_repair', false,  40::smallint),
+  ('Cleaning & repaste',        'laptop',        null::bigint, 'laptop_repair',        false,  50::smallint),
+  ('Operating system install',  'laptop',        null::bigint, 'laptop_repair',        false,  60::smallint),
+  ('Screen replacement',        'laptop',        null::bigint, 'laptop_repair',        false,  70::smallint),
+  ('Keyboard replacement',      'laptop',        null::bigint, 'laptop_repair',        false,  80::smallint),
+  ('Cleaning & repaste',        'desktop',       null::bigint, 'desktop_repair',       false,  90::smallint),
+  ('Operating system install',  'desktop',       null::bigint, 'desktop_repair',       false, 100::smallint),
+  ('Upgrade / parts fitting',   'desktop',       null::bigint, 'desktop_repair',       false, 110::smallint),
+  ('Virus removal',             'any',           null::bigint, 'laptop_repair',        false, 120::smallint);

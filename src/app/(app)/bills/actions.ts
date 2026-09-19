@@ -13,6 +13,7 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
+import { billLoanLink, type BillType } from "@/lib/bills";
 import { deleteRefusal, deleteVanished } from "@/lib/deletable";
 import { MONEY_SOURCES, type MoneySource } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
@@ -258,11 +259,35 @@ export async function saveBillAction(
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   const supabase = await createSupabaseServerClient();
+
+  /*
+    The loan this bill pays down, which `mark_bill_paid` needs in order to
+    reduce the balance in the same transaction (spec 12.1). Without it a bill
+    labelled "Loan installment" takes money out of the ledger every month and
+    leaves the debt exactly where it was - silently, because nothing looks
+    wrong. `billLoanLink` is also what clears the link when a bill is changed
+    back to an operating cost.
+  */
+  const loanId = billLoanLink(type as BillType, String(formData.get("loanId") ?? ""));
+
+  if (loanId !== null) {
+    const { data: loan } = await supabase
+      .from("loans")
+      .select("id")
+      .eq("id", loanId)
+      .maybeSingle();
+
+    if (!loan) {
+      return { fieldErrors: { loanId: "That loan no longer exists. Choose another." } };
+    }
+  }
+
   const values = {
     name,
     amount_centavos: amountCentavos,
     due_day: dueDay,
     type,
+    loan_id: loanId,
   };
 
   if (billId === "") {
@@ -281,13 +306,15 @@ export async function saveBillAction(
     });
 
     revalidatePath("/bills");
+    revalidatePath("/loans");
     revalidatePath("/overview");
+    revalidatePath("/checklist");
     return { success: `Added ${name}.` };
   }
 
   const { data: before } = await supabase
     .from("bills")
-    .select("name, amount_centavos, due_day, type")
+    .select("name, amount_centavos, due_day, type, loan_id")
     .eq("id", billId)
     .maybeSingle();
 
@@ -306,7 +333,9 @@ export async function saveBillAction(
   });
 
   revalidatePath("/bills");
+  revalidatePath("/loans");
   revalidatePath("/overview");
+  revalidatePath("/checklist");
   return { success: `Saved ${name}.` };
 }
 

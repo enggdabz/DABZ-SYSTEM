@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   REMINDER_DAYS,
+  billLoanLink,
   billStatus,
   billsNeedingAttention,
   monthTotals,
@@ -306,5 +307,40 @@ describe("monthTotals", () => {
     });
     expect(october.paid).toBe(0);
     expect(october.unpaid).toBe(parsePesos("20000"));
+  });
+});
+
+describe("billLoanLink", () => {
+  /*
+    The bug this exists to stop: a bill labelled "Loan installment" with no
+    loan behind it. `mark_bill_paid` only writes a loan payment when
+    `bills.loan_id` is set, so such a bill takes money out of the ledger every
+    month and leaves the balance untouched - and nothing looks wrong, which is
+    what makes it dangerous. Until the seeded bills were cleared, the link
+    arrived with them and no form ever set it.
+  */
+  it("keeps the loan an installment bill was pointed at", () => {
+    expect(billLoanLink("loan_installment", "loan-1")).toBe("loan-1");
+  });
+
+  it("allows an installment that has no loan to point at yet", () => {
+    // Real state: the owner entered the bill before the loan.
+    expect(billLoanLink("loan_installment", "")).toBeNull();
+    expect(billLoanLink("loan_installment", null)).toBeNull();
+    expect(billLoanLink("loan_installment", undefined)).toBeNull();
+  });
+
+  it("clears the link when a bill stops being an installment", () => {
+    // The half that actually bites: a bill changed back to an operating cost
+    // must stop paying a debt down, or it keeps doing it invisibly.
+    expect(billLoanLink("operating", "loan-1")).toBeNull();
+  });
+
+  it("does not treat whitespace as a loan", () => {
+    expect(billLoanLink("loan_installment", "   ")).toBeNull();
+  });
+
+  it("trims what it is given, so a stray space cannot break the key", () => {
+    expect(billLoanLink("loan_installment", " loan-1 ")).toBe("loan-1");
   });
 });

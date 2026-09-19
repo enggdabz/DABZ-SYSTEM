@@ -8,7 +8,13 @@ import {
   type CatalogueKind,
 } from "./deletable";
 
-const KINDS: CatalogueKind[] = ["bill", "loan", "product"];
+const KINDS: CatalogueKind[] = [
+  "bill",
+  "loan",
+  "product",
+  "apparel item",
+  "repair service",
+];
 
 describe("what may be deleted", () => {
   it("lets a row with no history go", () => {
@@ -37,6 +43,10 @@ describe("what may be deleted", () => {
     );
     expect(deleteRefusal("loan", true)).toContain("payments have been recorded against it");
     expect(deleteRefusal("product", true)).toContain("it has already been sold");
+    expect(deleteRefusal("apparel item", true)).toContain("it is already on a job order");
+    expect(deleteRefusal("repair service", true)).toContain(
+      "it has already been charged on a ticket",
+    );
   });
 
   it("offers a way forward in every refusal", () => {
@@ -51,6 +61,10 @@ describe("the confirmation step", () => {
     expect(deleteConfirmation("bill", "Internet")).toContain("Internet");
     expect(deleteConfirmation("loan", "BPI")).toContain("BPI");
     expect(deleteConfirmation("product", "Photocopy")).toContain("Photocopy");
+    expect(deleteConfirmation("apparel item", "Shirt")).toContain("Shirt");
+    expect(deleteConfirmation("repair service", "Virus removal")).toContain(
+      "Virus removal",
+    );
   });
 
   it("uses the name exactly as it was typed", () => {

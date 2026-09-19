@@ -23,6 +23,7 @@ import {
 } from "@/lib/apparel";
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requireOwnerOrAdmin, requirePermission } from "@/lib/auth/dal";
+import { deleteRefusal, deleteVanished } from "@/lib/deletable";
 import {
   getApparelOrder,
   getApparelProducts,
@@ -707,4 +708,74 @@ export async function saveApparelOptionAction(
   revalidatePath("/apparel/prices");
   revalidatePath("/apparel");
   return { success: `"${label}" added.` };
+}
+
+/**
+ * Removes an apparel item from the price list (the owner's own request,
+ * 19 Sep 2026).
+ *
+ * Only an item that has never been put on a job order. The key on
+ * `apparel_order_lines` is `on delete set null` and each line keeps its own
+ * copy of the name, so an old job order sheet would still read correctly - but
+ * it would lose the link back to what it was charging for, and an item the
+ * shop has actually made is part of its history. That one is stopped instead
+ * ("not offered"), which takes it off new orders and leaves the old ones be.
+ */
+export async function deleteApparelProductAction(
+  _previous: ApparelState,
+  formData: FormData,
+): Promise<ApparelState> {
+  const user = await requireOwnerOrAdmin();
+
+  const productId = String(formData.get("productId") ?? "").trim();
+  const supabase = await createSupabaseServerClient();
+
+  // The whole row: once it is gone, the audit log is the only record of it.
+  const { data: product } = await supabase
+    .from("apparel_products")
+    .select("name, base_price_centavos, income_category, sort_order, active, note")
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (!product) return { error: "That item no longer exists." };
+
+  const { data: hasHistory, error: historyError } = await supabase.rpc(
+    "apparel_product_has_history",
+    { p_product_id: productId },
+  );
+
+  if (historyError) {
+    return { error: `Could not check its job orders: ${historyError.message}` };
+  }
+
+  const refusal = deleteRefusal("apparel item", hasHistory === true);
+  if (refusal) return { error: refusal };
+
+  // `.select()` so a delete the policy silently refused can be told apart from
+  // one that worked: a DELETE that matches no policy raises nothing.
+  const { data: removed, error } = await supabase
+    .from("apparel_products")
+    .delete()
+    .eq("id", productId)
+    .select("id");
+
+  if (error) return { error: `Could not delete it: ${error.message}` };
+  if (!removed || removed.length === 0) {
+    return { error: deleteVanished("apparel item") };
+  }
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "delete",
+    entity: "apparel_product",
+    entityId: productId,
+    summary: `Deleted the apparel item "${product.name}"`,
+    before: product,
+  });
+
+  revalidatePath("/apparel/prices");
+  revalidatePath("/apparel");
+  revalidatePath("/checklist");
+  return { success: `Deleted ${product.name}.` };
 }

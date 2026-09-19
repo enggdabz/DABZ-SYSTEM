@@ -1197,7 +1197,8 @@ Then:
 ## 19 September 2026 — the catalogue is yours to enter
 
 **What you asked for:** clear the products, the loans and the bills so you can
-add your own, and give me a way to edit or delete one already entered.
+add your own, and give me a way to edit or delete one already entered. Then:
+clear the apparel and repair prices too.
 
 **What was built**
 
@@ -1241,13 +1242,43 @@ a single sale of the day. Zero means "not known yet", so that is what it says
 now — and the End of day screen no longer records a day as hitting a target
 that was never set.
 
+*The apparel and repair price lists too.* Asked for right after the first
+round, and done the same way in `0012_clear_apparel_and_repair_prices.sql`:
+the five apparel items and the twelve repair services are gone, with the same
+Delete-or-stop rule on both screens. Two things came with it:
+
+- **The apparel size ladder stays.** XS to 5XL are not a price list — they are
+  the sizes a roster can use, they match the code, and the add-on beside each
+  one is already blank. Deleting them would have removed the only place to
+  type a surcharge.
+- **The checking fee is now yours to name.** It is the one charge that applies
+  even when a customer says no, and it used to arrive on a seeded row with no
+  control anywhere — so clearing the list would have left the shop unable to
+  have one at all. The service form has a tick box for it now, and only one
+  service can carry it.
+
+*A bill that says "loan installment" now really pays one down.* Found while
+checking the above, and the most important fix here. That link only ever
+existed on the seeded bills and no form could set it, so once the seeds were
+cleared, every installment bill typed in by hand would have taken money out of
+the ledger every month and left the debt exactly where it was — with nothing
+on screen to say so. The bill form now asks which loan it pays down, the Bills
+screen warns about any installment that has none, and a test marks a
+hand-entered bill paid and checks the balance actually moved.
+
+*Some smaller things the empty lists exposed:* the Overview's bills and loans
+cards said "₱0.00 of ₱0.00 paid" and "Overdue: None" with nothing entered,
+which reads as a settled month rather than an empty one; the End of day screen
+would have shown "-₱500.00 short" against a target of zero; and the To fill in
+screen still quoted figures from the old seeded data.
+
 **How to check it**
 
 ```bash
 npm install
-npm test          # expect: 473 passed
-npm run test:rls  # expect: 256 checks (239 before, plus 17 for the delete rules)
-npm run db:push   # applies 0011_clear_catalogue_and_allow_delete.sql
+npm test          # expect: 478 passed
+npm run test:rls  # expect: 267 checks (239 before, plus 28 for the new rules)
+npm run db:push   # applies 0011 and 0012
 ```
 
 `npm run db:push` is the one that matters — the clearing happens in the
@@ -1256,8 +1287,10 @@ from each list, and how many it kept because they had already been used.
 
 Then, in the app:
 
-1. Open **Bills**, **Loans** and **Products**. All three are empty and each
-   says so, and **To fill in** now lists all three.
+1. Open **Bills**, **Loans**, **Products**, **Apparel prices** and **Repair
+   prices**. All five lists are empty and each says so, and **To fill in** now
+   lists every one of them. The apparel **size add-ons** are still there, all
+   blank — those are sizes, not prices.
 2. Add a bill. Press **Edit or delete this bill** — the panel opens with the
    form and, at the bottom, **Stop counting** beside **Delete**.
 3. Press **Delete**. It asks first, naming the bill. Cancel, then do it again
@@ -1267,7 +1300,14 @@ Then, in the app:
 5. Press **Undo** on the payment, and Delete comes back.
 6. The same on **Loans** and on **Products** — a product that has been sold can
    only be hidden.
-7. Check **Activity**: every delete is there with the row it removed.
+7. On **Repair prices**, add a service and tick **This is the checking fee**.
+   Try to tick it on a second one: it refuses, and says why.
+8. On **Loans**, add a loan. Then on **Bills** add one as a **Loan
+   installment** and choose that loan. Mark it paid, and check the loan's
+   balance actually drops. Leave another installment unlinked and the screen
+   warns you, at the top and on the card.
+9. Check **Activity**: every delete is there with the row it removed — and for
+   a product, the bulk price rules that went with it.
 
 ---
 

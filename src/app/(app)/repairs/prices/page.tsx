@@ -1,12 +1,17 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { DeleteButton } from "@/components/DeleteButton";
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { getRepairServices } from "@/lib/data/repairs";
+import {
+  getRepairServices,
+  getRepairServicesWithTickets,
+} from "@/lib/data/repairs";
 import { formatPesos } from "@/lib/money";
 import { UNIT_KIND_LABELS, type UnitKind } from "@/lib/repairs";
 
+import { deleteServiceAction } from "../actions";
 import { ServiceForm } from "./PriceForms";
 
 export const metadata = { title: "Repair prices · Dabz System" };
@@ -24,9 +29,11 @@ export default async function RepairPricesPage() {
   // Prices are the owner's to set (spec 7.2), the same rule everywhere else.
   await requireOwnerOrAdmin();
 
-  const [services, settings] = await Promise.all([
+  const [services, settings, servicesWithTickets] = await Promise.all([
     getRepairServices(),
     getSettings(),
+    // Which ones have been charged already, and so may only be stopped.
+    getRepairServicesWithTickets(),
   ]);
 
   const unpriced = services.filter(
@@ -49,12 +56,41 @@ export default async function RepairPricesPage() {
         </p>
       </div>
 
-      <Notice tone="info" title="Laptop and desktop are listed separately">
-        You asked whether they cost the same for the same work. I did not
-        decide: the same service can be listed once for <em>any machine</em>, or
-        once per machine with its own price. Cleaning &amp; repaste is set up
-        both ways so you can price them apart, or give them the same number.
-      </Notice>
+      {services.length === 0 ? (
+        <Notice tone="info" title="No services yet">
+          <p>
+            A ticket still works with an empty list &mdash; whoever writes one
+            is asked for the price &mdash; but two technicians will charge
+            differently for the same job until the list exists. Add what
+            DabzTech does below: head cleaning, operating system install, screen
+            replacement, virus removal, and so on.
+          </p>
+          <p className="mt-2">
+            Start with the <strong>checking fee</strong>, and tick the box that
+            marks it as such: it is the one charge that applies even when the
+            customer decides not to go ahead.
+          </p>
+        </Notice>
+      ) : (
+        <Notice tone="info" title="The same job can be priced per machine, or once for all">
+          <p>
+            Does a laptop cost the same as a desktop for the same work? That is
+            yours to answer. Add a service once for <em>any machine</em> to
+            charge the same, or once per machine to price them apart.
+          </p>
+        </Notice>
+      )}
+
+      {services.length > 0 && !checkingFee ? (
+        <Notice tone="attention" title="No service is marked as the checking fee">
+          <p>
+            Nothing is being charged when a customer says no to the repair, and
+            the totals on a ticket have no separate line for it. Edit the
+            service that should be it and tick &ldquo;This is the checking
+            fee&rdquo;.
+          </p>
+        </Notice>
+      ) : null}
 
       {checkingFee && checkingFee.priceCentavos === null ? (
         <Notice tone="attention" title="The checking fee has no price">
@@ -110,7 +146,22 @@ export default async function RepairPricesPage() {
                       {service.note ? ` · ${service.note}` : ""}
                     </span>
                   </span>
-                  <ServiceForm service={service} />
+                  <div className="flex flex-wrap items-start gap-3">
+                    <ServiceForm service={service} />
+                    <DeleteButton
+                      kind="repair service"
+                      name={service.name}
+                      idField="serviceId"
+                      id={service.id}
+                      hasHistory={servicesWithTickets.has(service.id)}
+                      action={deleteServiceAction}
+                      consequence={
+                        service.isCheckingFee
+                          ? "It is the checking fee, so nothing will be charged when a customer says no until another service is marked as one."
+                          : undefined
+                      }
+                    />
+                  </div>
                 </li>
               ))}
             </ul>

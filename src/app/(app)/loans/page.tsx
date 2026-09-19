@@ -244,11 +244,8 @@ export default async function LoansPage() {
                 </Disclosure>
 
                 {loanPayments.length > 0 ? (
-                  <details>
-                    <summary className="cursor-pointer text-sm text-muted hover:text-ink">
-                      Payment history ({loanPayments.length})
-                    </summary>
-                    <ul className="mt-3 divide-y divide-line/60 text-sm">
+                  <Disclosure label={`Payment history (${loanPayments.length})`}>
+                    <ul className="divide-y divide-line/60 text-sm">
                       {loanPayments.map((payment) => (
                         <li
                           key={payment.id}
@@ -265,7 +262,7 @@ export default async function LoansPage() {
                         </li>
                       ))}
                     </ul>
-                  </details>
+                  </Disclosure>
                 ) : null}
               </div>
             </Card>

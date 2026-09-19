@@ -186,6 +186,12 @@ async function OwnerOverview() {
     today,
   });
 
+  // Nothing entered is a different state from nothing owing, and both of these
+  // cards used to render them identically.
+  const activeBillCount = bills.filter((bill) => bill.active).length;
+  const activeLoanCount = money.activeLoanCount;
+  const loansWithoutRate = money.loansWithoutRateCount;
+
   /*
     The target now includes wages, as spec 12.3 asks: each active staff
     member's daily rate times the working days in a month. It stays null while
@@ -396,6 +402,28 @@ async function OwnerOverview() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title={`Bills for ${formatPeriod(period)}`}>
+          {/*
+            "PHP 0.00 of PHP 0.00 paid" above "Overdue: None" reads as a month
+            that is fully settled. With nothing entered it is the opposite: the
+            shop's real bills are all still out there, uncounted. So the card
+            says what is true - nothing is entered - rather than a row of
+            reassuring zeroes.
+          */}
+          {activeBillCount === 0 ? (
+            <>
+              <p className="text-sm text-muted">
+                No bills entered, so there is nothing to show here yet - not a
+                month with nothing to pay.
+              </p>
+              <Link
+                href="/bills"
+                className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}
+              >
+                Add your bills
+              </Link>
+            </>
+          ) : (
+            <>
           <p className="text-3xl font-semibold tracking-tight">
             {formatPesos(billTotals.paid)}
             <span className="text-lg font-medium text-muted">
@@ -436,6 +464,8 @@ async function OwnerOverview() {
           <Link href="/bills" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
             Open the bills screen
           </Link>
+            </>
+          )}
         </Card>
 
         <Card title="Total still owed">
@@ -443,7 +473,15 @@ async function OwnerOverview() {
             {formatPesos(money.totalDebtCentavos)}
           </p>
 
-          {money.growingLoans.length > 0 ? (
+          {activeLoanCount === 0 ? (
+            <p className="mt-3 text-sm text-muted">
+              No loans entered, so this is zero rather than true.{" "}
+              <Link href="/loans" className={`underline ${TAP_AREA}`}>
+                Add them on the loans screen
+              </Link>
+              .
+            </p>
+          ) : money.growingLoans.length > 0 ? (
             <div className="mt-4">
               <Notice
                 tone="attention"
@@ -458,8 +496,10 @@ async function OwnerOverview() {
             </div>
           ) : (
             <p className="mt-3 text-sm text-muted">
-              No balance-growing warnings. Note that most loans still have no
-              interest rate entered, so there is nothing to check against yet.
+              No balance-growing warnings.
+              {loansWithoutRate > 0
+                ? ` ${loansWithoutRate} of ${activeLoanCount} loans still have no interest rate entered, so there is nothing to check those against yet.`
+                : ""}
             </p>
           )}
 

@@ -1,15 +1,18 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { DeleteButton } from "@/components/DeleteButton";
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getApparelOptions,
   getApparelProducts,
+  getApparelProductsWithOrders,
   getSizePrices,
 } from "@/lib/data/apparel";
 import { formatPesos } from "@/lib/money";
 
+import { deleteApparelProductAction } from "../actions";
 import { OptionForm, ProductForm, SizePriceForm } from "./PriceForms";
 
 export const metadata = { title: "Apparel prices · Dabz System" };
@@ -20,12 +23,15 @@ export default async function ApparelPricesPage() {
   // Prices are the owner's to set (spec 7.2), the same rule as products.
   await requireOwnerOrAdmin();
 
-  const [products, sizes, options, settings] = await Promise.all([
-    getApparelProducts(),
-    getSizePrices(),
-    getApparelOptions(),
-    getSettings(),
-  ]);
+  const [products, sizes, options, settings, productsWithOrders] =
+    await Promise.all([
+      getApparelProducts(),
+      getSizePrices(),
+      getApparelOptions(),
+      getSettings(),
+      // Which items are on a job order already, and so may only be stopped.
+      getApparelProductsWithOrders(),
+    ]);
 
   const unpriced = products.filter(
     (product) => product.active && product.basePriceCentavos === null,
@@ -55,8 +61,21 @@ export default async function ApparelPricesPage() {
 
       <Card
         title="Items"
-        description="The five things Dabz Apparel sells, from your own list."
+        description="What Dabz Apparel sells. Add each one, and price it when you are ready."
       >
+        {products.length === 0 ? (
+          <div className="mb-5">
+            <Notice tone="info" title="No items yet">
+              <p>
+                A job order still works with an empty list &mdash; whoever
+                writes one is asked for the item and the price &mdash; but two
+                people will quote the same jersey differently until the list
+                exists. Add what you make below: sublimation jersey sets,
+                shirts, jackets, long sleeves, DTF prints.
+              </p>
+            </Notice>
+          </div>
+        ) : null}
         {unpriced.length > 0 ? (
           <div className="mb-5">
             <Notice
@@ -95,7 +114,17 @@ export default async function ApparelPricesPage() {
                   {product.note ? ` · ${product.note}` : ""}
                 </span>
               </span>
-              <ProductForm product={product} />
+              <div className="flex flex-wrap items-start gap-3">
+                <ProductForm product={product} />
+                <DeleteButton
+                  kind="apparel item"
+                  name={product.name}
+                  idField="productId"
+                  id={product.id}
+                  hasHistory={productsWithOrders.has(product.id)}
+                  action={deleteApparelProductAction}
+                />
+              </div>
             </li>
           ))}
         </ul>
@@ -126,7 +155,9 @@ export default async function ApparelPricesPage() {
 
         <p className="mb-4 text-sm text-muted">
           Leave a box empty to say nothing extra is charged yet. Enter 0 to say
-          the size genuinely costs no more.
+          the size genuinely costs no more. The ladder itself is fixed &mdash;
+          these are the sizes a roster can use, and every add-on on them starts
+          blank.
         </p>
 
         <div className="space-y-2">

@@ -80,13 +80,13 @@ export default async function ChecklistPage() {
       >
         <ul className="space-y-2.5 text-sm text-muted">
           <li>
-            <strong className="text-ink">The rest of the debt.</strong> You said
-            the real total is closer to ₱2,000,000; ₱1,336,264 is entered. Add
-            the rest on{" "}
+            <strong className="text-ink">Whether every debt is in.</strong> The
+            system can only add up what has been typed in, so the total owed is
+            right only once every lender is on{" "}
             <Link href="/loans" className={`underline ${TAP_AREA}`}>
               Loans
             </Link>
-            .
+            . Nothing here can tell you one is missing.
           </li>
           <li>
             <strong className="text-ink">Your real shop hours and payday.</strong>{" "}
@@ -109,11 +109,15 @@ export default async function ChecklistPage() {
           </li>
           <li>
             <strong className="text-ink">
-              What &ldquo;Magic Payment&rdquo; and &ldquo;Forests Lake&rdquo;
-              are.
+              Whether a bill is in the right category.
             </strong>{" "}
-            Both are seeded as operating costs with a note. Tell me and I will
-            put them in the right category.
+            A bill added as an operating cost and a bill added as a loan
+            installment look the same here. Only the second pays a debt down,
+            and only if it is pointed at the loan &mdash;{" "}
+            <Link href="/bills" className={`underline ${TAP_AREA}`}>
+              Bills
+            </Link>{" "}
+            warns when one is not.
           </li>
           <li>
             <strong className="text-ink">One-colour black logo files.</strong>{" "}

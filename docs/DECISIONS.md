@@ -198,6 +198,34 @@ add them yourself, and for a way to edit or delete one already entered.
 **How to change it:** the wording of every refusal is in `src/lib/deletable.ts`,
 in one place, so the button and the message cannot drift apart.
 
+**Then, the same day: the apparel and repair price lists too** (`0012`). Same
+rules, plus three decisions of their own:
+
+- **The apparel size ladder is NOT cleared.** XS to 5XL are not a price list —
+  they match `APPAREL_SIZES` in the code, they are what a roster picks from,
+  and the add-on beside each one was already blank. The screen edits those rows
+  and has no "add a size" form, so clearing them would have removed the only
+  place to type a surcharge. To make the ladder editable instead, add an
+  add/remove form there and then it could be cleared like the rest.
+- **The checking fee is now nameable.** `is_checking_fee` marks the one charge
+  that applies even when the customer says no, and it arrived on a seeded row
+  with no control anywhere — so clearing the list would have left the shop
+  unable to have a checking fee at all. The service form has a tick box, and a
+  partial unique index allows only one row to carry it.
+- **A bill labelled "loan installment" now has to be pointed at a loan.** This
+  was a real bug the clearing exposed: `bills.loan_id` had no writer anywhere
+  in the app, so once the seeded bills were gone, marking an installment paid
+  would take money out of the ledger and move no balance, silently. The bill
+  form asks for the loan, `billLoanLink()` clears it when the bill goes back to
+  being an operating cost, and the Bills screen warns about any installment
+  that has no loan behind it.
+- **A `SECURITY DEFINER` helper checks the caller itself.** The `*_has_history`
+  functions are PostgREST URLs, so one that answered a staff account would be a
+  way round "staff see nothing of the bills and loans" — one bit at a time.
+  They return null to anyone but Owner/Admin. The catch, learned the hard way:
+  a migration's own `DO` block then cannot call them either, because nobody is
+  signed in, and `where not null` deletes nothing while reporting success.
+
 ---
 
 ## Assumptions I am working under

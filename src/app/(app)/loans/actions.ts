@@ -436,6 +436,17 @@ export async function deleteLoanAction(
   const refusal = deleteRefusal("loan", hasHistory === true);
   if (refusal) return { error: refusal };
 
+  /*
+    Installment bills pointing at this loan. The key is `on delete set null`,
+    so they survive - but they quietly stop paying anything down, and after the
+    delete nothing records which ones they were. Read before, written into the
+    audit entry, and named in the success line so it is not a surprise.
+  */
+  const { data: linkedBills } = await supabase
+    .from("bills")
+    .select("id, name")
+    .eq("loan_id", loanId);
+
   const { data: removed, error } = await supabase
     .from("loans")
     .delete()
@@ -453,8 +464,12 @@ export async function deleteLoanAction(
     entityId: loanId,
     summary: `Deleted the loan with ${loan.lender} of ${formatPesos(
       Number(loan.statement_balance_centavos),
-    )}`,
-    before: loan,
+    )}${
+      linkedBills && linkedBills.length > 0
+        ? `, unlinking ${linkedBills.map((bill) => bill.name).join(", ")}`
+        : ""
+    }`,
+    before: { ...loan, linked_bills: linkedBills ?? [] },
   });
 
   revalidatePath("/loans");
@@ -462,5 +477,14 @@ export async function deleteLoanAction(
   revalidatePath("/overview");
   revalidatePath("/checklist");
 
-  return { success: `Deleted the loan with ${loan.lender}.` };
+  return {
+    success:
+      linkedBills && linkedBills.length > 0
+        ? `Deleted the loan with ${loan.lender}. ${linkedBills
+            .map((bill) => bill.name)
+            .join(", ")} ${
+            linkedBills.length === 1 ? "is" : "are"
+          } no longer paying any balance down.`
+        : `Deleted the loan with ${loan.lender}.`,
+  };
 }
