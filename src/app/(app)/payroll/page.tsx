@@ -93,12 +93,22 @@ export default async function PayrollPage({
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Payroll</h1>
-        <p className="mt-2 text-muted">
-          Weekly wages at a daily rate. A half day pays half the rate, and
-          overtime is your choice each day.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Payroll</h1>
+          <p className="mt-2 text-muted">
+            Weekly wages at a daily rate. A half day pays half the rate, and
+            overtime is your choice each day.
+          </p>
+        </div>
+        {/* The week on screen, as a sheet for the whole shop. The dates travel
+            in the address, so any other run of dates can be asked for there. */}
+        <Link
+          href={`/payroll/summary?from=${civilDateToISO(weekStart)}&to=${civilDateToISO(addDays(weekStart, 6))}`}
+          className="rounded-control bg-ink/5 px-4 py-2 text-sm font-medium ring-1 ring-line hover:bg-ink/10"
+        >
+          Print payroll summary
+        </Link>
       </div>
 
       {active.length === 0 ? (

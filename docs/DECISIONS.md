@@ -241,6 +241,49 @@ one-off for a database that was only ever being tried out. If real months of
 payments ever need clearing, that is a different conversation, not another
 migration like this one.
 
+## Decided after Phase 9 — Printable payroll summary for any dates
+
+You asked for a printable payroll summary for any run of dates, Owner and Admin
+only. It lives at **/payroll/summary**, with a **Print payroll summary** button
+beside the heading on the Payroll screen.
+
+The hard part is that a payroll week and a calendar month do not line up: the
+week beginning Monday 28 September is paid partly out of September and partly
+out of October. Everything below follows from that.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| A week cut by the dates | **Day pay and overtime count day by day**, so only the days inside the range are paid here. **The week's bonus and cash advance deduction count whole**, in whichever summary holds the week's **first day** | `buildPayrollSummary` in `src/lib/payroll-summary.ts`. The rule is one `startsInRange` check, and the tests beside it prove a split week is counted exactly once across two months |
+| One row per person, or one per week | **One row per person**, with "Includes part of a week" under the name when one of their weeks runs past an end | Same file: the rows are grouped by staff id. A week-by-week sheet would be a different table over the same figures |
+| Weeks not yet paid | **Included**, with the row marked *Not yet paid* or *Partly paid* and the total split into **Already paid out** and **Still to pay** | Filter on `status === "paid"` before building the rows if you only ever want a record of money that has left |
+| How long a range may be | **400 days.** Not a technical limit — a guard against a mistyped year, which would otherwise print a wall of nothing instead of an obvious mistake | `MAX_RANGE_DAYS` in `src/lib/payroll-summary.ts`, one number |
+| Paper | **Landscape.** Ten columns across A4 portrait would shrink the figures to the point where somebody checking their own pay cannot read them | The `@page` rule at the top of `src/app/(app)/payroll/summary/page.tsx`. Dropping a column would be the other way to make portrait fit |
+
+**Three things it deliberately does not do.**
+
+- **It never reads the stored weekly total.** Every figure is added up from the
+  saved days, the same rule as a payslip and a receipt — a stored total cannot
+  be cut in half honestly, and seven saved days can. Where a week lies *wholly*
+  inside the dates, the two are compared and any disagreement is printed as
+  **⚠ A week needs saving again**. A week the dates cut in two is never
+  compared, because half a week *should* come to less than the stored total,
+  and a warning on every month boundary would teach you to ignore it.
+- **It does not quietly leave anyone out.** An active staff member with a daily
+  rate and nothing saved in those dates is named under the table as **⚠ Not on
+  this sheet**. A missing row on a wage sheet looks exactly like a person who
+  earned nothing.
+- **It stores nothing and adds no migration**, the same as Reports (Phase 8).
+  The sheet is worked out fresh each time it is opened, so it can never fall
+  out of step with the payroll screen it was built from.
+
+Two smaller calls, for the record: **a quick pick covers a whole period** — This
+week is the full seven days of the payroll week, This month the full calendar
+month — because this is a sheet for a pay period, not a "so far" figure; and
+**dates entered the wrong way round are swapped rather than refused**, with a
+note saying so, because that is a slip, not a mistake.
+
+---
+
 ---
 
 ## Assumptions I am working under

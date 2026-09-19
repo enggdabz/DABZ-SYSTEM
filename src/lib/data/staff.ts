@@ -19,6 +19,7 @@ import {
   type DayType,
 } from "@/lib/payroll";
 import {
+  addDays,
   civilDateToISO,
   manilaToday,
   parseISODate,
@@ -198,6 +199,95 @@ export const getPayrollDays = cache(
       .from("payroll_days")
       .select("id, payroll_week_id, work_date, day_type, overtime_hours, overtime_pay_centavos")
       .eq("payroll_week_id", weekId)
+      .order("work_date");
+
+    if (error || !data) return [];
+
+    return data.flatMap((row) => {
+      const workDate = parseISODate(row.work_date);
+      if (!workDate) return [];
+      return [
+        {
+          id: row.id,
+          payrollWeekId: row.payroll_week_id,
+          workDate,
+          dayType: row.day_type as DayType,
+          overtimeHours: Number(row.overtime_hours),
+          overtimePayCentavos: Number(row.overtime_pay_centavos),
+        },
+      ];
+    });
+  },
+);
+
+/**
+ * Every payroll week that TOUCHES a run of dates, for the summary sheet.
+ *
+ * A week starting up to six days before the range still has days inside it -
+ * that is the week a month boundary cuts in two - so the query reaches back
+ * six days and no further.
+ *
+ * Filtered by DATE rather than by "the latest N weeks": a year of payroll for
+ * six people is over three hundred rows, and a limit would quietly cut the far
+ * end off a long summary without saying so.
+ */
+export const getPayrollWeeksTouching = cache(
+  async (fromISO: string, toISO: string): Promise<PayrollWeekRow[]> => {
+    const from = parseISODate(fromISO);
+    const to = parseISODate(toISO);
+    if (!from || !to) return [];
+
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("payroll_weeks")
+      .select(
+        "id, staff_id, week_start, daily_rate_centavos, bonus_centavos, advance_deduction_centavos, gross_centavos, net_centavos, status, paid_on, paid_source, unlock_reason",
+      )
+      .gte("week_start", civilDateToISO(addDays(from, -6)))
+      .lte("week_start", civilDateToISO(to))
+      .order("week_start");
+
+    if (error || !data) return [];
+
+    return data.flatMap((row) => {
+      const weekStart = parseISODate(row.week_start);
+      if (!weekStart) return [];
+      return [
+        {
+          id: row.id,
+          staffId: row.staff_id,
+          weekStart,
+          dailyRateCentavos: Number(row.daily_rate_centavos),
+          bonusCentavos: Number(row.bonus_centavos),
+          advanceDeductionCentavos: Number(row.advance_deduction_centavos),
+          grossCentavos: Number(row.gross_centavos),
+          netCentavos: Number(row.net_centavos),
+          status: row.status === "paid" ? "paid" : "draft",
+          paidOn: row.paid_on ? parseISODate(row.paid_on) : null,
+          paidSource: row.paid_source,
+          unlockReason: row.unlock_reason,
+        },
+      ];
+    });
+  },
+);
+
+/**
+ * The saved days for many weeks at once.
+ *
+ * One request for the whole sheet rather than one per week: a two-month
+ * summary for five people is forty weeks, and forty round trips to Singapore
+ * is most of a second before a single figure is added up.
+ */
+export const getPayrollDaysForWeeks = cache(
+  async (weekIds: readonly string[]): Promise<PayrollDayRow[]> => {
+    if (weekIds.length === 0) return [];
+
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from("payroll_days")
+      .select("id, payroll_week_id, work_date, day_type, overtime_hours, overtime_pay_centavos")
+      .in("payroll_week_id", [...weekIds])
       .order("work_date");
 
     if (error || !data) return [];
