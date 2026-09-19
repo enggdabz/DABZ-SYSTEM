@@ -195,7 +195,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
             <Input
               name="shopAddress"
               defaultValue={settings.shopAddress ?? ""}
-              placeholder="e.g. Lacson Street, Bacolod City"
+              placeholder="e.g. Rizal Avenue, San Carlos City, Pangasinan"
             />
           </Field>
 

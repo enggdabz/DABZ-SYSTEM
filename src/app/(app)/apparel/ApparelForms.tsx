@@ -78,7 +78,7 @@ export function NewOrderForm({
         hint="What the order is known by - often a team, not the person paying."
         error={state.fieldErrors?.teamName}
       >
-        <Input name="teamName" placeholder="e.g. Negros Runners Club" required autoFocus />
+        <Input name="teamName" placeholder="e.g. San Carlos Runners Club" required autoFocus />
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
