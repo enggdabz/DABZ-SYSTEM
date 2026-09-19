@@ -301,3 +301,10 @@ to ask:
   screen are unaffected. Its password floor is 8 to match
   `MIN_PASSWORD_LENGTH`: if the two disagree, one accepts a password the other
   refuses and the person hitting it cannot tell which.
+- **One loading outline serves every screen** (`src/app/(app)/loading.tsx`)
+  rather than twenty-three tailored ones. Every screen in the system is a
+  heading over a stack of cards, and bespoke outlines drift out of step with the
+  screens they imitate. It also earns its keep twice over: without a loading
+  boundary Next.js does not prefetch a dynamic screen at all, so adding the file
+  is what lets a section be fetched as its link comes into view. If one screen
+  ever needs its own, add a `loading.tsx` beside that page.
