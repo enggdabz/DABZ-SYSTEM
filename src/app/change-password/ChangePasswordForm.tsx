@@ -38,7 +38,11 @@ export function ChangePasswordForm() {
         />
       </Field>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {state.error ? (
+        <Notice tone="attention" title={state.error}>
+          {state.errorDetail ? <p>{state.errorDetail}</p> : null}
+        </Notice>
+      ) : null}
 
       <Button type="submit" disabled={pending} className="w-full">
         {pending ? "Saving…" : "Set my new password"}
