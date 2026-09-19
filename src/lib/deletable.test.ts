@@ -5,6 +5,7 @@ import {
   deleteConfirmation,
   deleteRefusal,
   deleteVanished,
+  historyCheckUnavailable,
   type CatalogueKind,
 } from "./deletable";
 
@@ -85,5 +86,24 @@ describe("a delete the database turned down", () => {
       expect(deleteVanished(kind)).toMatch(/^Nothing was deleted/);
       expect(deleteVanished(kind)).toMatch(/instead/);
     }
+  });
+});
+
+describe("when the history check cannot be reached", () => {
+  /*
+    PostgREST answers "function not found" both when a migration was never
+    applied AND when it is merely serving a cache built before the function
+    existed. An owner who had already run db:push and is told to run it again
+    has no way to tell which it was, so the message names both fixes.
+  */
+  it("names the function, and both of the things that cause this", () => {
+    const message = historyCheckUnavailable("bill_has_history");
+    expect(message).toContain("bill_has_history");
+    expect(message).toContain("reload schema");
+    expect(message).toContain("db:push");
+  });
+
+  it("says it will not guess, rather than deleting anyway", () => {
+    expect(historyCheckUnavailable("loan_has_history")).toContain("will not guess");
   });
 });

@@ -14,9 +14,14 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { billLoanLink, type BillType } from "@/lib/bills";
-import { deleteRefusal, deleteVanished } from "@/lib/deletable";
+import {
+  deleteRefusal,
+  deleteVanished,
+  historyCheckUnavailable,
+} from "@/lib/deletable";
 import { MONEY_SOURCES, type MoneySource } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import {
   civilDateToISO,
   formatPeriod,
@@ -420,7 +425,11 @@ export async function deleteBillAction(
   );
 
   if (historyError) {
-    return { error: `Could not check the bill's history: ${historyError.message}` };
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("bill_has_history")
+        : `Could not check the bill's history: ${historyError.message}`,
+    };
   }
 
   const refusal = deleteRefusal("bill", hasHistory === true);

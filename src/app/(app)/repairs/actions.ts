@@ -13,9 +13,14 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requireOwnerOrAdmin, requirePermission } from "@/lib/auth/dal";
 import { getRepairServices, getRepairTicket } from "@/lib/data/repairs";
-import { deleteRefusal, deleteVanished } from "@/lib/deletable";
+import {
+  deleteRefusal,
+  deleteVanished,
+  historyCheckUnavailable,
+} from "@/lib/deletable";
 import { MONEY_SOURCES } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { civilDateToISO, manilaToday } from "@/lib/period";
 import {
   TICKET_STATUSES,
@@ -689,7 +694,11 @@ export async function deleteServiceAction(
   );
 
   if (historyError) {
-    return { error: `Could not check its tickets: ${historyError.message}` };
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("repair_service_has_history")
+        : `Could not check its tickets: ${historyError.message}`,
+    };
   }
 
   const refusal = deleteRefusal("repair service", hasHistory === true);

@@ -10,9 +10,14 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit, diffFields } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { deleteRefusal, deleteVanished } from "@/lib/deletable";
+import {
+  deleteRefusal,
+  deleteVanished,
+  historyCheckUnavailable,
+} from "@/lib/deletable";
 import { DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface ProductActionState {
@@ -298,7 +303,11 @@ export async function deleteProductAction(
   );
 
   if (historyError) {
-    return { error: `Could not check whether it has been sold: ${historyError.message}` };
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("product_has_history")
+        : `Could not check whether it has been sold: ${historyError.message}`,
+    };
   }
 
   const refusal = deleteRefusal("product", hasHistory === true);

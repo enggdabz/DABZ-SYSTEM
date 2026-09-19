@@ -113,3 +113,26 @@ export function deleteVanished(kind: CatalogueKind): string {
   const rule = RULES[kind];
   return `Nothing was deleted: this ${rule.noun} now has history behind it. ${rule.instead}`;
 }
+
+/**
+ * What to say when the "has this got history?" question cannot be asked.
+ *
+ * Supabase does not reach PostgreSQL directly - it goes through PostgREST,
+ * which keeps its own cache of what functions exist. A cache built before
+ * migration 0011 or 0012 ran answers "function not found", which looks exactly
+ * like a migration that was never applied and has a different fix. Both are
+ * named, because from the screen they are indistinguishable (see
+ * `src/lib/postgrest.ts`).
+ *
+ * The delete is refused rather than attempted: without the answer the screen
+ * cannot promise that deleting is safe, and a delete that takes a payment
+ * history with it is not something to find out about afterwards.
+ */
+export function historyCheckUnavailable(rpcName: string): string {
+  return (
+    `The system could not reach ${rpcName}, so it cannot tell whether this is safe to delete - ` +
+    "and it will not guess. Show this to the owner: in the Supabase SQL editor run " +
+    "notify pgrst, 'reload schema'; and if that does not help, the migrations have not " +
+    "been applied, so run npm run db:push."
+  );
+}

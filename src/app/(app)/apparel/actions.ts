@@ -23,7 +23,11 @@ import {
 } from "@/lib/apparel";
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requireOwnerOrAdmin, requirePermission } from "@/lib/auth/dal";
-import { deleteRefusal, deleteVanished } from "@/lib/deletable";
+import {
+  deleteRefusal,
+  deleteVanished,
+  historyCheckUnavailable,
+} from "@/lib/deletable";
 import {
   getApparelOrder,
   getApparelProducts,
@@ -31,6 +35,7 @@ import {
 } from "@/lib/data/apparel";
 import { MONEY_SOURCES } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { civilDateToISO, manilaToday } from "@/lib/period";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -745,7 +750,11 @@ export async function deleteApparelProductAction(
   );
 
   if (historyError) {
-    return { error: `Could not check its job orders: ${historyError.message}` };
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("apparel_product_has_history")
+        : `Could not check its job orders: ${historyError.message}`,
+    };
   }
 
   const refusal = deleteRefusal("apparel item", hasHistory === true);
