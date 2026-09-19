@@ -34,6 +34,27 @@ export interface ApparelProduct {
   note: string | null;
 }
 
+/**
+ * Which apparel items are already on a job order, so the price screen knows
+ * which ones may still be deleted (see `src/lib/deletable.ts`).
+ *
+ * One call for the whole list rather than one per row, and it counts distinct
+ * items rather than order lines. An empty set on failure is the safe
+ * direction: the screen offers a Delete, the policy refuses it, and the owner
+ * is told nothing was removed.
+ */
+export const getApparelProductsWithOrders = cache(
+  async (): Promise<Set<string>> => {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase.rpc("apparel_products_with_orders");
+
+    if (error || !data) return new Set();
+    return new Set(
+      (data as { apparel_product_id: string }[]).map((row) => row.apparel_product_id),
+    );
+  },
+);
+
 export interface ApparelOption {
   id: string;
   kind: "fabric" | "collar";

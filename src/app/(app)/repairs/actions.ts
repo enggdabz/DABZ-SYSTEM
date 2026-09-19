@@ -13,8 +13,14 @@ import { revalidatePath } from "next/cache";
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requireOwnerOrAdmin, requirePermission } from "@/lib/auth/dal";
 import { getRepairServices, getRepairTicket } from "@/lib/data/repairs";
+import {
+  deleteRefusal,
+  deleteVanished,
+  historyCheckUnavailable,
+} from "@/lib/deletable";
 import { MONEY_SOURCES } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { civilDateToISO, manilaToday } from "@/lib/period";
 import {
   TICKET_STATUSES,
@@ -598,14 +604,25 @@ export async function saveServiceAction(
     }
   }
 
+  /*
+    The checking fee is the one charge that applies even when the customer says
+    no (spec 9.2), and the ticket totals keep it separate because of this flag.
+    It used to arrive on a seeded row with no control anywhere, so once the
+    seeded list was cleared there was no way to have a checking fee at all.
+    A partial unique index (migration 0012) makes sure only one row carries it.
+  */
+  const isCheckingFee = formData.get("isCheckingFee") !== null;
+
   const row = {
     name,
     unit_kind: unitKind,
     price_centavos: priceCentavos,
-    income_category:
-      unitKind === "any"
+    income_category: isCheckingFee
+      ? "checking_fee"
+      : unitKind === "any"
         ? String(formData.get("incomeCategory") ?? "laptop_repair")
         : UNIT_INCOME_CATEGORY[unitKind as UnitKind],
+    is_checking_fee: isCheckingFee,
     active: formData.get("active") !== null,
     note: String(formData.get("note") ?? "").trim() || null,
   };
@@ -616,6 +633,12 @@ export async function saveServiceAction(
     : await supabase.from("repair_services").insert({ ...row, created_by: user.id });
 
   if (error) {
+    if (error.message.includes("repair_services_one_checking_fee")) {
+      return {
+        error:
+          "Another service is already marked as the checking fee. Take the mark off that one first - there can only be one.",
+      };
+    }
     return {
       error: error.message.includes("repair_services_name_idx")
         ? "There is already a service with that name for that machine."
@@ -636,4 +659,76 @@ export async function saveServiceAction(
   revalidatePath("/repairs/prices");
   revalidatePath("/checklist");
   return { success: `"${name}" saved.` };
+}
+
+/**
+ * Removes a service from the repair price list (the owner's own request,
+ * 19 Sep 2026).
+ *
+ * Only a service that has never been charged on a ticket. The key on
+ * `repair_lines` is `on delete set null` and each line keeps its own copy of
+ * the name, so an old ticket would still read correctly - but it would lose
+ * the link back to what it charged for, and work the shop has actually done is
+ * part of its history. That one is stopped instead ("not offered").
+ */
+export async function deleteServiceAction(
+  _previous: RepairState,
+  formData: FormData,
+): Promise<RepairState> {
+  const user = await requireOwnerOrAdmin();
+
+  const serviceId = String(formData.get("serviceId") ?? "").trim();
+  const supabase = await createSupabaseServerClient();
+
+  const { data: service } = await supabase
+    .from("repair_services")
+    .select("name, unit_kind, price_centavos, income_category, is_checking_fee, sort_order, active, note")
+    .eq("id", serviceId)
+    .maybeSingle();
+
+  if (!service) return { error: "That service no longer exists." };
+
+  const { data: hasHistory, error: historyError } = await supabase.rpc(
+    "repair_service_has_history",
+    { p_service_id: serviceId },
+  );
+
+  if (historyError) {
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("repair_service_has_history")
+        : `Could not check its tickets: ${historyError.message}`,
+    };
+  }
+
+  const refusal = deleteRefusal("repair service", hasHistory === true);
+  if (refusal) return { error: refusal };
+
+  const { data: removed, error } = await supabase
+    .from("repair_services")
+    .delete()
+    .eq("id", serviceId)
+    .select("id");
+
+  if (error) return { error: `Could not delete it: ${error.message}` };
+  if (!removed || removed.length === 0) {
+    return { error: deleteVanished("repair service") };
+  }
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "delete",
+    entity: "repair_service",
+    entityId: serviceId,
+    summary: `Deleted the repair service "${service.name}"${
+      service.is_checking_fee ? " - it was the checking fee" : ""
+    }`,
+    before: service,
+  });
+
+  revalidatePath("/repairs/prices");
+  revalidatePath("/repairs");
+  revalidatePath("/checklist");
+  return { success: `Deleted ${service.name}.` };
 }

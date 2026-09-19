@@ -1,11 +1,17 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { DeleteButton } from "@/components/DeleteButton";
+import { Card, Disclosure, Notice, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { getAllProducts, SECTION_LABELS } from "@/lib/data/pos";
+import {
+  getAllProducts,
+  getProductsWithSales,
+  SECTION_LABELS,
+} from "@/lib/data/pos";
 import { DIVISIONS } from "@/lib/divisions";
 import { formatPesos } from "@/lib/money";
 
+import { deleteProductAction } from "./actions";
 import { PriceTiersForm, ProductActiveForm, ProductForm } from "./ProductForms";
 
 export const metadata = { title: "Products · Dabz System" };
@@ -14,7 +20,11 @@ export default async function ProductsPage() {
   await connection();
 
   await requireOwnerOrAdmin();
-  const products = await getAllProducts();
+  const [products, productsWithSales] = await Promise.all([
+    getAllProducts(),
+    // Which ones have been sold, and so may only be hidden rather than deleted.
+    getProductsWithSales(),
+  ]);
 
   const active = products.filter((product) => product.active);
   const hidden = products.filter((product) => !product.active);
@@ -43,13 +53,17 @@ export default async function ProductsPage() {
         </Notice>
       ) : null}
 
-      <Notice tone="info" title="Colour tiers are named by ink coverage">
-        <p>
-          Light, medium, heavy and full page match the ₱5 / ₱8 / ₱10 / ₱15 you
-          gave me. That is my guess at what the tiers are for &mdash; rename them
-          here if they mean something else in your shop.
-        </p>
-      </Notice>
+      {products.length === 0 ? (
+        <Notice tone="info" title="No products yet">
+          <p>
+            The counter has no buttons, so every sale has to be typed in by
+            hand. Add the things you sell most often below &mdash; black &amp;
+            white printing, photocopies, lamination, mugs. A product with no
+            price still works: the counter asks for the amount each time, which
+            is the right answer for anything you price per job.
+          </p>
+        </Notice>
+      ) : null}
 
       <section className="space-y-4">
         {active.map((product) => (
@@ -74,11 +88,11 @@ export default async function ProductsPage() {
               </div>
             </div>
 
-            <details className="mt-4 border-t border-line/60 pt-4">
-              <summary className="cursor-pointer text-sm text-muted hover:text-ink">
-                Edit, or set a bulk price
-              </summary>
-              <div className="mt-5 space-y-6">
+            <Disclosure
+              className="mt-4 border-t border-line/60 pt-4"
+              label="Edit, set a bulk price, or delete"
+            >
+              <div className="space-y-6">
                 <ProductForm
                   product={{
                     id: product.id,
@@ -94,8 +108,8 @@ export default async function ProductsPage() {
                 <div className="border-t border-line/60 pt-5">
                   <h3 className="text-sm font-medium">Bulk price</h3>
                   <p className="mt-1 text-sm text-muted">
-                    For example: from 50 pages up, each one costs ₱2.50. You have
-                    not given me any bulk rules, so there are none.
+                    For example: from 50 pages up, each one costs ₱2.50. Leave
+                    it alone if every quantity costs the same.
                   </p>
                   <div className="mt-3">
                     <PriceTiersForm
@@ -109,15 +123,30 @@ export default async function ProductsPage() {
                   </div>
                 </div>
 
-                <div className="border-t border-line/60 pt-5">
+                <div className="flex flex-wrap items-start gap-3 border-t border-line/60 pt-5">
                   <ProductActiveForm
                     productId={product.id}
                     name={product.name}
                     active
                   />
+                  <DeleteButton
+                    kind="product"
+                    name={product.name}
+                    idField="productId"
+                    id={product.id}
+                    hasHistory={productsWithSales.has(product.id)}
+                    action={deleteProductAction}
+                    consequence={
+                      product.tiers.length > 0
+                        ? `Its ${product.tiers.length} bulk price rule${
+                            product.tiers.length === 1 ? "" : "s"
+                          } go with it.`
+                        : undefined
+                    }
+                  />
                 </div>
               </div>
-            </details>
+            </Disclosure>
           </Card>
         ))}
       </section>
@@ -127,18 +156,35 @@ export default async function ProductsPage() {
           title={`Hidden from the counter (${hidden.length})`}
           description="Kept, because old receipts still refer to them."
         >
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {hidden.map((product) => (
               <li
                 key={product.id}
                 className="flex flex-wrap items-center justify-between gap-3"
               >
                 <span className="text-sm">{product.name}</span>
-                <ProductActiveForm
-                  productId={product.id}
-                  name={product.name}
-                  active={false}
-                />
+                <div className="flex flex-wrap items-start gap-3">
+                  <ProductActiveForm
+                    productId={product.id}
+                    name={product.name}
+                    active={false}
+                  />
+                  <DeleteButton
+                    kind="product"
+                    name={product.name}
+                    idField="productId"
+                    id={product.id}
+                    hasHistory={productsWithSales.has(product.id)}
+                    action={deleteProductAction}
+                    consequence={
+                      product.tiers.length > 0
+                        ? `Its ${product.tiers.length} bulk price rule${
+                            product.tiers.length === 1 ? "" : "s"
+                          } go with it.`
+                        : undefined
+                    }
+                  />
+                </div>
               </li>
             ))}
           </ul>

@@ -273,11 +273,38 @@ describe("targetProgress", () => {
     expect(progress.shortfallCentavos).toBe(targetCentavos);
   });
 
-  it("does not divide by zero when there is no target", () => {
+  /*
+    A zero target is what a shop looks like before any bills are entered, which
+    since the catalogue was cleared is every shop on its first day. Calling it
+    "reached" would put a green tick at the top of the Overview before a single
+    sale, so it reports "not known yet" instead - and never divides by zero.
+  */
+  it("says a target of zero is not known rather than reached", () => {
     expect(targetProgress({ achievedCentavos: 0, targetCentavos: 0 })).toMatchObject({
-      percent: 100,
-      reached: true,
+      percent: 0,
+      reached: false,
+      unknown: true,
+      shortfallCentavos: 0,
     });
+  });
+
+  it("does not call a real target unknown, even on a day with nothing sold", () => {
+    expect(
+      targetProgress({ achievedCentavos: 0, targetCentavos }).unknown,
+    ).toBe(false);
+    expect(
+      targetProgress({ achievedCentavos: targetCentavos, targetCentavos }).unknown,
+    ).toBe(false);
+  });
+
+  it("does not report a day's takings as reaching nothing", () => {
+    // Money taken in against no target is still not an achievement to tick.
+    const progress = targetProgress({
+      achievedCentavos: parsePesos("3000"),
+      targetCentavos: 0,
+    });
+    expect(progress.reached).toBe(false);
+    expect(progress.unknown).toBe(true);
   });
 
   it("treats a loss-making day as zero progress, not negative", () => {

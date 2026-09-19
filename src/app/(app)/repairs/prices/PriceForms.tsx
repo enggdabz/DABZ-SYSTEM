@@ -17,6 +17,7 @@ export function ServiceForm({
     unitKind: UnitKind | "any";
     priceCentavos: number | null;
     incomeCategory: string;
+    isCheckingFee: boolean;
     active: boolean;
     note: string | null;
   };
@@ -105,6 +106,27 @@ export function ServiceForm({
           className="size-4 rounded border-line"
         />
         <span>Offer this</span>
+      </label>
+
+      {/*
+        Only one service can carry this. It is what makes the charge appear on
+        a ticket even when the customer decides not to go ahead, and what keeps
+        it in its own line of the totals.
+      */}
+      <label className="flex items-start gap-2 text-sm">
+        <input
+          type="checkbox"
+          name="isCheckingFee"
+          defaultChecked={service?.isCheckingFee ?? false}
+          className="mt-0.5 size-4 rounded border-line"
+        />
+        <span>
+          This is the checking fee
+          <span className="block text-xs text-muted">
+            Charged even when the customer says no to the repair. Only one
+            service can be it.
+          </span>
+        </span>
       </label>
 
       {state.error ? <Notice tone="attention" title={state.error} /> : null}

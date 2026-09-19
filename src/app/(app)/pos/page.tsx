@@ -30,6 +30,21 @@ export default async function PosPage() {
         </p>
       </div>
 
+      {products.length === 0 ? (
+        <Notice tone="info" title="No buttons yet, but the counter still works">
+          <p>
+            Nothing has been added to the product list, so there is nothing to
+            tap. Use <strong>New product</strong> below to type an item, a
+            quantity and a price straight onto the sale &mdash; and tick
+            &ldquo;save this to the product list&rdquo; to turn it into a button
+            for next time.
+            {isOwnerOrAdmin(user)
+              ? " The Products screen is where you add them in bulk."
+              : ""}
+          </p>
+        </Notice>
+      ) : null}
+
       {unpriced.length > 0 ? (
         <Notice
           tone="info"

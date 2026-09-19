@@ -14,22 +14,24 @@ do $$
 begin
   raise notice '--- phase 4: structure ---';
 
+  -- The products come from 01_catalogue_fixtures.sql; everyone signed in may
+  -- read them, which is what makes the counter work for staff.
   if (select count(*) from public.products) <> 11 then
-    raise exception 'FAIL: expected the 11 seeded products';
+    raise exception 'FAIL: expected the 11 fixture products';
   end if;
-  raise notice 'PASS: the counter buttons are seeded';
+  raise notice 'PASS: staff read the counter buttons';
 
-  -- Only the prices the owner actually gave.
+  -- Five of the eleven have no price at all: that is a real state, and the
+  -- counter asks for the amount instead of assuming one.
   if (select count(price_centavos) from public.products) <> 6 then
-    raise exception 'FAIL: a price was invented for a product the owner has not priced';
+    raise exception 'FAIL: a price appeared on a product that has none';
   end if;
-  raise notice 'PASS: no price was invented for lamination, stickers, mugs or DTF';
+  raise notice 'PASS: a product with no price keeps having no price';
 
-  -- And no bulk rules, because the owner has not given them.
   if (select count(*) from public.product_price_tiers) <> 0 then
-    raise exception 'FAIL: a bulk discount rule was invented';
+    raise exception 'FAIL: a bulk discount rule appeared from nowhere';
   end if;
-  raise notice 'PASS: no bulk discount rule was invented';
+  raise notice 'PASS: no bulk discount rule appeared from nowhere';
 
   -- Maya is now a real payment method (open decision 17.12).
   insert into public.ledger_entries (direction, amount_centavos, tag, category, source)

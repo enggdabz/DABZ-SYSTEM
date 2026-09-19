@@ -31,6 +31,11 @@ export interface ClosingResult {
   over: boolean;
   totalSalesCentavos: Centavos;
   targetCentavos: Centavos;
+  /**
+   * False while the target is zero, which means "not known yet" rather than
+   * "met" - see the note in `src/lib/target.ts`. A day closed before any bills
+   * were entered must not go into the record as a day the target was hit.
+   */
   targetReached: boolean;
 }
 
@@ -56,6 +61,7 @@ export function computeClosing(input: ClosingInput): ClosingResult {
     over: differenceCentavos > 0,
     totalSalesCentavos,
     targetCentavos: input.targetCentavos,
-    targetReached: totalSalesCentavos >= input.targetCentavos,
+    targetReached:
+      input.targetCentavos > 0 && totalSalesCentavos >= input.targetCentavos,
   };
 }

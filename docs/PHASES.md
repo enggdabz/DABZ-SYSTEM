@@ -155,6 +155,12 @@ migration files, add the three settings, and create your owner account at
 
 ## Phase 2 — Bills, loans, ledger, Overview ✅
 
+> **Note, 19 September 2026.** The seeded bills and loans described below were
+> cleared at the owner's request — see
+> [the catalogue is yours to enter](#19-september-2026--the-catalogue-is-yours-to-enter)
+> at the end of this file. Everything else here still holds; only the rows that
+> arrived with it are gone.
+
 **Built**
 
 *Bills (spec 12.1)*
@@ -400,6 +406,12 @@ With Supabase connected and **all four** migrations run:
 ---
 
 ## Phase 4 — Customers and the Dabz Printshoppe POS ✅
+
+> **Note, 19 September 2026.** The seeded counter buttons described below were
+> cleared at the owner's request — see
+> [the catalogue is yours to enter](#19-september-2026--the-catalogue-is-yours-to-enter)
+> at the end of this file. The counter itself is unchanged, and its **New
+> product** step still adds an item that has no button.
 
 Also in this phase: the time clock was tightened so **each person clocks only
 themselves in** (open decision 17.2, answered).
@@ -1179,6 +1191,123 @@ Then:
    that was never covered by a test before.
 6. Existing accounts already stuck in the loop need nothing special — the next
    time they choose a password it sticks.
+
+---
+
+## 19 September 2026 — the catalogue is yours to enter
+
+**What you asked for:** clear the products, the loans and the bills so you can
+add your own, and give me a way to edit or delete one already entered. Then:
+clear the apparel and repair prices too.
+
+**What was built**
+
+*The three lists start empty.* Phase 2 shipped with 11 bills and 6 loans read
+off the specification, and Phase 4 with 11 counter buttons. Migration
+`0011_clear_catalogue_and_allow_delete.sql` removes all of them. It is a new
+migration rather than an edit to the old ones, because a migration that has
+already been applied must never be changed — and the useful side effect is
+that a database built from scratch now ends up exactly where yours does:
+empty, waiting for you.
+
+*Edit is now a button.* It was always possible — the form was there — but the
+way in was a line of small grey text that did not look like anything, which is
+why it read as missing. Every bill, loan and product card now has a proper
+**Edit** handle the same size and shape as the buttons beside it.
+
+*Delete, with one limit.* A bill, loan or product that nothing has happened to
+can be deleted outright. One that money has moved against cannot:
+
+| The row | What you can do | Why |
+|---|---|---|
+| A bill never marked paid | **Delete** | Nothing refers to it |
+| A bill marked paid in any month | **Stop counting** only | Its payments and their ledger entries would go with it |
+| A loan with no payments | **Delete** | Nothing refers to it |
+| A loan paid down at all | **Stop counting** only | Same — the money it recorded would vanish |
+| A product never sold | **Delete** | Nothing refers to it |
+| A product that has been sold | **Hide from the counter** only | It is part of what the shop has actually sold |
+
+Stopping keeps every figure and takes the row out of the running totals, so
+nothing is lost either way. The screen tells you which case you are in before
+you press anything, and deleting asks once and names what it is about to
+remove. Whatever is deleted is written to the audit log first, in full.
+
+*Loans can be stopped.* They never could. A debt that was settled, or entered
+twice, stayed in the total owed for good; now it can be set aside and brought
+back.
+
+*A target of zero says so.* With no bills entered the daily target is zero, and
+the Overview used to show a green **✓ Reached** at the top of the screen before
+a single sale of the day. Zero means "not known yet", so that is what it says
+now — and the End of day screen no longer records a day as hitting a target
+that was never set.
+
+*The apparel and repair price lists too.* Asked for right after the first
+round, and done the same way in `0012_clear_apparel_and_repair_prices.sql`:
+the five apparel items and the twelve repair services are gone, with the same
+Delete-or-stop rule on both screens. Two things came with it:
+
+- **The apparel size ladder stays.** XS to 5XL are not a price list — they are
+  the sizes a roster can use, they match the code, and the add-on beside each
+  one is already blank. Deleting them would have removed the only place to
+  type a surcharge.
+- **The checking fee is now yours to name.** It is the one charge that applies
+  even when a customer says no, and it used to arrive on a seeded row with no
+  control anywhere — so clearing the list would have left the shop unable to
+  have one at all. The service form has a tick box for it now, and only one
+  service can carry it.
+
+*A bill that says "loan installment" now really pays one down.* Found while
+checking the above, and the most important fix here. That link only ever
+existed on the seeded bills and no form could set it, so once the seeds were
+cleared, every installment bill typed in by hand would have taken money out of
+the ledger every month and left the debt exactly where it was — with nothing
+on screen to say so. The bill form now asks which loan it pays down, the Bills
+screen warns about any installment that has none, and a test marks a
+hand-entered bill paid and checks the balance actually moved.
+
+*Some smaller things the empty lists exposed:* the Overview's bills and loans
+cards said "₱0.00 of ₱0.00 paid" and "Overdue: None" with nothing entered,
+which reads as a settled month rather than an empty one; the End of day screen
+would have shown "-₱500.00 short" against a target of zero; and the To fill in
+screen still quoted figures from the old seeded data.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 478 passed
+npm run test:rls  # expect: 267 checks (239 before, plus 28 for the new rules)
+npm run db:push   # applies 0011 and 0012
+```
+
+`npm run db:push` is the one that matters — the clearing happens in the
+database, so nothing changes until it runs. It prints how many rows it removed
+from each list, and how many it kept because they had already been used.
+
+Then, in the app:
+
+1. Open **Bills**, **Loans**, **Products**, **Apparel prices** and **Repair
+   prices**. All five lists are empty and each says so, and **To fill in** now
+   lists every one of them. The apparel **size add-ons** are still there, all
+   blank — those are sizes, not prices.
+2. Add a bill. Press **Edit or delete this bill** — the panel opens with the
+   form and, at the bottom, **Stop counting** beside **Delete**.
+3. Press **Delete**. It asks first, naming the bill. Cancel, then do it again
+   and confirm; the bill goes.
+4. Add another bill and mark it paid. Open the same panel: there is no Delete
+   button now, and a line saying why and what to do instead.
+5. Press **Undo** on the payment, and Delete comes back.
+6. The same on **Loans** and on **Products** — a product that has been sold can
+   only be hidden.
+7. On **Repair prices**, add a service and tick **This is the checking fee**.
+   Try to tick it on a second one: it refuses, and says why.
+8. On **Loans**, add a loan. Then on **Bills** add one as a **Loan
+   installment** and choose that loan. Mark it paid, and check the loan's
+   balance actually drops. Leave another installment unlinked and the screen
+   warns you, at the top and on the card.
+9. Check **Activity**: every delete is there with the row it removed — and for
+   a product, the bulk price rules that went with it.
 
 ---
 

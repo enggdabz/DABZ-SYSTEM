@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { DeleteButton } from "@/components/DeleteButton";
+import { Card, Disclosure, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { billStatus, monthTotals, paidKey, type BillStatus } from "@/lib/bills";
-import { getBillPayments, getBills, paidKeysFrom } from "@/lib/data/money";
+import {
+  getBillPayments,
+  getBills,
+  getBillsWithPayments,
+  getLoans,
+  paidKeysFrom,
+} from "@/lib/data/money";
 import { formatPesos } from "@/lib/money";
 import {
   addMonths,
@@ -15,6 +22,7 @@ import {
   periodKey,
 } from "@/lib/period";
 
+import { deleteBillAction } from "./actions";
 import {
   BillActiveForm,
   BillEditForm,
@@ -52,15 +60,32 @@ export default async function BillsPage({
   const period = parsePeriodKey(month ?? "") ?? currentPeriod();
   const today = manilaToday();
 
-  const [bills, payments] = await Promise.all([
+  const [bills, payments, billsWithPayments, loans] = await Promise.all([
     getBills(),
     getBillPayments(period),
+    // Which bills have ever been paid, and so may only be stopped rather than
+    // deleted. All time, not this month.
+    getBillsWithPayments(),
+    /*
+      So an installment bill can be pointed at the loan it pays down. That
+      link used to arrive with the seeded bills and had no form of its own; a
+      bill typed in without it says "Loan installment" and then takes money
+      out of the ledger every month while the balance sits still.
+    */
+    getLoans(),
   ]);
+
+  const loanChoices = loans
+    .filter((loan) => loan.active)
+    .map((loan) => ({ id: loan.id, lender: loan.lender }));
   const paidKeys = paidKeysFrom(payments);
   const totals = monthTotals({ bills, paidKeys, period, today });
 
   const active = bills.filter((bill) => bill.active);
   const stopped = bills.filter((bill) => !bill.active);
+  const unlinkedInstallments = active.filter(
+    (bill) => bill.type === "loan_installment" && bill.loanId === null,
+  );
 
   const previous = periodKey(addMonths(period, -1));
   const next = periodKey(addMonths(period, 1));
@@ -75,6 +100,35 @@ export default async function BillsPage({
           one is settled.
         </p>
       </div>
+
+      {bills.length === 0 ? (
+        <Notice tone="info" title="No bills yet">
+          <p>
+            Nothing has been entered, so the monthly total is zero and the daily
+            target does not yet know what the shop has to cover. Add them one at
+            a time at the bottom of this screen - electricity, water, rent,
+            internet, each loan installment. The due day can be left blank until
+            you are sure of it.
+          </p>
+        </Notice>
+      ) : null}
+
+      {unlinkedInstallments.length > 0 ? (
+        <Notice
+          tone="attention"
+          title={`${unlinkedInstallments.length} loan installment${
+            unlinkedInstallments.length === 1 ? " is" : "s are"
+          } not linked to a loan`}
+        >
+          <p>
+            {unlinkedInstallments.map((bill) => bill.name).join(", ")} &mdash;
+            marking {unlinkedInstallments.length === 1 ? "it" : "them"} paid
+            records the money leaving, but reduces no balance, so the debt will
+            look like it is not moving. Open Edit on each one and choose the
+            loan it pays down.
+          </p>
+        </Notice>
+      ) : null}
 
       {totals.missingDueDayCount > 0 ? (
         <Notice
@@ -192,13 +246,32 @@ export default async function BillsPage({
                       {payment.source.replace(/_/g, " ")}
                     </p>
                   ) : null}
-                  {bill.loanId ? (
-                    <p className="mt-2 text-xs text-muted">
-                      Paying this also pays down its loan.{" "}
-                      <Link href="/loans" className={`underline ${TAP_AREA}`}>
-                        See loans
-                      </Link>
-                    </p>
+                  {bill.type === "loan_installment" ? (
+                    bill.loanId ? (
+                      <p className="mt-2 text-xs text-muted">
+                        Paying this also pays down{" "}
+                        {loans.find((loan) => loan.id === bill.loanId)?.lender ??
+                          "its loan"}
+                        .{" "}
+                        <Link href="/loans" className={`underline ${TAP_AREA}`}>
+                          See loans
+                        </Link>
+                      </p>
+                    ) : (
+                      /*
+                        The silent case, said out loud. An installment bill with
+                        no loan behind it is paid every month and reduces
+                        nothing - the ledger shows the money gone and the debt
+                        exactly where it was.
+                      */
+                      <p className="mt-2 flex items-start gap-1.5 text-xs text-attention">
+                        <span aria-hidden="true">{"⚠"}</span>
+                        <span>
+                          Not linked to a loan, so paying it will not reduce any
+                          balance. Choose the loan under Edit.
+                        </span>
+                      </p>
+                    )
                   ) : null}
                 </div>
 
@@ -216,20 +289,32 @@ export default async function BillsPage({
                 </div>
               </div>
 
-              <details className="mt-5 border-t border-line/60 pt-4">
-                <summary className="cursor-pointer text-sm text-muted hover:text-ink">
-                  {bill.dueDay === null ? "Set the due day, or edit this bill" : "Edit this bill"}
-                </summary>
-                <div className="mt-4 space-y-6">
+              <Disclosure
+                className="mt-5 border-t border-line/60 pt-4"
+                label={
+                  bill.dueDay === null
+                    ? "Set the due day, edit or delete"
+                    : "Edit or delete this bill"
+                }
+              >
+                <div className="space-y-6">
                   <DueDayForm billId={bill.id} dueDay={bill.dueDay} />
                   <div className="border-t border-line/60 pt-4">
-                    <BillEditForm bill={bill} />
+                    <BillEditForm bill={bill} loans={loanChoices} />
                   </div>
-                  <div className="border-t border-line/60 pt-4">
+                  <div className="flex flex-wrap items-start gap-3 border-t border-line/60 pt-4">
                     <BillActiveForm billId={bill.id} billName={bill.name} active={bill.active} />
+                    <DeleteButton
+                      kind="bill"
+                      name={bill.name}
+                      idField="billId"
+                      id={bill.id}
+                      hasHistory={billsWithPayments.has(bill.id)}
+                      action={deleteBillAction}
+                    />
                   </div>
                 </div>
-              </details>
+              </Disclosure>
             </Card>
           );
         })}
@@ -240,13 +325,23 @@ export default async function BillsPage({
           title={`No longer counted (${stopped.length})`}
           description="Kept for their history. They are not part of the monthly total or the daily target."
         >
-          <ul className="space-y-3">
+          <ul className="space-y-4">
             {stopped.map((bill) => (
               <li key={bill.id} className="flex flex-wrap items-center justify-between gap-3">
                 <span className="text-sm">
                   {bill.name} &middot; {formatPesos(bill.amountCentavos)}
                 </span>
-                <BillActiveForm billId={bill.id} billName={bill.name} active={false} />
+                <div className="flex flex-wrap items-start gap-3">
+                  <BillActiveForm billId={bill.id} billName={bill.name} active={false} />
+                  <DeleteButton
+                    kind="bill"
+                    name={bill.name}
+                    idField="billId"
+                    id={bill.id}
+                    hasHistory={billsWithPayments.has(bill.id)}
+                    action={deleteBillAction}
+                  />
+                </div>
               </li>
             ))}
           </ul>
@@ -254,7 +349,7 @@ export default async function BillsPage({
       ) : null}
 
       <Card title="Add a bill">
-        <BillEditForm />
+        <BillEditForm loans={loanChoices} />
       </Card>
     </div>
   );

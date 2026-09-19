@@ -274,6 +274,30 @@ export function monthTotals(options: {
   };
 }
 
+/**
+ * Which loan, if any, a bill should be tied to.
+ *
+ * Paying a linked bill also pays down its loan - `mark_bill_paid` writes both
+ * in one transaction (spec 12.1). That link used to exist only on the seeded
+ * bills, so when the seeds were cleared and the owner typed their own in,
+ * "Loan installment" became a label that did nothing: the money left the
+ * ledger every month and the loan balance never moved. There was no warning,
+ * because nothing was wrong as far as the system could tell.
+ *
+ * So the link is now chosen on the form, and this is the rule the form and the
+ * action share. The half worth being careful about is the second one: changing
+ * a bill back to an operating cost has to CLEAR the link, or a bill that no
+ * longer claims to be an installment keeps quietly paying one down.
+ */
+export function billLoanLink(
+  type: BillType,
+  loanId: string | null | undefined,
+): string | null {
+  if (type !== "loan_installment") return null;
+  const trimmed = (loanId ?? "").trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 /** Total of every active bill, used for the daily target (spec 12.3). */
 export function totalMonthlyBills(bills: readonly Bill[]): Centavos {
   return sumCentavos(

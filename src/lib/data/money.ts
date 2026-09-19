@@ -115,6 +115,35 @@ export function paidKeysFrom(payments: readonly BillPaymentRow[]): Set<string> {
   );
 }
 
+/**
+ * Which bills have ever been marked paid, so the screen knows which ones may
+ * still be deleted (see `src/lib/deletable.ts`).
+ *
+ * All time, not the twelve-month window above: a bill paid once in 2026 is
+ * part of the shop's history for good. One call for the whole list, because
+ * asking per bill would be a round trip to Singapore per card.
+ *
+ * An empty set on failure is the safe direction: the screen offers a Delete,
+ * the delete policy refuses it, and the owner is told nothing was removed. The
+ * opposite mistake would hide the button with no explanation.
+ */
+export const getBillsWithPayments = cache(async (): Promise<Set<string>> => {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("bills_with_payments");
+
+  if (error || !data) return new Set();
+  return new Set((data as { bill_id: string }[]).map((row) => row.bill_id));
+});
+
+/** The same question for loans: which ones have a payment behind them. */
+export const getLoansWithPayments = cache(async (): Promise<Set<string>> => {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("loans_with_payments");
+
+  if (error || !data) return new Set();
+  return new Set((data as { loan_id: string }[]).map((row) => row.loan_id));
+});
+
 export const getLoans = cache(async (): Promise<Loan[]> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
@@ -267,6 +296,14 @@ export interface OverviewData {
   monthlyBillsCentavos: Centavos;
   totalDebtCentavos: Centavos;
   growingLoans: LoanSummary[];
+  /**
+   * How many loans are being counted, and how many of those still have no
+   * interest rate. The Overview needs both to tell "nothing is growing" apart
+   * from "there is nothing to check" - with no loans entered at all, a total
+   * of zero and no warnings would read as a shop with no debt.
+   */
+  activeLoanCount: number;
+  loansWithoutRateCount: number;
 }
 
 export const getOverviewMoney = cache(async (): Promise<OverviewData> => {
@@ -310,5 +347,10 @@ export const getOverviewMoney = cache(async (): Promise<OverviewData> => {
     growingLoans: summaries.filter(
       (summary) => summary.loan.active && summary.balanceGrowing,
     ),
+    activeLoanCount: summaries.filter((summary) => summary.loan.active).length,
+    loansWithoutRateCount: summaries.filter(
+      (summary) =>
+        summary.loan.active && summary.loan.interestPercentPerMonth === null,
+    ).length,
   };
 });

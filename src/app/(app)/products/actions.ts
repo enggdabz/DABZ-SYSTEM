@@ -4,14 +4,20 @@
  * Products and their bulk prices (spec 7.1, 7.2, 7.4).
  *
  * Owner/Admin only: staff can save a new product from the counter, but only
- * the owner renames, reprices or removes one.
+ * the owner renames, reprices, hides or deletes one.
  */
 import { revalidatePath } from "next/cache";
 
 import { recordAudit, diffFields } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
+import {
+  deleteRefusal,
+  deleteVanished,
+  historyCheckUnavailable,
+} from "@/lib/deletable";
 import { DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface ProductActionState {
@@ -247,4 +253,92 @@ export async function removePriceTierAction(
   revalidatePath("/pos");
 
   return { success: "Rule removed." };
+}
+
+/**
+ * Removes a product entirely (the owner's own request, 19 Sep 2026).
+ *
+ * Only a product that has never been sold. `sale_lines` copies the name onto
+ * each line, so an old receipt would survive the deletion - but the line's
+ * link back to the product would be lost, and a product the shop has actually
+ * sold is part of its history whether or not a receipt still reads correctly.
+ * That one is hidden from the counter instead.
+ *
+ * Its bulk price rules go with it: they describe nothing once the product is
+ * gone, and they are the owner's own rules rather than a record of money.
+ */
+export async function deleteProductAction(
+  _previous: ProductActionState,
+  formData: FormData,
+): Promise<ProductActionState> {
+  const actor = await requireOwnerOrAdmin();
+
+  const productId = String(formData.get("productId") ?? "");
+  const supabase = await createSupabaseServerClient();
+
+  const { data: product } = await supabase
+    .from("products")
+    .select(
+      "name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active",
+    )
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (!product) return { error: "That product no longer exists." };
+
+  /*
+    The bulk price rules go with the product - they cascade. They are the
+    owner's own rules rather than a record of money, so taking them is right,
+    but they have to be written down first: after the delete there is nothing
+    left to reconstruct them from.
+  */
+  const { data: tiers } = await supabase
+    .from("product_price_tiers")
+    .select("min_quantity, unit_price_centavos")
+    .eq("product_id", productId);
+
+  const { data: hasHistory, error: historyError } = await supabase.rpc(
+    "product_has_history",
+    { p_product_id: productId },
+  );
+
+  if (historyError) {
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("product_has_history")
+        : `Could not check whether it has been sold: ${historyError.message}`,
+    };
+  }
+
+  const refusal = deleteRefusal("product", hasHistory === true);
+  if (refusal) return { error: refusal };
+
+  const { data: removed, error } = await supabase
+    .from("products")
+    .delete()
+    .eq("id", productId)
+    .select("id");
+
+  if (error) return { error: `Could not delete it: ${error.message}` };
+  if (!removed || removed.length === 0) return { error: deleteVanished("product") };
+
+  await recordAudit({
+    actorId: actor.id,
+    actorUsername: actor.username,
+    action: "delete",
+    entity: "products",
+    entityId: productId,
+    summary: `Deleted the product "${product.name}"${
+      tiers && tiers.length > 0
+        ? ` and its ${tiers.length} bulk price rule${tiers.length === 1 ? "" : "s"}`
+        : ""
+    }`,
+    before: { ...product, price_tiers: tiers ?? [] },
+  });
+
+  revalidatePath("/products");
+  revalidatePath("/pos");
+  revalidatePath("/checklist");
+
+  return { success: `Deleted ${product.name}.` };
 }

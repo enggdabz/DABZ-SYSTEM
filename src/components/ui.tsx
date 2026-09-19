@@ -167,6 +167,46 @@ export function Notice({
   );
 }
 
+/**
+ * A panel that opens, whose handle is a real button rather than a line of
+ * small grey text.
+ *
+ * Every screen that edits something keeps the form folded away - eleven open
+ * four-field forms bury the figures the screen exists to show. But the handle
+ * was written as a `text-sm` summary, which measures about 20px and reads as a
+ * caption, and the owner reasonably reported that there was no way to edit a
+ * bill: the way in did not look like anything. So the handle is now shaped and
+ * sized like the other buttons on the card.
+ *
+ * `list-none` plus the WebKit rule removes the browser's own triangle, which
+ * would otherwise sit inside the button; the caret is drawn instead so it can
+ * turn as the panel opens.
+ */
+export function Disclosure({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <details className={`group ${className}`}>
+      <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-control bg-ink/5 px-4 py-2 text-sm font-medium text-ink ring-1 ring-line transition-colors hover:bg-ink/10 [&::-webkit-details-marker]:hidden">
+        <span
+          aria-hidden="true"
+          className="text-muted transition-transform group-open:rotate-90"
+        >
+          {"▸"}
+        </span>
+        {label}
+      </summary>
+      <div className="mt-5">{children}</div>
+    </details>
+  );
+}
+
 /** A small label, e.g. a role or a status. */
 export function Tag({
   children,

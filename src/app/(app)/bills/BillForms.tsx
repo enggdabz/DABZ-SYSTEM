@@ -150,6 +150,7 @@ export function DueDayForm({
 
 export function BillEditForm({
   bill,
+  loans,
 }: {
   bill?: {
     id: string;
@@ -157,13 +158,26 @@ export function BillEditForm({
     amountCentavos: number;
     dueDay: number | null;
     type: "operating" | "loan_installment";
+    loanId: string | null;
   };
+  /** The loans this bill could be paying down. Active ones only. */
+  loans: { id: string; lender: string }[];
 }) {
   const [state, submit, pending] = useActionState<BillActionState, FormData>(
     saveBillAction,
     {},
   );
   const errors = state.fieldErrors ?? {};
+
+  /*
+    Which loan the bill pays down is only asked once the bill says it IS an
+    installment, so the field has to follow the type box rather than the saved
+    value. Without the link, "Loan installment" is a label that does nothing:
+    the money leaves the ledger every month and the balance never moves.
+  */
+  const [type, setType] = useState<"operating" | "loan_installment">(
+    bill?.type ?? "operating",
+  );
 
   return (
     <form action={submit} className="space-y-5">
@@ -204,12 +218,53 @@ export function BillEditForm({
           hint="A loan installment can be linked to a loan, so paying it also pays down the balance."
           error={errors.type}
         >
-          <Select name="type" defaultValue={bill?.type ?? "operating"}>
+          <Select
+            name="type"
+            value={type}
+            onChange={(event) =>
+              setType(event.target.value as "operating" | "loan_installment")
+            }
+          >
             <option value="operating">Operating cost</option>
             <option value="loan_installment">Loan installment</option>
           </Select>
         </Field>
+
+        {type === "loan_installment" ? (
+          <Field
+            label="Which loan does it pay down?"
+            hint={
+              loans.length === 0
+                ? "No loans entered yet. Add the loan first, then come back and link it."
+                : "Marking this bill paid will reduce that loan's balance by the same amount, in the same step."
+            }
+            error={errors.loanId}
+          >
+            <Select name="loanId" defaultValue={bill?.loanId ?? ""}>
+              <option value="">Not linked to a loan</option>
+              {loans.map((loan) => (
+                <option key={loan.id} value={loan.id}>
+                  {loan.lender}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        ) : null}
       </div>
+
+      {/*
+        Said plainly rather than left to be discovered next month, when the
+        ledger shows the money gone and the debt unchanged.
+      */}
+      {type === "loan_installment" && loans.length === 0 ? (
+        <Notice tone="attention" title="This bill will not reduce any balance yet">
+          <p>
+            There is no loan to link it to. The bill still works and still gets
+            paid; it just will not pay a debt down until you add the loan and
+            come back to choose it here.
+          </p>
+        </Notice>
+      ) : null}
 
       {state.error ? <Notice tone="attention" title={state.error} /> : null}
       {state.success ? <Notice tone="success" title={state.success} /> : null}

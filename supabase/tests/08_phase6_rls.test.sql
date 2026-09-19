@@ -18,22 +18,22 @@ begin
   raise notice '--- phase 6: structure ---';
 
   if (select count(*) from public.apparel_products) <> 5 then
-    raise exception 'FAIL: expected the 5 seeded apparel items';
+    raise exception 'FAIL: expected the 5 fixture apparel items';
   end if;
-  raise notice 'PASS: the five apparel items are seeded';
+  raise notice 'PASS: an owner reads every apparel item';
 
   if (select count(base_price_centavos) from public.apparel_products) <> 0 then
-    raise exception 'FAIL: a price was invented for an apparel item';
+    raise exception 'FAIL: a price appeared on an apparel item that has none';
   end if;
-  raise notice 'PASS: no apparel price was invented';
+  raise notice 'PASS: an apparel item with no price keeps having no price';
 
   if (select count(*) from public.apparel_size_prices) <> 9 then
-    raise exception 'FAIL: expected the 9 seeded sizes';
+    raise exception 'FAIL: expected the 9 seeded sizes - 0012 must NOT clear the ladder';
   end if;
   if (select count(extra_centavos) from public.apparel_size_prices) <> 0 then
     raise exception 'FAIL: a size surcharge was invented';
   end if;
-  raise notice 'PASS: the size ladder is seeded with no surcharges invented';
+  raise notice 'PASS: the size ladder survives, with no surcharge invented';
 
   if (select apparel_down_payment_percent from public.app_settings where id = 1) is not null then
     raise exception 'FAIL: a down payment policy was invented';

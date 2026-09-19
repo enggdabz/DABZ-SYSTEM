@@ -142,6 +142,26 @@ export const getAllProducts = cache(async (): Promise<Product[]> => {
   }));
 });
 
+/**
+ * Which products have been sold, so the Products screen knows which ones may
+ * still be deleted (see `src/lib/deletable.ts`).
+ *
+ * A database function rather than a read of `sale_lines`, for two reasons: it
+ * answers for every product in one call instead of one per card, and it counts
+ * distinct products rather than lines, so a shop with fifty thousand sale
+ * lines does not fetch fifty thousand rows to learn about thirty products.
+ *
+ * An empty set on failure is the safe direction: the screen offers a Delete,
+ * the delete policy refuses it, and the owner is told nothing was removed.
+ */
+export const getProductsWithSales = cache(async (): Promise<Set<string>> => {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("products_with_sales");
+
+  if (error || !data) return new Set();
+  return new Set((data as { product_id: string }[]).map((row) => row.product_id));
+});
+
 export interface Customer {
   id: string;
   name: string;

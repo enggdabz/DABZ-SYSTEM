@@ -186,6 +186,12 @@ async function OwnerOverview() {
     today,
   });
 
+  // Nothing entered is a different state from nothing owing, and both of these
+  // cards used to render them identically.
+  const activeBillCount = bills.filter((bill) => bill.active).length;
+  const activeLoanCount = money.activeLoanCount;
+  const loansWithoutRate = money.loansWithoutRateCount;
+
   /*
     The target now includes wages, as spec 12.3 asks: each active staff
     member's daily rate times the working days in a month. It stays null while
@@ -225,7 +231,9 @@ async function OwnerOverview() {
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-sm font-medium text-muted">Today&apos;s target</h2>
-          {progress.reached ? (
+          {progress.unknown ? (
+            <Tag tone="attention">{"⚠"} No target yet</Tag>
+          ) : progress.reached ? (
             <Tag tone="success">{"✓"} Reached</Tag>
           ) : (
             <Tag>{formatPesos(progress.shortfallCentavos)} to go</Tag>
@@ -234,10 +242,17 @@ async function OwnerOverview() {
 
         <p className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">
           {formatPesos(money.todayTowardTargetCentavos)}
-          <span className="text-2xl font-medium text-muted">
-            {" "}
-            of {formatPesos(target.targetCentavos)}
-          </span>
+          {/*
+            With no bills and no wages entered the target is zero, and "of ₱0"
+            would read as a target that has been met. It is not one - it is a
+            question nobody has answered yet, so the figure is left off.
+          */}
+          {progress.unknown ? null : (
+            <span className="text-2xl font-medium text-muted">
+              {" "}
+              of {formatPesos(target.targetCentavos)}
+            </span>
+          )}
         </p>
 
         <p className="mt-2 text-sm text-muted">
@@ -275,7 +290,27 @@ async function OwnerOverview() {
         </p>
 
         <div className="mt-4">
-          {payrollEstimate.centavos === null ? (
+          {progress.unknown ? (
+            <Notice
+              tone="attention"
+              title="There is no target yet, because nothing has been entered to cover"
+            >
+              <p>
+                The target is the shop&apos;s monthly bills and wages divided
+                across its working days, and neither is known yet - so this is
+                not a target that has been reached, it is one that has not been
+                set. Add what the shop pays every month on the{" "}
+                <Link href="/bills" className={`underline ${TAP_AREA}`}>
+                  Bills
+                </Link>{" "}
+                screen, and the daily rates on the{" "}
+                <Link href="/staff" className={`underline ${TAP_AREA}`}>
+                  Staff
+                </Link>{" "}
+                screen.
+              </p>
+            </Notice>
+          ) : payrollEstimate.centavos === null ? (
             <Notice
               tone="attention"
               title="This target covers bills only, so it is too low"
@@ -367,6 +402,28 @@ async function OwnerOverview() {
 
       <div className="grid gap-5 lg:grid-cols-2">
         <Card title={`Bills for ${formatPeriod(period)}`}>
+          {/*
+            "PHP 0.00 of PHP 0.00 paid" above "Overdue: None" reads as a month
+            that is fully settled. With nothing entered it is the opposite: the
+            shop's real bills are all still out there, uncounted. So the card
+            says what is true - nothing is entered - rather than a row of
+            reassuring zeroes.
+          */}
+          {activeBillCount === 0 ? (
+            <>
+              <p className="text-sm text-muted">
+                No bills entered, so there is nothing to show here yet - not a
+                month with nothing to pay.
+              </p>
+              <Link
+                href="/bills"
+                className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}
+              >
+                Add your bills
+              </Link>
+            </>
+          ) : (
+            <>
           <p className="text-3xl font-semibold tracking-tight">
             {formatPesos(billTotals.paid)}
             <span className="text-lg font-medium text-muted">
@@ -407,6 +464,8 @@ async function OwnerOverview() {
           <Link href="/bills" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
             Open the bills screen
           </Link>
+            </>
+          )}
         </Card>
 
         <Card title="Total still owed">
@@ -414,7 +473,15 @@ async function OwnerOverview() {
             {formatPesos(money.totalDebtCentavos)}
           </p>
 
-          {money.growingLoans.length > 0 ? (
+          {activeLoanCount === 0 ? (
+            <p className="mt-3 text-sm text-muted">
+              No loans entered, so this is zero rather than true.{" "}
+              <Link href="/loans" className={`underline ${TAP_AREA}`}>
+                Add them on the loans screen
+              </Link>
+              .
+            </p>
+          ) : money.growingLoans.length > 0 ? (
             <div className="mt-4">
               <Notice
                 tone="attention"
@@ -429,8 +496,10 @@ async function OwnerOverview() {
             </div>
           ) : (
             <p className="mt-3 text-sm text-muted">
-              No balance-growing warnings. Note that most loans still have no
-              interest rate entered, so there is nothing to check against yet.
+              No balance-growing warnings.
+              {loansWithoutRate > 0
+                ? ` ${loansWithoutRate} of ${activeLoanCount} loans still have no interest rate entered, so there is nothing to check those against yet.`
+                : ""}
             </p>
           )}
 

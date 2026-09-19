@@ -53,8 +53,8 @@ receiving code.
   `supabase_migrations.schema_migrations` so none can run twice. The `0000`-
   style four-digit prefixes are accepted as versions and sort before any later
   `supabase migration new` timestamp, so both naming styles can coexist. Verified
-  by pushing all eleven to a throwaway PostgreSQL and then running the whole RLS
-  suite against the result: 42 tables, 239 checks, identical to `run.sh`.
+  by pushing all thirteen to a throwaway PostgreSQL and then running the whole
+  RLS suite against the result: 42 tables, 267 checks, identical to `run.sh`.
 - **CI runs all of it on every push and pull request** (`.github/workflows/ci.yml`):
   lint, typecheck, unit tests, the security rules and the schema checker, then
   the build. The security rules and the schema checker need a real PostgreSQL,
@@ -179,6 +179,41 @@ round trip is the one thing that must be tried against a real project.
   interest rate are real states, shown with a warning and an editable field.
   Never substitute a default for something only the owner can know — a
   confident wrong warning is worse than none, because it gets trusted.
+- **Nothing in the catalogue is seeded.** Bills, loans, products, apparel items
+  and repair services are all the owner's to enter; `0011` and `0012` cleared
+  the rows `0002`, `0005`, `0007` and `0008` used to ship. An empty list is a
+  real state too, so every one of those screens says so and
+  `src/lib/data/checklist.ts` lists it. Never add a starter row back by editing
+  an old migration. The apparel SIZE LADDER is the exception and stays: those
+  rows are where a per-size surcharge is typed in, not a list anyone invented.
+- **A "loan installment" bill only pays a debt down if it is POINTED AT one.**
+  `mark_bill_paid` writes a loan payment when `bills.loan_id` is set and not
+  otherwise, so a bill with the label and no link takes money out of the ledger
+  every month and moves no balance - silently. The link is chosen on the bill
+  form (`billLoanLink` in `src/lib/bills.ts`, which also clears it when a bill
+  goes back to being an operating cost), and the Bills screen warns about any
+  installment that has none.
+- **Delete only where nothing has happened; otherwise stop.** A bill that has
+  been marked paid, a loan that has been paid down and a product that has been
+  sold are kept — their payment rows cascade, so deleting one would take real
+  money records with it. The rule is enforced by the delete policies in `0011`,
+  not by the button, and the wording of every refusal lives in
+  `src/lib/deletable.ts` so the screen and the action cannot disagree. A delete
+  writes the whole row to the audit log first, INCLUDING whatever the delete
+  cascades away or unlinks - a product's bulk price rules, a loan's installment
+  bills - because afterwards there is nothing left to reconstruct them from.
+- **A `SECURITY DEFINER` helper checks the caller itself.** The `*_has_history`
+  functions are published by PostgREST as URLs, so one that answered anybody
+  would be a way round the rule that staff see nothing of the bills and loans,
+  one bit at a time. They return null to anyone who is not Owner/Admin, and the
+  app treats anything but `true` as "no history" - the safe direction. Note the
+  consequence: a migration's own DO block cannot call them, because nobody is
+  signed in and the whole expression comes back null. Write the `exists` check
+  out in the statement instead.
+- **A daily target of zero means "not known", never "reached".** With no bills
+  entered the target is zero, and a green ✓ at the top of the Overview before
+  the first sale is the most confidently wrong thing the system could say. See
+  `unknown` in `src/lib/target.ts` and `targetReached` in `src/lib/closing.ts`.
 
 ## Payroll rules (built in Phase 3)
 

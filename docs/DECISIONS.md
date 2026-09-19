@@ -48,20 +48,28 @@ the right limits.
 
 ## Asked for Phase 2, and now waiting on you in the app
 
-Phase 2 is built and seeded with your real figures. Rather than guess the
-missing pieces, the screens ask for them and warn until they are filled in.
+> **Superseded on 19 September 2026.** Phase 2 used to ship with your figures
+> from the specification already entered — 11 bills, 6 loans, and the 11
+> counter buttons from Phase 4. You asked for all three lists to be emptied so
+> you could enter them yourself, so migration `0011` removes them. The
+> questions below no longer point at rows that exist; what replaces them is
+> simply **the lists are empty, and the To fill in screen says so**.
+
+Rather than guess the missing pieces, the screens ask for them and warn until
+they are filled in.
 
 | # | Question | Where to answer it |
 |---|---|---|
-| 17.13 | **The due day of each of the 11 bills.** Without these the system cannot warn you before a bill is late | **Bills** screen — a box beside each bill. It shows **⚠ Due day not set** until you fill it in |
-| 17.13 | **Interest rates from the statements**, especially Credit card 3 | **Loans** screen. Until a rate is entered, the payoff time ignores interest and says so, and no balance-growing warning can be raised |
-| 17.13 | **The remaining ~₱660,000 of debt** | **Loans** screen → Add a loan |
-| 17.13 | What **"Magic Payment"** and **"Forests Lake"** are, so they land in the right category | Tell me and I will categorise them. Both are seeded as operating costs with a note |
-| — | The prototype "Dabz Shop Manager": are any bills already marked paid this month, and do the spec 12.1 amounts still match? | Mark them paid on the **Bills** screen. The amounts seeded total ₱141,127.00, matching your figure |
-| 12.3 | Estimated monthly payroll for the daily target | Comes with Phase 3, from each staff member's daily rate × their typical working days. Confirm that approach when we get there |
+| 17.13 | **The bills themselves, then the due day of each.** Without a due day the system cannot warn you before a bill is late | **Bills** screen → Add a bill. Each one shows **⚠ Due day not set** until you fill it in |
+| 17.13 | **Each debt, with the balance from its latest statement** | **Loans** screen → Add a loan |
+| 17.13 | **Interest rates from the statements** | **Loans** screen. Until a rate is entered, the payoff time ignores interest and says so, and no balance-growing warning can be raised |
+| — | Whether any bill is **already paid this month** | Mark it paid on the **Bills** screen once the bill exists |
+| 12.3 | Estimated monthly payroll for the daily target | Built in Phase 3, from each staff member's daily rate × the working days in a month |
 
 **Why nothing was guessed:** a made-up due day would produce confident, wrong
 warnings — worse than no warning at all, because you would start trusting them.
+The same reasoning is now why the lists start empty: a bill you did not type in
+is a figure you did not check.
 
 ## Asked for Phase 3, and now waiting on you in the app
 
@@ -149,6 +157,74 @@ Made by me, per the owner's instruction to decide and revise later.
 write what is wrong in the customer's words, and the price is asked for on each
 charge. The claim stub prints with what came in, what came with it and what it
 looked like on arrival — the three things an argument later turns on.
+
+---
+
+## Decided on 19 September 2026 — the catalogue is yours to enter
+
+You asked for the products, the loans and the bills to be cleared so you could
+add them yourself, and for a way to edit or delete one already entered.
+
+**What was decided, and why**
+
+- **The seeded rows are removed by a migration, not by hand** —
+  `supabase/migrations/0011_clear_catalogue_and_allow_delete.sql`. An earlier
+  migration must never be edited once it has been applied, so the way to undo
+  one is a later migration that removes what it put there. The useful side
+  effect is that a database built from scratch ends up in the same state as
+  your real one: empty, waiting for you. To put a starter list back, add a new
+  migration that inserts it — never edit `0002` or `0005`.
+- **A row may be deleted only while nothing has happened to it.** A bill that
+  has been marked paid, a loan that has been paid down, a product that has been
+  sold: those have payment records and ledger entries hanging off them, and the
+  database would take those with them. Those can only be **stopped** (or
+  hidden), which keeps every figure and takes the row out of the running
+  totals. The screen says which is which before you press anything.
+- **The rule lives in the database**, as delete policies, not only in the
+  button — a Server Action is a public endpoint. `supabase/tests/11_delete_rules.test.sql`
+  proves it against a real PostgreSQL. To loosen it, change the policies in
+  `0011`; do not add a Server Action that works around them.
+- **Deleting is recorded.** The whole row is written to the audit log first,
+  with a before/after, so what was removed is still readable afterwards. That
+  is the only trace left, which is why it is the whole row and not a summary.
+- **Loans gained a Stop button**, which they never had. A loan could be added
+  and edited but never set aside, so a settled debt stayed in the total owed
+  for good.
+- **A daily target of zero now reads as "no target yet", not "reached".** With
+  no bills entered the target is zero, and the Overview used to put a green
+  ✓ Reached at the top of the screen before a single sale. Zero means not
+  known. `src/lib/target.ts` and `src/lib/closing.ts`.
+
+**How to change it:** the wording of every refusal is in `src/lib/deletable.ts`,
+in one place, so the button and the message cannot drift apart.
+
+**Then, the same day: the apparel and repair price lists too** (`0012`). Same
+rules, plus three decisions of their own:
+
+- **The apparel size ladder is NOT cleared.** XS to 5XL are not a price list —
+  they match `APPAREL_SIZES` in the code, they are what a roster picks from,
+  and the add-on beside each one was already blank. The screen edits those rows
+  and has no "add a size" form, so clearing them would have removed the only
+  place to type a surcharge. To make the ladder editable instead, add an
+  add/remove form there and then it could be cleared like the rest.
+- **The checking fee is now nameable.** `is_checking_fee` marks the one charge
+  that applies even when the customer says no, and it arrived on a seeded row
+  with no control anywhere — so clearing the list would have left the shop
+  unable to have a checking fee at all. The service form has a tick box, and a
+  partial unique index allows only one row to carry it.
+- **A bill labelled "loan installment" now has to be pointed at a loan.** This
+  was a real bug the clearing exposed: `bills.loan_id` had no writer anywhere
+  in the app, so once the seeded bills were gone, marking an installment paid
+  would take money out of the ledger and move no balance, silently. The bill
+  form asks for the loan, `billLoanLink()` clears it when the bill goes back to
+  being an operating cost, and the Bills screen warns about any installment
+  that has no loan behind it.
+- **A `SECURITY DEFINER` helper checks the caller itself.** The `*_has_history`
+  functions are PostgREST URLs, so one that answered a staff account would be a
+  way round "staff see nothing of the bills and loans" — one bit at a time.
+  They return null to anyone but Owner/Admin. The catch, learned the hard way:
+  a migration's own `DO` block then cannot call them either, because nobody is
+  signed in, and `where not null` deletes nothing while reporting success.
 
 ---
 

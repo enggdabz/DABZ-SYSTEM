@@ -67,9 +67,41 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
 
   const items: ChecklistItem[] = [];
 
-  const billsWithoutDueDay = bills.filter(
-    (bill) => bill.active && bill.dueDay === null,
-  );
+  /*
+    The three lists the owner enters by hand (19 Sep 2026). Nothing is seeded
+    any more, so "empty" is the state a new shop starts in - and an empty list
+    is the one gap that cannot show up as a missing FIGURE, because there is no
+    row to hang a warning on. Without these three entries the To fill in screen
+    would look finished while the Overview quietly reported a monthly bill
+    total of zero.
+  */
+  const activeBills = bills.filter((bill) => bill.active);
+  if (activeBills.length === 0) {
+    items.push({
+      id: "no-bills",
+      title: "No bills added yet",
+      why: "The monthly total is zero, which is not the same as nothing to pay. The daily target works out what the shop has to earn from these, so until they are in it is short by the whole of the rent, the power and the internet.",
+      names: [],
+      href: "/bills",
+      linkLabel: "Open Bills",
+      important: true,
+    });
+  }
+
+  const activeLoans = loans.filter((loan) => loan.active);
+  if (activeLoans.length === 0) {
+    items.push({
+      id: "no-loans",
+      title: "No loans added yet",
+      why: "The total owed shows zero. Add each debt with the balance from its latest statement and the date that statement was issued, so the figure can always be tied back to a piece of paper.",
+      names: [],
+      href: "/loans",
+      linkLabel: "Open Loans",
+      important: true,
+    });
+  }
+
+  const billsWithoutDueDay = activeBills.filter((bill) => bill.dueDay === null);
   if (billsWithoutDueDay.length > 0) {
     items.push({
       id: "bill-due-days",
@@ -82,8 +114,8 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
-  const loansWithoutRate = loans.filter(
-    (loan) => loan.active && loan.interestPercentPerMonth === null,
+  const loansWithoutRate = activeLoans.filter(
+    (loan) => loan.interestPercentPerMonth === null,
   );
   if (loansWithoutRate.length > 0) {
     items.push({
@@ -129,8 +161,21 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
-  const productsWithoutPrice = products.filter(
-    (product) => product.active && product.priceCentavos === null,
+  const activeProducts = products.filter((product) => product.active);
+  if (activeProducts.length === 0) {
+    items.push({
+      id: "no-products",
+      title: "No products added yet",
+      why: "The counter screen has no buttons, so every sale has to be typed in by hand. Add the few things you sell most often and the counter gets fast; a product with no price still works, it just asks for the amount.",
+      names: [],
+      href: "/products",
+      linkLabel: "Open Products",
+      important: true,
+    });
+  }
+
+  const productsWithoutPrice = activeProducts.filter(
+    (product) => product.priceCentavos === null,
   );
   if (productsWithoutPrice.length > 0) {
     items.push({
@@ -192,8 +237,21 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
-  const apparelWithoutPrice = apparelItems.filter(
-    (item) => item.active && item.basePriceCentavos === null,
+  const activeApparel = apparelItems.filter((item) => item.active);
+  if (activeApparel.length === 0) {
+    items.push({
+      id: "no-apparel-items",
+      title: "No apparel items added yet",
+      why: "A job order still works - whoever writes one is asked for the item and the price - but two people will quote the same jersey differently until the list exists.",
+      names: [],
+      href: "/apparel/prices",
+      linkLabel: "Open apparel prices",
+      important: true,
+    });
+  }
+
+  const apparelWithoutPrice = activeApparel.filter(
+    (item) => item.basePriceCentavos === null,
   );
   if (apparelWithoutPrice.length > 0) {
     items.push({
@@ -224,8 +282,37 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
+  const activeRepairServices = repairServices.filter((service) => service.active);
+  if (activeRepairServices.length === 0) {
+    items.push({
+      id: "no-repair-services",
+      title: "No repair services added yet",
+      why: "A ticket still works - whoever writes one is asked for the price - but two technicians will charge differently for the same job until the list exists. Start with the checking fee.",
+      names: [],
+      href: "/repairs/prices",
+      linkLabel: "Open repair prices",
+      important: true,
+    });
+  }
+
+  /*
+    Two different gaps, and they used to be one. `find` returns undefined when
+    NO service is marked as the checking fee, which silently produced no
+    checklist item at all - fine while a seeded row always carried the flag,
+    wrong now that the list starts empty and the flag is the owner's to set.
+  */
   const checkingFee = repairServices.find((service) => service.isCheckingFee);
-  if (checkingFee && checkingFee.priceCentavos === null) {
+  if (activeRepairServices.length > 0 && !checkingFee) {
+    items.push({
+      id: "repair-checking-fee-missing",
+      title: "No service is marked as the checking fee",
+      why: "Nothing is charged when a customer decides not to go ahead, and a ticket's totals have no separate line for it. Tick the box on whichever service it should be.",
+      names: [],
+      href: "/repairs/prices",
+      linkLabel: "Open repair prices",
+      important: true,
+    });
+  } else if (checkingFee && checkingFee.priceCentavos === null) {
     items.push({
       id: "repair-checking-fee",
       title: "No checking fee set",
@@ -237,8 +324,8 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
-  const repairsWithoutPrice = repairServices.filter(
-    (service) => service.active && !service.isCheckingFee && service.priceCentavos === null,
+  const repairsWithoutPrice = activeRepairServices.filter(
+    (service) => !service.isCheckingFee && service.priceCentavos === null,
   );
   if (repairsWithoutPrice.length > 0) {
     items.push({

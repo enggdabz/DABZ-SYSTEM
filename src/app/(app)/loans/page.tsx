@@ -1,13 +1,25 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { DeleteButton } from "@/components/DeleteButton";
+import { Card, Disclosure, Notice, Tag } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { getLoanPayments, getLoanSummaries } from "@/lib/data/money";
+import {
+  getBills,
+  getLoanPayments,
+  getLoanSummaries,
+  getLoansWithPayments,
+} from "@/lib/data/money";
 import { describeMonths } from "@/lib/loans";
 import { formatPesos } from "@/lib/money";
 import { civilDateToISO, formatCivilDate, manilaToday } from "@/lib/period";
 
-import { LoanEditForm, RecordPaymentForm, UpdateFromStatementForm } from "./LoanForms";
+import { deleteLoanAction } from "./actions";
+import {
+  LoanActiveForm,
+  LoanEditForm,
+  RecordPaymentForm,
+  UpdateFromStatementForm,
+} from "./LoanForms";
 
 export const metadata = { title: "Loans · Dabz System" };
 
@@ -16,13 +28,35 @@ export default async function LoansPage() {
 
   await requireOwnerOrAdmin();
 
-  const [summaries, payments] = await Promise.all([
+  const [summaries, payments, loansWithPayments, bills] = await Promise.all([
     getLoanSummaries(),
     getLoanPayments(),
+    // Which loans have a payment behind them, and so may only be stopped.
+    getLoansWithPayments(),
+    // Only to warn, before a loan goes, about an installment bill that would
+    // be left pointing at nothing.
+    getBills(),
   ]);
+
+  /*
+    An installment bill points at a loan, and that key is `on delete set null`
+    - so deleting the loan does not take the bill with it, it quietly stops the
+    bill paying anything down. Said out loud before the button is pressed, not
+    discovered next month when the balance has not moved.
+  */
+  function linkedBillNames(loanId: string): string | undefined {
+    const linked = bills.filter((bill) => bill.loanId === loanId);
+    if (linked.length === 0) return undefined;
+    return `${linked.map((bill) => bill.name).join(", ")} ${
+      linked.length === 1 ? "is a bill" : "are bills"
+    } that pays this loan down. ${
+      linked.length === 1 ? "It stays" : "They stay"
+    } on the Bills screen, but will stop reducing any balance.`;
+  }
 
   const today = civilDateToISO(manilaToday());
   const active = summaries.filter((summary) => summary.loan.active);
+  const stopped = summaries.filter((summary) => !summary.loan.active);
   const totalDebt = active.reduce((sum, summary) => sum + summary.remainingCentavos, 0);
   const growing = active.filter((summary) => summary.balanceGrowing);
   const missingRates = active.filter(
@@ -44,11 +78,24 @@ export default async function LoansPage() {
           {formatPesos(totalDebt)}
         </p>
         <p className="mt-2 text-sm text-muted">
-          Across {active.length} loan{active.length === 1 ? "" : "s"}. The
-          specification noted the real figure is likely closer to
-          {" "}{formatPesos(200000000)}, so there are probably debts still to add.
+          {active.length === 0
+            ? "No loans are being counted, so this is zero rather than true."
+            : `Across ${active.length} loan${active.length === 1 ? "" : "s"}, from the statement balances you entered less the payments recorded since.`}
         </p>
       </Card>
+
+      {summaries.length === 0 ? (
+        <Notice tone="info" title="No loans yet">
+          <p>
+            Nothing has been entered, so the total above is zero rather than
+            true. Add each debt below with the balance printed on its most
+            recent statement and the date that statement was issued - the system
+            works from that figure and subtracts the payments you record after
+            it, so it can always be tied back to a piece of paper. The interest
+            rate can wait until you have one to hand.
+          </p>
+        </Notice>
+      ) : null}
 
       {growing.length > 0 ? (
         <Notice
@@ -167,11 +214,8 @@ export default async function LoansPage() {
                   today={today}
                 />
 
-                <details>
-                  <summary className="cursor-pointer text-sm text-muted hover:text-ink">
-                    Update from a statement, or edit this loan
-                  </summary>
-                  <div className="mt-4 space-y-6">
+                <Disclosure label="Update from a statement, edit or delete">
+                  <div className="space-y-6">
                     <UpdateFromStatementForm
                       loanId={loan.id}
                       balanceCentavos={loan.statementBalanceCentavos}
@@ -180,15 +224,28 @@ export default async function LoansPage() {
                     <div className="border-t border-line/60 pt-5">
                       <LoanEditForm loan={loan} today={today} />
                     </div>
+                    <div className="flex flex-wrap items-start gap-3 border-t border-line/60 pt-5">
+                      <LoanActiveForm
+                        loanId={loan.id}
+                        lender={loan.lender}
+                        active={loan.active}
+                      />
+                      <DeleteButton
+                        kind="loan"
+                        name={loan.lender}
+                        idField="loanId"
+                        id={loan.id}
+                        hasHistory={loansWithPayments.has(loan.id)}
+                        action={deleteLoanAction}
+                        consequence={linkedBillNames(loan.id)}
+                      />
+                    </div>
                   </div>
-                </details>
+                </Disclosure>
 
                 {loanPayments.length > 0 ? (
-                  <details>
-                    <summary className="cursor-pointer text-sm text-muted hover:text-ink">
-                      Payment history ({loanPayments.length})
-                    </summary>
-                    <ul className="mt-3 divide-y divide-line/60 text-sm">
+                  <Disclosure label={`Payment history (${loanPayments.length})`}>
+                    <ul className="divide-y divide-line/60 text-sm">
                       {loanPayments.map((payment) => (
                         <li
                           key={payment.id}
@@ -205,7 +262,7 @@ export default async function LoansPage() {
                         </li>
                       ))}
                     </ul>
-                  </details>
+                  </Disclosure>
                 ) : null}
               </div>
             </Card>
@@ -213,9 +270,38 @@ export default async function LoansPage() {
         })}
       </section>
 
+      {stopped.length > 0 ? (
+        <Card
+          title={`No longer counted (${stopped.length})`}
+          description="Kept for their payment history. They are not part of the total owed."
+        >
+          <ul className="space-y-4">
+            {stopped.map(({ loan }) => (
+              <li key={loan.id} className="flex flex-wrap items-center justify-between gap-3">
+                <span className="text-sm">
+                  {loan.lender} &middot; {formatPesos(loan.statementBalanceCentavos)}
+                </span>
+                <div className="flex flex-wrap items-start gap-3">
+                  <LoanActiveForm loanId={loan.id} lender={loan.lender} active={false} />
+                  <DeleteButton
+                    kind="loan"
+                    name={loan.lender}
+                    idField="loanId"
+                    id={loan.id}
+                    hasHistory={loansWithPayments.has(loan.id)}
+                    action={deleteLoanAction}
+                    consequence={linkedBillNames(loan.id)}
+                  />
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
       <Card
         title="Add a loan"
-        description="The specification noted around PHP 660,000 of debts still to be entered."
+        description="The balance as printed on the most recent statement, and the date it was true."
       >
         <LoanEditForm today={today} />
       </Card>
