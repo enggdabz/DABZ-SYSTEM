@@ -12,20 +12,14 @@ import { redirect } from "next/navigation";
 import { recordAudit } from "@/lib/audit";
 import { checkPassword } from "@/lib/auth/credentials";
 import { getSignedInUser } from "@/lib/auth/dal";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface ChangePasswordState {
   error?: string;
+  /** Shown under `error`, for a failure the person has to hand to the owner. */
+  errorDetail?: string;
   fieldErrors?: Record<string, string>;
-}
-
-/**
- * True when the database has not had `npm run db:push` run against it since
- * this fix landed. PostgREST answers an unknown function with PGRST202, and
- * telling the owner exactly which command to run beats "unknown error".
- */
-function missingFunction(error: { code?: string; message: string }): boolean {
-  return error.code === "PGRST202" || /finish_password_change/.test(error.message);
 }
 
 export async function changePasswordAction(
@@ -74,10 +68,32 @@ export async function changePasswordAction(
   const { error: flagError } = await supabase.rpc("finish_password_change");
 
   if (flagError) {
+    /*
+      Two failures, two different fixes, and the person reading this may be a
+      staff member who can do neither - so the screen tells them what to show
+      the owner rather than pretending they can act on it.
+
+      The first version of this message named only `npm run db:push`, which is
+      wrong half the time: PostgREST answers PGRST202 both when the function is
+      genuinely absent AND when it is merely serving a cache built before the
+      function existed. An owner who had already applied the migration was told
+      to apply it again, with nothing on screen to suggest otherwise.
+    */
+    if (isFunctionMissingFromApi(flagError)) {
+      return {
+        error: "Your new password was saved, but the system could not finish the change.",
+        errorDetail:
+          "Show this to the owner. Supabase cannot see finish_password_change. " +
+          "In the SQL editor run: notify pgrst, 'reload schema'; - and if that " +
+          "does not help, the migrations have not been applied, so run npm run " +
+          "db:push. Then sign in again with your NEW password, not the " +
+          "temporary one.",
+      };
+    }
+
     return {
-      error: missingFunction(flagError)
-        ? 'Your new password was saved, but the database has not been updated with the fix for the "change your password" loop yet. Run `npm run db:push`, then sign in again with your NEW password.'
-        : `Your new password was saved, but the system could not finish the change: ${flagError.message}`,
+      error: "Your new password was saved, but the system could not finish the change.",
+      errorDetail: `Show this to the owner: ${flagError.message}`,
     };
   }
 
