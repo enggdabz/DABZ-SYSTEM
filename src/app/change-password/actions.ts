@@ -22,6 +22,19 @@ export interface ChangePasswordState {
   fieldErrors?: Record<string, string>;
 }
 
+/**
+ * The raw failure, in square brackets at the end of the notice.
+ *
+ * Put there because of a real morning spent guessing: the screen said one
+ * thing, the owner had already done it, and a photograph of the screen could
+ * not say which of three failures it actually was. A code somebody can read
+ * out over the phone is worth the small ugliness on screen.
+ */
+function describeError(error: { code?: string | null; message?: string | null }): string {
+  const code = error.code ? error.code : "no code";
+  return `${code}: ${error.message ?? "no message"}`;
+}
+
 export async function changePasswordAction(
   _previous: ChangePasswordState,
   formData: FormData,
@@ -87,13 +100,15 @@ export async function changePasswordAction(
           "In the SQL editor run: notify pgrst, 'reload schema'; - and if that " +
           "does not help, the migrations have not been applied, so run npm run " +
           "db:push. Then sign in again with your NEW password, not the " +
-          "temporary one.",
+          `temporary one. [${describeError(flagError)}]`,
       };
     }
 
     return {
       error: "Your new password was saved, but the system could not finish the change.",
-      errorDetail: `Show this to the owner: ${flagError.message}`,
+      errorDetail:
+        "Show this to the owner, and sign in again with your NEW password, not " +
+        `the temporary one. [${describeError(flagError)}]`,
     };
   }
 
