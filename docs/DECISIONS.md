@@ -326,3 +326,13 @@ to ask:
   is reviewable, and so re-importing the project cannot silently lose it. If
   the Supabase project ever moves region, change this to match - the two
   belong in the same place, whichever place that is.
+- **Nobody may update their own profile row, and that stays true.** The fix for
+  the sign-in loop (written up in [PHASES.md](PHASES.md)) could have been a "you may edit yourself" policy on
+  `profiles`, and that would have been a mistake: a policy cannot say WHICH
+  COLUMNS an update may touch, so a policy wide enough to let a staff member
+  clear their own password flag is wide enough to let them set their own role
+  to `admin`. Instead there is `finish_password_change()`, a `SECURITY DEFINER`
+  function that takes no arguments, names no row but the caller's, and changes
+  one boolean. Same shape as `unlock_payroll_week`: the table stays shut and
+  there is one named way past it. If a person ever needs to change their own
+  full name, add a second narrow function rather than opening the table.

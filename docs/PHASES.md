@@ -1123,6 +1123,64 @@ Run `supabase/migrations/0009_phase9_public.sql` against your project, then:
 
 ---
 
+## Fix — the "change your password" loop (19 Sep 2026)
+
+**What you saw:** a new staff member or a new admin signed in with the
+temporary password, typed a new one, and landed straight back on **Choose your
+password**. Every time. Their password really was being changed each round,
+which is why it looked like the new one kept being thrown away.
+
+**What was wrong:** a new account is marked *must change password*, and every
+screen bounces that person to the change screen until the mark is cleared. The
+change screen cleared it with an ordinary write to their own account row — but
+the security rules never allowed anybody to edit their own row. The owner can
+edit anyone, an admin can edit **staff**, and that is the whole list. A staff
+member is not on it. Nor is an admin editing themselves: their own row is an
+admin row, not a staff row.
+
+The part that made it silent: when the security rules refuse a write like that,
+PostgreSQL does not complain — it just changes nothing. So the system believed
+the mark was cleared, sent the person to the Overview, read the mark again, and
+sent them back. Round and round.
+
+The owner never hit it because the owner account is created with the mark
+already off, so the one account used to test everything was the one account the
+bug could not touch.
+
+**What was done:** the mark is now cleared by a database function,
+`finish_password_change()`, which can only ever touch the person calling it and
+can only ever change that one true/false. The account table stays shut to
+self-editing, so this does not become a way for a staff member to promote
+themselves — a new security test proves both halves. And if the change ever
+fails again, the screen now says so instead of quietly sending you round the
+loop.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 463 passed
+npm run db:push   # applies 0010_finish_password_change.sql
+```
+
+`npm run db:push` is the important one — the fix is in the database, so the
+app on its own will not clear it. Until you run it, the change screen says so
+and names the command.
+
+Then:
+
+1. On **Accounts**, create a staff account and write down the temporary
+   password. Do the same for an admin account.
+2. Sign in as the staff member. You are asked to choose a password.
+3. Choose one. You land on the **Overview** — not back on the same screen.
+4. Sign out, sign back in with the new password. Straight to the Overview.
+5. Repeat with the admin account: that half was broken too, and is the half
+   that was never covered by a test before.
+6. Existing accounts already stuck in the loop need nothing special — the next
+   time they choose a password it sticks.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the
