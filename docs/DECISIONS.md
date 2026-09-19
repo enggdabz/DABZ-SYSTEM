@@ -226,6 +226,21 @@ rules, plus three decisions of their own:
   a migration's own `DO` block then cannot call them either, because nobody is
   signed in, and `where not null` deletes nothing while reporting success.
 
+**And then `0013`, the same day.** `0011` and `0012` kept two bills and two
+loans, because the owner had marked them paid while trying the system out, and
+those had payment history. The owner asked for them gone too. `0013` removes
+them **and the ledger entries their payments wrote** — leaving those behind
+would put a money-out row on the books for a bill the system can no longer
+explain, and the monthly expense totals would still count it.
+
+It stops there on purpose: sales, job orders and repair tickets are untouched,
+because a customer may be holding the receipt, and the audit log is
+append-only and is now the only record that any of it existed. **The general
+rule is unchanged** — a row with history is stopped, never deleted. `0013` is a
+one-off for a database that was only ever being tried out. If real months of
+payments ever need clearing, that is a different conversation, not another
+migration like this one.
+
 ---
 
 ## Assumptions I am working under

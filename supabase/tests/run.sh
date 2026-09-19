@@ -40,6 +40,10 @@ quiet "$HERE/../migrations/0010_finish_password_change.sql"
 quiet "$HERE/../migrations/0011_clear_catalogue_and_allow_delete.sql"
 quiet "$HERE/../migrations/0012_clear_apparel_and_repair_prices.sql"
 
+# 0013 is a one-off data clear with no schema in it, and it would empty the
+# fixtures below. The suite proves the POLICIES; that migration is checked by
+# applying it to a throwaway copy, not by running it here.
+
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
 # read now bring their own.
