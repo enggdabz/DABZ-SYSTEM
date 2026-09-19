@@ -86,7 +86,7 @@ begin
   raise notice '--- phase 6: writing an order ---';
 
   insert into public.apparel_orders (order_number, team_name, promised_on, created_by)
-  values ('A-260918-001', 'Negros Runners', current_date + 10,
+  values ('A-260918-001', 'San Carlos Runners', current_date + 10,
           '33333333-3333-3333-3333-333333333333')
   returning id into v_order;
 

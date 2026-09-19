@@ -158,7 +158,7 @@ function payable(overrides: Partial<Payable> = {}): Payable {
   return {
     id: "p1",
     supplierId: null,
-    supplierName: "Negros Paper Supply",
+    supplierName: "Pangasinan Paper Supply",
     description: "20 reams bond paper",
     amountCentavos: parsePesos("4800"),
     receivedOn: "2026-09-10",
