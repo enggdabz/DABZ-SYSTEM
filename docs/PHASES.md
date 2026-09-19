@@ -1311,6 +1311,102 @@ Then, in the app:
 
 ---
 
+## Added after Phase 9 — a printable payroll summary for any dates
+
+**Built**
+
+A new screen at **/payroll/summary**, reached by **Print payroll summary**
+beside the heading on the Payroll screen, and Owner/Admin only like the rest of
+payroll. Pick any two dates — or tap **This week**, **Last week**, **This
+month**, **Last month** — and it prints one line per person: daily rate, days
+paid, overtime, bonus, gross, cash advance taken off, net pay, whether it has
+actually been handed over, and a line to sign on. It prints landscape, black on
+white, with **Prepared by** and **Approved by** at the bottom.
+
+The payslip answers *what does this person get this week?*. This answers *what
+did wages cost me in September?*, which is a different question, because a
+payroll week and a calendar month do not line up.
+
+**The rule the whole thing turns on**
+
+The week beginning Monday 28 September ends on Sunday 4 October, so a September
+sheet and an October sheet both want a piece of it. So:
+
+- **Day pay and overtime are counted day by day.** Only the days inside the
+  dates are paid on that sheet.
+- **The week's bonus and its cash advance deduction are counted whole**, on
+  whichever sheet holds the week's **first day**. They are single figures for a
+  whole week and there is no honest way to halve them — attaching them to the
+  first day is what makes two sheets side by side count each one exactly once,
+  never twice and never not at all.
+
+A row whose weeks run past either end says **Includes part of a week**, and the
+sheet prints the rule under the table rather than leaving you to work it out.
+
+**What it refuses to get wrong**
+
+- **It never reads the stored weekly total.** Every figure is added up from the
+  saved days, the same rule as a payslip and a receipt. Where a week lies
+  *wholly* inside the dates the two are compared, and a disagreement prints as
+  **⚠ A week needs saving again** — but a week the dates cut in two is never
+  compared, because half a week *should* come to less, and a warning on every
+  month boundary would teach you to ignore it.
+- **It does not quietly leave anyone out.** Someone active, with a daily rate,
+  and nothing saved in those dates is named under the table as **⚠ Not on this
+  sheet**. A missing row on a wage sheet looks exactly like a person who earned
+  nothing.
+- **A rate that changed mid-range is printed in full** — "₱500 / ₱550" — because
+  the rate is copied onto each week when it is saved, and a raise must not
+  rewrite what was paid before it.
+- **Dates the wrong way round are swapped**, with a note saying so. A range
+  over 400 days is refused, because that is a mistyped year, not a question.
+
+**It stores nothing and adds no migration**, exactly like Reports: the sheet is
+worked out fresh each time it is opened, so it cannot fall out of step with the
+payroll screen it was built from.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Money, dates, payroll, and the split-week rule | `npm test` | 520 tests (35 of them new) |
+| Every table and column the app asks for exists | `npm run check:schema` | 42 tables, 728 column references |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | unchanged — this added no migration |
+| The sheet at 390 / 768 / 1024 / 1440, and on landscape paper | headless browser | no overflow, every tap target over 24px |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The tests worth knowing about take one payroll week that straddles 30 September,
+build a September sheet and an October sheet from it, and assert that the two
+add back up to exactly the week's real gross and net — with the bonus and the
+advance appearing on one sheet and not the other.
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 520 passed
+npm run dev
+```
+
+No migration to run. Then, in the app:
+
+1. On **Payroll**, fill in and save a week for two staff members, then step to
+   the next week and save that one too. **Mark paid** one of them.
+2. Press **Print payroll summary** beside the heading. The sheet opens on the
+   week you were looking at, one row per person.
+3. Tap **This month**. Both weeks now sit on one row per person, and the row
+   for the person you paid reads **Partly paid** with what is still owed.
+   **Already paid out** and **Still to pay** add up to **Total net pay**.
+4. Press Ctrl+P. It should come out landscape, black on white, with the
+   navigation gone and the signature lines on the page.
+5. The interesting one: save a week that **starts in one month and ends in the
+   next** — the week of Monday 28 September, say — with a bonus and an advance
+   deduction on it. Print **This month**, then last month's dates, and add the
+   two rows together. They come back to exactly what the payslip for that week
+   says, with the bonus counted once, on the sheet holding the 28th.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the
