@@ -221,3 +221,16 @@ begin
     v_deleted, v_kept;
 end;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Tell the API about the new functions
+-- ---------------------------------------------------------------------------
+-- Supabase reaches the database through PostgREST, which holds a cached
+-- picture of the schema and will answer "function not found" for a brand new
+-- one until it reloads. The app calls all six of the functions above, so
+-- without this the Delete buttons would be broken for however long the cache
+-- took to notice.
+--
+-- A plain PostgreSQL with nothing listening ignores this, so the test harness
+-- is unaffected.
+notify pgrst, 'reload schema';
