@@ -1740,9 +1740,9 @@ This is a bigger gap than usual, so it is worth being plain about:
 
 ```bash
 npm install
-npm run db:push     # applies 0016
+npm run db:push     # applies 0016 and anything after it
 npm run push:keys   # ONCE - then paste both keys into .env.local and Vercel
-npm test            # expect: 645 passed
+npm test            # expect: no failures
 npm run dev
 ```
 
