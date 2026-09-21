@@ -340,6 +340,41 @@ of step with the rows underneath it.
 
 ---
 
+## Decided for Phase 11 — Notifications
+
+You asked for these knowing the build plan lists them under *Later, not in the
+first build*, and knowing phases 4 to 10 are still waiting to be confirmed.
+Recorded here so the reason is on paper: **you asked, twice, after I raised
+both points.** They are independent of Phase 10, so nothing is stacked on
+unverified work.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| A daily summary, or an alert per event | **One summary each morning.** A shop generates dozens of these a week; twelve a day gets the channel muted, and a muted channel is worse than none because everyone still believes it works | Add a kind to `digestLines` in `src/lib/notifications.ts` |
+| What happens on a quiet day | **Nothing is sent.** Not "all clear" — enough cheerful notifications and you swipe them away unread, and the one that mattered goes too | `buildDigest` returns null. It is the behaviour most likely to be "fixed" by mistake; there is a test named for it |
+| When the summary arrives | **Your shop's opening time**, read from the `workDayStart` you already set. Nothing invented | The cron fires at `0 0 * * *` UTC = 8am Manila, in `vercel.json`. Change your opening hour and change that line to match (UTC = Manila − 8) |
+| Anything immediate | **A customer message, and nothing else.** It is the only one with a person waiting at the other end (spec 9) | `notifyOwnersOfEnquiry` in `src/app/(public)/actions.ts` |
+| What the customer alert says | **That somebody wrote, and nothing about who.** A lock screen is readable by whoever is near the phone, and a stranger's name and number are Owner/Admin material (spec 4.3) | `enquiryAlert`. Worth keeping as it is |
+| Who may receive them | **Owner and Admin only**, refused by the database and not only by the screen. Every figure a summary carries is beyond a staff checkbox | The insert policy in `0016`. Widening it means deciding what a staff digest could safely say, which is a real question, not a toggle |
+| Whether admins see each other's phones | **No.** An endpoint is a device; one admin reading another's device list is a privacy question with no upside | `push_subscriptions_read_own` in `0016` |
+| Per-kind on/off switches | **Not built.** One summary does not need filtering, and every switch is another thing to get wrong | If you want them they belong on the subscription row, not in Settings — a person may have two phones with different answers |
+| Turning a phone off | **Deletes the row.** The one place in this system where deleting is right: it is a standing permission, not a money record, and a withdrawn permission must leave nothing behind that anything could still send to | `unsubscribeAction` |
+| A phone that stops answering | **404 and 410 switch it off** (the browser is gone); anything else is forgiven ten times first | `MAX_FAILURES` and `subscriptionVerdict`. Switching off after one bad afternoon is how somebody silently stops getting warnings |
+| A third use of the service-role key | **Allowed, for the digest cron**, which runs as nobody and must read every Owner/Admin's phones and the shop's warnings. Now listed in AGENTS.md beside sign-in and the public page | It is the only way a cron can read anything. What keeps it safe is `CRON_SECRET` and the fact that the route only ever sends |
+| Hand-rolling the Web Push crypto | **No — added the `web-push` package.** It is a VAPID JWT plus RFC 8291 aes128gcm encryption, and getting either subtly wrong does not raise an error, it just makes the push service answer 400 and nobody learns why | It is the standard implementation. The alternative is ~120 lines of crypto this project has no business owning |
+
+**Two things worth knowing before you rely on it**
+
+- **The last hop is untested.** Everything up to the moment a message leaves
+  the server is covered by the 628 tests. Whether it lands on your phone needs
+  a real deployment, a real project and a real handset — the steps are in
+  [PHASES.md](PHASES.md).
+- **On an iPhone you must add the system to your Home Screen first.** Apple
+  only allows notifications for an app installed that way. Safari in an
+  ordinary tab will say it is unsupported, and it is right.
+
+---
+
 ## Assumptions I am working under
 
 Where the spec gives a default, I use it and note it here rather than stopping

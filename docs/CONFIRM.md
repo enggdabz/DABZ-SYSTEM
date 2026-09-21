@@ -1,7 +1,7 @@
 # Confirming what has been built
 
-Seven phases are finished and **waiting on you to confirm they work** — 4, 5, 6,
-7, 8, 9 and 10. Until they are confirmed the build plan says the next phase does
+Eight phases are finished and **waiting on you to confirm they work** — 4, 5,
+6, 7, 8, 9, 10 and 11. Until they are confirmed the build plan says the next phase does
 not start, so this page exists to make confirming them a job you can actually
 finish rather than a vague one you keep putting off.
 
@@ -19,8 +19,8 @@ look for in Phase 8's report.
 ```bash
 git pull
 npm install
-npm run db:push     # applies all 16 migrations, in order
-npm test            # expect: 592 passed
+npm run db:push     # applies all 17 migrations, in order
+npm test            # expect: 628 passed
 npm run dev
 ```
 
@@ -33,9 +33,9 @@ written before these were true:
   migration in order and records each one, so none can run twice.
 - **Ignore the per-phase test counts in PHASES.md.** Each says what was true on
   the day it was written — 234, 270, 339, and so on. There is one number now
-  and it is **592**. A phase that says "expect: 270 passed" is not broken.
+  and it is **628**. A phase that says "expect: 270 passed" is not broken.
 
-If `npm test` does not say 592, stop and tell me before going further. Nothing
+If `npm test` does not say 628, stop and tell me before going further. Nothing
 below is worth checking against a broken build.
 
 ---
@@ -57,6 +57,7 @@ complaint than as a tick.
 - [ ] Phase 8 — Reports
 - [ ] Phase 9 — The public page and customer messages
 - [ ] Phase 10 — One counter, all three divisions
+- [ ] Phase 11 — Notifications on your phone
 
 ---
 
@@ -231,6 +232,44 @@ No migration of its own — reports read what the phases above already wrote.
 
 ---
 
+## Phase 11 — Notifications on your phone
+
+This one needs two things set up first, and they are not optional:
+
+```bash
+npm run push:keys   # ONCE. Paste both keys into .env.local and into Vercel.
+```
+
+Plus a `CRON_SECRET` — any long random string (`openssl rand -base64 32`), in
+both places too. Without it the digest route refuses everybody, **including
+Vercel**, which is deliberate: it is a public URL that reads the whole shop.
+
+Then, **on your phone**:
+
+1. Open the system on your phone and sign in as the owner. **On an iPhone, add
+   it to your Home Screen first** and open it from there — Apple only allows
+   notifications for an app installed that way. Safari in an ordinary tab will
+   say it is unsupported, and it is right.
+2. **Settings → Notifications → Turn on for this phone.** Allow it when your
+   phone asks. It should appear in the list, named.
+3. On a computer, open **Settings** as the same person: the phone is listed
+   there too, because it is yours.
+4. Sign in as an **admin** on the computer. Your phone is **not** in their
+   list, and theirs is not in yours.
+5. Sign in as a **staff member**. There is no notifications section at all.
+6. From a private window, send yourself a message through the **public page**.
+   Your phone should buzz within seconds, saying a customer has messaged — and
+   saying **nothing about who, or what they wrote**. Tap it: it opens Messages.
+7. Force a morning summary rather than waiting for one:
+   `curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-site/api/notifications/digest`
+   With nothing wrong in the shop it answers *"Nothing needed attention, so
+   nothing was sent"*. **That is the correct answer, not a failure.** Make a
+   bill overdue, then try again.
+8. Call that same URL **without** the header. It should answer *Not found*.
+9. Press **Turn off** in Settings. The phone disappears from the list.
+
+---
+
 ## The one check nobody has done yet
 
 **Phase 10 at four screen widths: 390, 768, 1024 and 1440.** It could not be
@@ -242,8 +281,13 @@ things need your eyes, because no test can see either:
 - The **breakdown table** on End of day. At 390px it should be a stack of cards,
   one per division; from tablet width up, a real table.
 
-Everything else in Phase 10 is covered by the 592 unit tests and the 301
+Everything else in Phase 10 is covered by the 628 unit tests and the 319
 security checks.
+
+**Phase 11 has a bigger gap, and it is named in its own section of
+[PHASES.md](PHASES.md):** whether a notification actually lands on your phone
+cannot be tested here at all. It needs the keys generated, a deployment, and a
+real handset. Phase 11's steps walk you through it.
 
 ---
 

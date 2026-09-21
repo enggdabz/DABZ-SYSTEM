@@ -23,6 +23,12 @@ import { headers } from "next/headers";
 
 import { checkEnquiry, isRateLimited, type EnquiryForm } from "@/lib/enquiries";
 import {
+  countUnansweredEnquiries,
+  getSubscriptionsForOwnersAndAdmins,
+} from "@/lib/data/notifications";
+import { enquiryAlert } from "@/lib/notifications";
+import { isPushConfigured, sendPushToAll } from "@/lib/push";
+import {
   createSupabaseAdminClient,
   isAdminClientConfigured,
 } from "@/lib/supabase/admin";
@@ -118,5 +124,54 @@ export async function sendEnquiryAction(
     signed in here. The enquiry is its own record, and answering it is the
     thing that gets logged.
   */
+
+  /*
+    Tell the owner, now rather than in the morning (Phase 11).
+
+    This is the ONLY immediate notification in the system, and it earns that
+    because there is a person at the other end: spec 9 exists because a
+    customer who gets no reply asks the next shop.
+
+    Deliberately NOT awaited into the customer's answer. Their message is
+    saved; whether the owner's phone can be reached is no business of theirs,
+    and a push service having a bad minute must never turn a successful
+    enquiry into "could not be sent". `notifyOwnersOfEnquiry` swallows its own
+    failures for the same reason.
+  */
+  await notifyOwnersOfEnquiry();
+
   return { success: THANK_YOU };
+}
+
+/**
+ * A push to every Owner and Admin who has turned notifications on.
+ *
+ * Never throws and never blocks the customer: every failure is swallowed here,
+ * because the alternative is a stranger being told their message failed when
+ * it is sitting safely in the database.
+ */
+async function notifyOwnersOfEnquiry(): Promise<void> {
+  try {
+    if (!isPushConfigured()) return;
+
+    const [phones, waiting] = await Promise.all([
+      getSubscriptionsForOwnersAndAdmins(),
+      countUnansweredEnquiries(),
+    ]);
+
+    if (phones.length === 0) return;
+
+    const alert = enquiryAlert({ waiting });
+
+    await sendPushToAll(phones, {
+      title: alert.title,
+      body: alert.body,
+      url: alert.url,
+      // Its own tag, so a second message replaces the first rather than
+      // burying it - the count in the body already says how many are waiting.
+      tag: "dabz-enquiry",
+    });
+  } catch {
+    // The customer's message is saved. Nothing here is worth telling them.
+  }
 }
