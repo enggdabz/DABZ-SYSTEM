@@ -1785,7 +1785,7 @@ You asked for "a calendar of all projects in Dabz Apparel; make it minus one
 day from the original due date, and if it is not finished, put it in the next
 day but assign it as a priority project."
 
-**Built** — a new screen at **Apparel → Apparel calendar**
+**Built** — a new screen at **Apparel → Project calendar**
 (`/apparel/calendar`), also in the sidebar under Daily.
 
 - **Two dates, not one.** The *promised* date is what the customer was told and
@@ -1840,7 +1840,7 @@ npm run dev
 ```
 
 1. Open **Apparel**, start a job order and give it a promised date **three days
-   from now**. Open **Apparel calendar**: it is on the square *two* days from
+   from now**. Open **Project calendar**: it is on the square *two* days from
    now — one day before you promised it.
 2. Change the promised date to **yesterday**. The order now sits on **today**,
    in amber, with ⚠ and "Carried over 2 days", and the Apparel screen says so
@@ -1850,6 +1850,54 @@ npm run dev
 4. Clear the promised date. It leaves the grid and appears under **Not on the
    calendar** — the system will not guess a date.
 5. Open the same screen on a phone: the same month, as a list.
+
+---
+
+## 21 September 2026 — the way into the project calendar
+
+The calendar shipped with its way in written as a line of underlined text
+beside the red **New job order** button, and the owner reported not being able
+to find it. That is the same mistake the Disclosure handle made in Phase 2: a
+way in that does not look like anything.
+
+**Changed**
+
+- The link is now a **button**, on its own row directly under the page heading
+  — above the three summary cards, not below them. On a phone the cards used to
+  push it a screenful down, and what is due today matters more than a running
+  total does.
+- It carries the **live count** beside it: *"2 carried over and needing doing
+  first · 1 due off the bench today · next on 24 Sep 2026"*. A button that says
+  what is waiting is worth crossing the screen for in a way that the word
+  *Calendar* is not. With nothing on the bench it says so plainly, and with no
+  promised dates entered it says **that** rather than "all up to date" — the
+  same rule as a daily target of zero meaning "not known".
+- Renamed **Project calendar** everywhere, from *Apparel calendar*. The owner
+  calls this work "projects"; "Apparel calendar" read as a corner of the
+  Apparel screen rather than as its own thing. It stays in the sidebar under
+  **Daily**, next to Apparel, because it is opened every morning and it is the
+  same orders.
+- A new `feature` button variant in `src/components/ui.tsx` for this: the
+  accent as a **tint and a frame**, never a fill. A screen has one main action
+  and it wears the filled red — a second red button leaves neither of them
+  meaning anything.
+
+**The part that needed measuring**
+
+The obvious way to write that variant is accent text on an accent tint, the
+shape `Tag tone="accent"` already uses. In a browser it measures **3.06:1**
+against the dark surface, under the 4.5:1 floor, and dark is the shop's default
+look — so the label is `text-ink`, which measures **15.72:1** dark and
+**13.73:1** light. The frame does the attracting; the text does the telling. A
+button nobody can read is a worse answer to "make it more visible" than the
+underlined link it replaced.
+
+| What | How | Result |
+|---|---|---|
+| The counts behind the line — carried over, due today, next day, waiting on a date | `npm test` | 738 tests (6 new) |
+| Contrast of the new button, both themes | headless browser | 15.72:1 dark, 13.73:1 light — both pass AA |
+| The screen at 390 / 768 / 1024 / 1440 | headless browser | no sideways scroll; the button on the first screenful at every width (390px: 312px down) |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
 
 ---
 

@@ -912,3 +912,26 @@ to ask:
   another one, so the sidebar now marks the longest matching link as the
   current page rather than every link that matches — without it, opening the
   calendar lit up **Apparel** and **Apparel calendar** at once.
+- **A second action that must not be missed gets the accent as a frame, not as
+  a fill** (`feature` in `src/components/ui.tsx`). The project calendar shipped
+  with a text link for its way in and the owner could not find it, which is the
+  Phase 2 Disclosure lesson again: a way in has to look like one. The rule that
+  red is reserved for the main action still holds — two filled red buttons on a
+  screen leave neither meaning anything — so this tints the background and
+  draws the outline in the accent while leaving the label at full contrast.
+  That last part came out of a measurement, not a preference: written the
+  obvious way, as accent text on an accent tint, it is 3.06:1 against the dark
+  surface, and dark is the default look. The label is `text-ink` instead, at
+  15.72:1. To make something else prominent without it becoming a second
+  primary, this is the variant to reach for.
+- **The calendar is called "Project calendar", and its way in carries the
+  count.** The owner's word for an apparel job order is a project, and
+  "Apparel calendar" read as a corner of the Apparel screen rather than as its
+  own screen. It stays in the **Daily** group beside Apparel rather than moving
+  to another one: it is opened every morning and it is the same orders, and a
+  group heading with one link under it would look like a mistake. The band sits
+  ABOVE the three summary cards because on a phone those cards pushed it a
+  screenful down, and what is due off the bench today is more use first thing
+  than what is still owed in total. The line beside the button is counts
+  (`summariseProjects`), never reassurance: with no promised dates entered it
+  says nobody has set any, rather than implying nothing is due.

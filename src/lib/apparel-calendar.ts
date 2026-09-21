@@ -213,6 +213,70 @@ export function compareProjects(a: ScheduledProject, b: ScheduledProject): numbe
   return a.orderNumber < b.orderNumber ? -1 : a.orderNumber > b.orderNumber ? 1 : 0;
 }
 
+/**
+ * Every order placed, ready to be read.
+ *
+ * One function so the calendar screen and the Apparel screen cannot disagree
+ * about what is on the bench - which orders count, and where each one sits.
+ */
+export function scheduleAll(options: {
+  orders: readonly CalendarOrder[];
+  today: CivilDate;
+}): ScheduledProject[] {
+  return options.orders
+    // A cancelled order is not work, so it is not on the production calendar.
+    // It is not deleted either - it stays on the Apparel screen with its
+    // reason, because the customer may be holding the job order sheet.
+    .filter((order) => order.status !== "cancelled")
+    .map((order) => scheduleProject({ order, today: options.today }))
+    .sort(compareProjects);
+}
+
+export interface CalendarSummary {
+  /** Carried over from a day that passed. The number that needs doing first. */
+  priority: number;
+  /** Due off the bench today, and not late yet. */
+  dueToday: number;
+  /** The next day after today with work targeted at it. Null when there is none. */
+  nextOn: string | null;
+  /** Open orders with no promised date, so no day at all. */
+  undated: number;
+}
+
+/**
+ * The one line the Apparel screen shows about the calendar.
+ *
+ * Counts rather than a cheerful summary: with nothing on the bench it says so
+ * plainly. A screen that says "all up to date" when nobody has entered a
+ * promised date is claiming to know something it does not - the same mistake
+ * as a daily target of zero reading as "reached".
+ */
+export function summariseProjects(
+  projects: readonly ScheduledProject[],
+  today: CivilDate,
+): CalendarSummary {
+  const todayISO = civilDateToISO(today);
+
+  const later = projects
+    .filter(
+      (project) =>
+        !project.done && project.targetOn !== null && project.targetOn > todayISO,
+    )
+    .map((project) => project.targetOn as string)
+    .sort();
+
+  return {
+    priority: projects.filter((project) => project.priority).length,
+    dueToday: projects.filter(
+      (project) => !project.done && !project.priority && project.targetOn === todayISO,
+    ).length,
+    nextOn: later[0] ?? null,
+    undated: projects.filter(
+      (project) => project.reason === "no_promised_date" && isOpenOrder(project.status),
+    ).length,
+  };
+}
+
 export interface CalendarDay {
   date: string;
   day: number;
@@ -249,12 +313,7 @@ export function buildCalendar(options: {
   const { period, today, weekStartsOn } = options;
   const todayISO = civilDateToISO(today);
 
-  const projects = options.orders
-    // A cancelled order is not work, so it is not on the production calendar.
-    // It is not deleted either - it stays on the Apparel screen with its
-    // reason, because the customer may be holding the job order sheet.
-    .filter((order) => order.status !== "cancelled")
-    .map((order) => scheduleProject({ order, today }));
+  const projects = scheduleAll({ orders: options.orders, today });
 
   const byDay = new Map<string, ScheduledProject[]>();
   for (const project of projects) {
