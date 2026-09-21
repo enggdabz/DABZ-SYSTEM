@@ -35,6 +35,8 @@ export async function saveSettingsAction(
     workDayStart: String(formData.get("workDayStart") ?? ""),
     workDayEnd: String(formData.get("workDayEnd") ?? ""),
     autoLogoutMinutes: String(formData.get("autoLogoutMinutes") ?? ""),
+    // A checkbox sends nothing at all when it is unticked.
+    staffStaySignedIn: formData.get("staffStaySignedIn") !== null,
     staffExpenseApprovalLimitPesos: String(
       formData.get("staffExpenseApprovalLimitPesos") ?? "",
     ),

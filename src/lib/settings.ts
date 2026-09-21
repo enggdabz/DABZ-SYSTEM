@@ -14,6 +14,15 @@ export interface AppSettings {
   workDayStart: string; // "08:00"
   workDayEnd: string; // "17:00"
   autoLogoutMinutes: number;
+  /**
+   * True leaves a staff account signed in until the person signs out.
+   *
+   * The owner asked for this (21 September 2026): the counter staff were being
+   * thrown back to the login screen in the middle of a working day. Owner and
+   * admin accounts keep the idle timer either way, because they are the ones
+   * who can open payroll, the ledger and the bills.
+   */
+  staffStaySignedIn: boolean;
   staffExpenseApprovalLimitCentavos: Centavos;
   staffDiscountLimitPercent: number;
   staffDiscountLimitCentavos: Centavos;
@@ -80,6 +89,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   workDayStart: "08:00", // spec 13.2, to be confirmed (17.5)
   workDayEnd: "17:00",
   autoLogoutMinutes: 15, // spec 4.1
+  staffStaySignedIn: true, // owner's request, 21 Sep 2026 (see DECISIONS.md)
   staffExpenseApprovalLimitCentavos: 200_000, // PHP 2,000 (spec 17.8 example)
   staffDiscountLimitPercent: 10, // spec 17.8 example
   staffDiscountLimitCentavos: 10_000, // PHP 100 (spec 17.8 example)
@@ -106,6 +116,7 @@ export interface SettingsRow {
   work_day_start: string;
   work_day_end: string;
   auto_logout_minutes: number;
+  staff_stay_signed_in?: boolean | null;
   staff_expense_approval_limit_centavos: number;
   staff_discount_limit_percent: string | number;
   staff_discount_limit_centavos: number;
@@ -131,6 +142,10 @@ export function settingsFromRow(row: SettingsRow): AppSettings {
     workDayStart: row.work_day_start.slice(0, 5),
     workDayEnd: row.work_day_end.slice(0, 5),
     autoLogoutMinutes: row.auto_logout_minutes,
+    // Missing means migration 0014 has not run yet, which is not the same as
+    // the owner unticking the box. The owner's answer was "keep them signed
+    // in", so that is what an unmigrated database gets too.
+    staffStaySignedIn: row.staff_stay_signed_in ?? true,
     staffExpenseApprovalLimitCentavos: row.staff_expense_approval_limit_centavos,
     // numeric columns arrive as strings, to avoid losing precision in transit.
     staffDiscountLimitPercent: Number(row.staff_discount_limit_percent),
@@ -196,6 +211,7 @@ export function validateSettingsForm(form: {
   workDayStart: string;
   workDayEnd: string;
   autoLogoutMinutes: string;
+  staffStaySignedIn: boolean;
   staffExpenseApprovalLimitPesos: string;
   staffDiscountLimitPercent: string;
   staffDiscountLimitPesos: string;
@@ -308,6 +324,7 @@ export function validateSettingsForm(form: {
       workDayStart: form.workDayStart,
       workDayEnd: form.workDayEnd,
       autoLogoutMinutes: autoLogout,
+      staffStaySignedIn: form.staffStaySignedIn,
       staffExpenseApprovalLimitCentavos: expenseLimit,
       staffDiscountLimitPercent: discountPercent,
       staffDiscountLimitCentavos: discountAmount,
@@ -342,6 +359,7 @@ export function settingsToRow(settings: AppSettings): SettingsRow {
     work_day_start: settings.workDayStart,
     work_day_end: settings.workDayEnd,
     auto_logout_minutes: settings.autoLogoutMinutes,
+    staff_stay_signed_in: settings.staffStaySignedIn,
     staff_expense_approval_limit_centavos: settings.staffExpenseApprovalLimitCentavos,
     staff_discount_limit_percent: settings.staffDiscountLimitPercent,
     staff_discount_limit_centavos: settings.staffDiscountLimitCentavos,
@@ -391,4 +409,27 @@ export function discountNeedsApproval(
 
   const asCentavos = Math.round((discount.subtotal * discount.percent) / 100);
   return asCentavos > settings.staffDiscountLimitCentavos;
+}
+
+// ---------------------------------------------------------------------------
+// Who the idle timer applies to (spec 4.1, revised 21 September 2026)
+// ---------------------------------------------------------------------------
+
+/**
+ * How many idle minutes before this person is signed out, or null for never.
+ *
+ * Only a staff account can be exempt, and only while the owner leaves the box
+ * ticked. Anything that is not plainly "staff" keeps the timer, so a role
+ * added later is timed until somebody decides otherwise - the safe way round
+ * for a shared counter computer.
+ *
+ * Takes a plain string rather than `Role` so a value read straight out of the
+ * database cannot widen the exemption by being unrecognised.
+ */
+export function idleSignOutMinutes(
+  role: string,
+  settings: Pick<AppSettings, "autoLogoutMinutes" | "staffStaySignedIn">,
+): number | null {
+  if (role === "staff" && settings.staffStaySignedIn) return null;
+  return settings.autoLogoutMinutes;
 }

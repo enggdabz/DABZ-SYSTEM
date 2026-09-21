@@ -27,7 +27,7 @@ Two jobs, about 30 minutes total. Do them in order. Nothing here costs money.
 
 ### 2. Create the tables — one command
 
-The fourteen files in `supabase/migrations/` are the whole database. The Supabase
+The fifteen files in `supabase/migrations/` are the whole database. The Supabase
 CLI runs them all, in order, and remembers which ones it has already run, so it
 can never apply one twice.
 
@@ -44,7 +44,7 @@ npm run db:push
 the project. If you have lost it, **Project Settings** → **Database** →
 *Reset database password*.
 
-You should see all fourteen applied:
+You should see all fifteen applied:
 
 ```
 Applying migration 0000_phase0_hello.sql...
@@ -54,6 +54,7 @@ Applying migration 0010_finish_password_change.sql...
 Applying migration 0011_clear_catalogue_and_allow_delete.sql...
 Applying migration 0012_clear_apparel_and_repair_prices.sql...
 Applying migration 0013_force_clear_catalogue.sql...
+Applying migration 0014_staff_stay_signed_in.sql...
 Finished supabase db push.
 ```
 
@@ -73,6 +74,7 @@ Finished supabase db push.
 | `0011_clear_catalogue_and_allow_delete.sql` | Empties the bills, loans and products, so you enter your own — **and lets you delete one you entered wrongly** |
 | `0012_clear_apparel_and_repair_prices.sql` | The same for the apparel items and the repair services, and lets you say which service is the checking fee |
 | `0013_force_clear_catalogue.sql` | Clears the few rows `0011` and `0012` kept because they had already been used, **including their payments and the ledger entries those wrote** |
+| `0014_staff_stay_signed_in.sql` | Lets staff accounts stay signed in until they sign out, instead of being signed out when idle — owner and admin accounts keep the timer |
 
 Every table gets **Row Level Security** switched on. RLS means the database
 itself refuses to hand out rows unless a rule says it may — so a mistake in the
@@ -101,7 +103,7 @@ npm run db:migrations
 
 ### 3. Or create them by hand, without the CLI
 
-If you would rather not install anything, the same fourteen files can be pasted in:
+If you would rather not install anything, the same fifteen files can be pasted in:
 
 1. In the left sidebar click **SQL Editor**, then **New query**.
 2. Open `supabase/migrations/0000_phase0_hello.sql`, copy everything in it,

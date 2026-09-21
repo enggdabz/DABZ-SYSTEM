@@ -1407,6 +1407,67 @@ No migration to run. Then, in the app:
 
 ---
 
+## 21 September 2026 — staff stay signed in until they sign out
+
+**What you asked for:** stop throwing the counter staff back to the login
+screen in the middle of the day.
+
+**What was happening:** spec 4.1 asks for an idle sign-out, and the system
+applied it to everybody — fifteen minutes with nobody touching the screen and
+you are out. On a counter machine that sits between customers, that is several
+times a day, and each one costs a re-typed username and password with somebody
+waiting.
+
+**What was done:** the timer is now a question of *who*, not just *how long*.
+
+- **Staff accounts stay signed in until somebody signs out.** No timer is
+  started for them at all, so there is nothing that can fire by mistake.
+- **Owner and admin accounts keep the timer**, unchanged. Those are the
+  accounts that can open payroll, the ledger and the bills, and the counter
+  computer is shared — so the screen that matters most is still the one that
+  locks itself.
+- It is a **switch, not a removal**. Settings → *Keep staff accounts signed in
+  until they sign out*. Untick it and staff go straight back on the timer; the
+  minutes box beside it still sets the length, up to 480.
+- The footer on every screen says which rule you are under, so nobody has to
+  guess whether they are about to be signed out.
+
+Staff still cannot change this for themselves — it is a shop setting, Owner and
+Admin only, and a security test proves a staff account cannot flip it.
+
+**The honest trade-off:** a staff account left signed in on the counter machine
+stays open to whoever walks up to it. That is why the exemption stops at staff:
+a staff account cannot see bills, loans, the ledger, payroll or an enquiry, so
+what is exposed is the counter itself. **Use *Switch user* when you leave it.**
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 526 passed (6 new)
+npm run test:rls  # expect: 268 checks (267 before this, plus its 1)
+npm run db:push   # applies 0014_staff_stay_signed_in.sql
+```
+
+`npm run db:push` matters here — the switch is a column, and until it exists
+every account keeps the old timer.
+
+Then, in the app:
+
+1. Sign in as the **owner**. The footer still reads *Signed out automatically
+   after 15 minutes of no activity*.
+2. Open **Settings**. Under *Rules and limits*, the new tick box is already
+   ticked.
+3. Sign in as a **staff** member on another browser. The footer now reads *You
+   stay signed in until you sign out*. Leave it alone past the idle minutes —
+   it is still there.
+4. Back as the owner, untick the box and save. The staff screen goes back to
+   the countdown wording on its next load.
+5. Leave the owner's own screen idle past fifteen minutes with the box ticked.
+   It still signs out — that half is deliberately unchanged.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the
