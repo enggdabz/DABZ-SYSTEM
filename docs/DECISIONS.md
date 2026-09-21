@@ -380,6 +380,46 @@ the same family, and now says so out loud.
 
 ---
 
+## Decided after Phase 10 — a deactivated account reads nothing of its own
+
+Deactivating an account is supposed to remove all access **immediately**
+(spec 4.2), and a token stays valid until it expires. So "immediately" has to
+be the policies' job, not the sign-in screen's. `current_role_name()` returns
+null for a deactivated person, so every policy written in terms of a role or a
+permission already refused them — but the **own-row** policies matched on
+`auth.uid()` alone. Somebody dismissed this morning could still read, this
+afternoon: their own daily rate, address and emergency contact; their own
+permission list; and their own payslips, attendance, cash advances and
+deductions.
+
+Migration `0015` fixed the same defect on `sales`, `sale_lines` and
+`void_requests`. `0016` is the rest of it, found by listing **every** policy
+whose predicate reaches `auth.uid()` and **every `SECURITY DEFINER` helper that
+resolves the caller**, in a real database, rather than by looking where a test
+happened to fail.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| Five tables that never mention `auth.uid()` | Fixed in **one place**: `my_staff_id()`. It is `SECURITY DEFINER`, so it bypasses RLS on `staff` and answered for anybody whose profile id matched, active or not. `payroll_weeks`, `payroll_days`, `attendance_entries`, `cash_advances` and `advance_deductions` all compare against it, so guarding the helper closes all five | `my_staff_id()` in `0016` |
+| `staff_read_own`, `user_permissions_read_self` | Guarded with `current_role_name() is not null`, the same shape `0015` used | The policies in `0016` |
+| `profiles_read_self` | **Deliberately left open.** It is the row the app reads to discover the account is inactive — `getSignedInUser()` reads `status` from it and sends the person to "your account is no longer active". Guarding it would make a dismissed person's own name unreadable to the very screen trying to explain the situation, and they would get a blank "signed out" instead. It carries their own username and name and nothing about anybody else | Add the same clause if that message is ever worth losing |
+| `stock_movements_insert` | **Nothing to do.** It looks unguarded and is not: its check goes through `has_permission()`, which is already false for a deactivated account | — |
+
+**A `SECURITY DEFINER` helper must check the caller itself.** This is the third
+time that rule has come up — after the `*_has_history` functions and
+`is_active_staff` — and it is the same lesson each time: being `SECURITY
+DEFINER` is exactly what makes the check mandatory rather than optional,
+because nothing above it will do the check on the way past.
+
+**The test runs every check twice**
+(`supabase/tests/13_deactivated_account.test.sql`): once while the account is
+active, to prove the policies still serve the people they are meant to, and
+once after it is deactivated with the same live token. A test that only
+checked the second half would pass just as well on a policy that refuses
+everybody.
+
+---
+
 ## Assumptions I am working under
 
 Where the spec gives a default, I use it and note it here rather than stopping
