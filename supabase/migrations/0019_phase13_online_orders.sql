@@ -1,4 +1,4 @@
--- Phase 12: Dabz Apparel online orders (docs/spec.md).
+-- Phase 13: Dabz Apparel online orders (docs/spec.md).
 --
 -- WHAT THIS IS
 --

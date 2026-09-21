@@ -967,3 +967,53 @@ to ask:
   `supabase_migrations.schema_migrations` directly and compare it with the
   files, which would answer the whole question at once and need a route that
   can see that schema.
+
+- **21 September 2026 — the production report: an item is a line on the job
+  order, and a project is its least advanced item.** You asked for a category
+  where every project can be opened and each item marked off through design,
+  colour test, pattern, print, heat press, fabric cutting, sewing, quality
+  checking, packaging and ready, with the project's own status summed from
+  them. Six things inside that were decided here rather than asked about.
+  **An "item" is a line on the job order — "18 full sublimation jerseys" — and
+  not one player's shirt.** A batch of one design is printed together, pressed
+  together and sewn together, and ten ticks against each of eighteen names is
+  180 boxes nobody would keep up to date at the counter; marking the line is
+  what the shop actually does. To change it, the marks would move from
+  `apparel_order_lines` to `apparel_order_names` and `ProductionItem` in
+  `src/lib/production.ts` would be built from the roster instead — everything
+  above it, the sum included, would work unchanged. **The sum is a minimum, not
+  an average.** A project is only as far along as its least advanced item,
+  because the customer collects all of it at once; an average would read as 90%
+  while the jacket nobody has started is the whole truth about when the job is
+  ready. **A bench ticked past a gap is reported, never counted backwards.**
+  Ticking Sewing says the sewing is done and says nothing about the printing,
+  so the run of benches marked *from the start* is what the project rolls up
+  on, and the blank ones behind a later tick are named on screen. Filling them
+  in would be the system deciding on no evidence that a bench nobody marked had
+  finished — and the one it invented could be the colour test on a job about to
+  be printed wrong. **Nothing about the status is stored**: no project stage
+  column, no nightly job, and the Phase 12 security test fails if such a column
+  ever appears. It is worked out from the marks every time a screen is opened,
+  the same choice as an order's total, a payslip and a report. **A tick is
+  removed when it was wrong**, rather than answered with an opposite row the
+  way a ledger entry is voided and a stock movement is reversed. Those are
+  money and the history is the point; a production mark is a statement about
+  where the work is right now, and the honest correction to "the printing is
+  done" when it is not is to stop saying it. The history is kept in the audit
+  log, which is written on every change and which nobody can edit. **The ten
+  benches are a constant, not a setting** (`PRODUCTION_STAGES` in
+  `src/lib/production.ts`), because they are your own process rather than a
+  figure only you can know. Adding an eleventh means editing that list *and*
+  the check constraint in `0018_phase12_production.sql`; a test reads the
+  migration and fails if the two ever stop agreeing about how a bench is
+  spelled.
+- **The production report and the job order are allowed to disagree, and the
+  disagreement is shown.** The counter moves an order to "Ready for pickup";
+  the shop floor ticks the benches. Nothing makes them agree, and either one
+  can be the one that is behind — so when they differ, both screens say so and
+  neither is changed. Deriving one from the other was the obvious alternative
+  and it is wrong in both directions: an order that moved itself to Ready
+  because the last box was ticked would have a customer called in before
+  anybody had looked at the work, and a project forced to "In production"
+  because the order says so would overwrite what the person at the bench
+  actually reported.

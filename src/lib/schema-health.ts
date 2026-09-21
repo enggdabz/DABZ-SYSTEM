@@ -147,6 +147,11 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0016_phase11_notifications",
     breaks: "notifications on your phone",
   })),
+  ...["apparel_production_steps"].map((name) => ({
+    name,
+    migration: "0018_phase12_production",
+    breaks: "the production report - where each item on a project has got to",
+  })),
   ...[
     "online_categories",
     "online_design_products",
@@ -168,8 +173,8 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     "online_rate_events",
   ].map((name) => ({
     name,
-    migration: "0018_phase12_online_orders",
-    breaks: "the online shop, its orders, the production board and the order calendar",
+    migration: "0019_phase13_online_orders",
+    breaks: "the online shop, its orders, the production board and the order calendar"
   })),
 ];
 
@@ -231,7 +236,7 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
   {
     name: "app_settings",
     column: "online_min_days_ahead",
-    migration: "0018_phase12_online_orders",
+    migration: "0019_phase13_online_orders",
     breaks: "the online shop's own settings, and saving any other setting",
   },
   {
@@ -243,7 +248,7 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     */
     name: "customers",
     column: "messenger_psid",
-    migration: "0018_phase12_online_orders",
+    migration: "0019_phase13_online_orders",
     breaks: "linking a customer to their Messenger chat later on",
   },
 ];

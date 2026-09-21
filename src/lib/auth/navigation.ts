@@ -60,29 +60,46 @@ export const NAV_SECTIONS: NavSection[] = [
     phase: 6,
   },
   /*
-    The online shop's orders (Phase 12). They are Dabz Apparel's work, so the
-    permission is the same one that opens the job orders - a person trusted
-    with those is the person who runs these.
+    The production report: the same projects again, but by bench rather than
+    by day. It sits here for the same reason the calendar does - it is opened
+    on the shop floor, several times a day, and it is the same job orders.
+  */
+  {
+    href: "/production",
+    label: "Production report",
+    permission: "apparel_job_orders",
+    group: "Daily",
+    phase: 12,
+  },
+
+  /*
+    The online shop's orders (Phase 13). They are Dabz Apparel's work too, so
+    the permission is the same one that opens the job orders - a person
+    trusted with those is the person who runs these.
 
     Two entries, not six. The module has its own tab bar (Orders, Production,
     Calendar, Reports, Products, Designs) because that is how docs/spec.md 9
-    lays it out, and six more links in a rail that already holds twenty-three
+    lays it out, and six more links in a rail that already holds twenty-four
     would bury the ones the counter uses every hour. These two are the ones
     somebody opens without being sent there.
+
+    "Online production" rather than "Production board": the board above is the
+    shop's benches, this one is the online orders' steps, and two links a
+    finger apart both called Production would send somebody to the wrong one.
   */
   {
     href: "/online-orders",
     label: "Online orders",
     permission: "apparel_job_orders",
     group: "Daily",
-    phase: 12,
+    phase: 13,
   },
   {
     href: "/online-orders/production",
-    label: "Production board",
+    label: "Online production",
     permission: "apparel_job_orders",
     group: "Daily",
-    phase: 12,
+    phase: 13,
   },
   { href: "/repairs", label: "Repairs", permission: "dabztech_tickets", group: "Daily", phase: 7 },
   { href: "/customers", label: "Customers", group: "Daily", phase: 4 },
@@ -102,7 +119,7 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Online shop",
     ownerOrAdminOnly: true,
     group: "Manage",
-    phase: 12,
+    phase: 13,
   },
   { href: "/accounts", label: "Accounts", ownerOrAdminOnly: true, group: "Manage", phase: 1 },
   { href: "/activity", label: "Activity", ownerOrAdminOnly: true, group: "Manage", phase: 1 },

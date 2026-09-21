@@ -52,8 +52,10 @@ quiet "$HERE/../migrations/0015_phase10_collections.sql"
 quiet "$HERE/../migrations/0016_phase11_notifications.sql"
 # 0017 closes the own-row reads a deactivated account still had - 14 tests it.
 quiet "$HERE/../migrations/0017_deactivated_account_reads_nothing.sql"
-# 0018 is the online shop and its orders - 15 tests it.
-quiet "$HERE/../migrations/0018_phase12_online_orders.sql"
+# 0018 adds the production marks - 15 tests them.
+quiet "$HERE/../migrations/0018_phase12_production.sql"
+# 0019 is the online shop and its orders - 16 tests it.
+quiet "$HERE/../migrations/0019_phase13_online_orders.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -72,4 +74,5 @@ run "$HERE/11_delete_rules.test.sql"
 run "$HERE/12_phase10_rls.test.sql"
 run "$HERE/13_phase11_rls.test.sql"
 run "$HERE/14_deactivated_account.test.sql"
-run "$HERE/15_online_orders_rls.test.sql"
+run "$HERE/15_phase12_rls.test.sql"
+run "$HERE/16_online_orders_rls.test.sql"

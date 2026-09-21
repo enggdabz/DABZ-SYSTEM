@@ -90,7 +90,7 @@ export default async function PublicHomePage() {
 
         <div className="mt-8 flex flex-wrap gap-3">
           {/*
-            The way into the online shop (Phase 12). First, and shaped like the
+            The way into the online shop (Phase 13). First, and shaped like the
             main action, because it is the one thing on this page a customer
             can finish by themselves - everything else here ends in a message
             somebody has to answer.

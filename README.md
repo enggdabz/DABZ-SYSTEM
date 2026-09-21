@@ -259,7 +259,7 @@ red is the Dabz brand colour and a red label would look like a button
 - [docs/PHASES.md](docs/PHASES.md) — the build phases and current progress
 - [docs/DECISIONS.md](docs/DECISIONS.md) — open questions for the owner
 
-The online shop (Phase 12) has its own three:
+The online shop (Phase 13) has its own three:
 
 - [docs/spec.md](docs/spec.md) — its specification, which is the source of truth
 - [docs/open-questions.md](docs/open-questions.md) — what is waiting on the

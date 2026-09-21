@@ -20,7 +20,7 @@ import { describe, expect, it } from "vitest";
  */
 
 /**
- * Every page a CUSTOMER sees. The online shop (Phase 12) is on this list for
+ * Every page a CUSTOMER sees. The online shop (Phase 13) is on this list for
  * the same reason the public page is: it prints what the owner has filled in
  * and leaves out what they have not, and the gap has to surface somewhere
  * they will look.

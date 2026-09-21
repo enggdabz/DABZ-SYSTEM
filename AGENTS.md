@@ -61,9 +61,9 @@ receiving code.
   `supabase_migrations.schema_migrations` so none can run twice. The `0000`-
   style four-digit prefixes are accepted as versions and sort before any later
   `supabase migration new` timestamp, so both naming styles can coexist. Verified
-  by pushing all eighteen to a throwaway PostgreSQL and then running the whole
-  RLS suite against the result: 43 tables and one view, 333 checks, identical
-  to `run.sh`.
+  by pushing all twenty to a throwaway PostgreSQL and then running the whole
+  RLS suite against the result: 60 tables and three views, 415 checks,
+  identical to `run.sh`.
 - **CI runs all of it on every push and pull request** (`.github/workflows/ci.yml`):
   lint, typecheck, unit tests, the security rules and the schema checker, then
   the build. The security rules and the schema checker need a real PostgreSQL,
@@ -565,7 +565,7 @@ round trip is the one thing that must be tried against a real project.
   invalidates every phone already turned on. Until both exist, Settings says
   so and offers no button, the same as every figure only the owner can supply.
 
-## Online orders rules (built in Phase 12)
+## Online orders rules (built in Phase 13)
 
 The module has its own specification: read `docs/spec.md`, then
 `docs/open-questions.md` for every place it was mapped onto the rules above.
@@ -580,7 +580,7 @@ The module has its own specification: read `docs/spec.md`, then
 - **No `online_*` order table has an insert, update or delete policy, for
   anybody.** Every write goes through a `SECURITY DEFINER` function that checks
   the caller itself and writes the order, its money and its history in one
-  transaction. `15_online_orders_rls.test.sql` fails if a write policy appears.
+  transaction. `16_online_orders_rls.test.sql` fails if a write policy appears.
 - **`create_online_order` trusts nothing the caller sends.** It re-reads the
   product, its category, its path, its price and its minimum out of the
   database; derives the quantity from the roster or the size tally rather than
@@ -614,7 +614,7 @@ The module has its own specification: read `docs/spec.md`, then
   day full and Reports show no meter until somebody says. Both are on the To
   fill in screen. The specification's sample 60 and ₱100,000 are sample data,
   which `docs/spec.md` 0.4 says so itself.
-- **Nothing in Phase 12 writes to the ledger.** A payment on an online order is
+- **Nothing in Phase 13 writes to the ledger.** A payment on an online order is
   recorded against the order and nowhere else, so the three sanctioned ways
   money reaches the ledger stay three. Joining them up is a decision about the
   books, not a detail - see `docs/open-questions.md`.

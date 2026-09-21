@@ -17,7 +17,7 @@ export const PUBLIC_PATHS = [
   "/",
   "/login",
   "/setup",
-  // The online shop (Phase 12): the catalogue, a product, the order, the
+  // The online shop (Phase 13): the catalogue, a product, the order, the
   // checkout, the receipt and track-my-order. Every one of them is for
   // somebody who is nobody, and the writes behind them are validated and
   // rate-limited in the Server Actions rather than guarded here.

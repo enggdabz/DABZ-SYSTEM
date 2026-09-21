@@ -35,7 +35,7 @@ wired up". Everything else in that table is done.
 
 The code is deployed the moment the branch merges; the database is not.
 
-1. **`npm run db:push`** applies `0018`, which creates sixteen tables, two
+1. **`npm run db:push`** applies `0019`, which creates sixteen tables, two
    views, three storage buckets and the six new settings columns. Then open
    **System check** (`/system`) — it now asks the live database about every one
    of them by name.
@@ -85,7 +85,7 @@ The code is deployed the moment the branch merges; the database is not.
 The same five commands as the rest of the system (`AGENTS.md`):
 
 ```bash
-npm test              # 1,021 unit tests, 256 of them this module's
+npm test              # 1,054 unit tests, 262 of them this module's
 npm run test:rls      # the security rules against a real PostgreSQL
 npm run check:schema  # every table and column the app asks for exists
 npm run typecheck && npm run lint && npm run build

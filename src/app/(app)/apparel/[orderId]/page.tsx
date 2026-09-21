@@ -20,8 +20,10 @@ import {
   getVoidedPayments,
 } from "@/lib/data/apparel";
 import { getCustomers } from "@/lib/data/pos";
+import { getProductionSteps, productionFor } from "@/lib/data/production";
 import { MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { formatPesos } from "@/lib/money";
+import { projectStatusLabel } from "@/lib/production";
 import { formatCivilDate, parseISODate, civilDateToISO, manilaToday } from "@/lib/period";
 
 import {
@@ -55,7 +57,7 @@ export default async function ApparelOrderPage({
 
   const { orderId } = await params;
 
-  const [detail, products, options, sizes, customers, settings, voided] =
+  const [detail, products, options, sizes, customers, settings, voided, marks] =
     await Promise.all([
       getApparelOrder(orderId),
       getApparelProducts(),
@@ -64,6 +66,7 @@ export default async function ApparelOrderPage({
       getCustomers(),
       getSettings(),
       getVoidedPayments(orderId),
+      getProductionSteps(),
     ]);
 
   if (!detail) notFound();
@@ -82,6 +85,14 @@ export default async function ApparelOrderPage({
     .map((size) => size.size);
 
   const stepIndex = ORDER_FLOW.indexOf(order.status);
+
+  /*
+    Where the shop floor says the work has got to, which is a different
+    question from the step above: that one is the order's own journey through
+    the counter, this one is its items' journey through the benches. Both are
+    shown, and neither is derived from the other - see src/lib/production.ts.
+  */
+  const production = productionFor(detail, marks.steps);
 
   return (
     <div className="space-y-8">
@@ -147,6 +158,41 @@ export default async function ApparelOrderPage({
             </li>
           ))}
         </ol>
+
+        <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-line/60 pt-4 text-sm">
+          <span className="font-medium">On the bench:</span>
+          {marks.failed ? (
+            <span className="text-attention">
+              <span aria-hidden="true">{"⚠"} </span>
+              not known &mdash; the benches could not be read
+            </span>
+          ) : (
+            <>
+              <Tag
+                tone={
+                  production.complete
+                    ? "success"
+                    : production.noItems || production.stage === null
+                      ? "neutral"
+                      : "accent"
+                }
+              >
+                {projectStatusLabel(production)}
+              </Tag>
+              <span className="text-muted">
+                {production.noItems
+                  ? "nothing being made yet"
+                  : `${production.marksDone} of ${production.marksTotal} benches marked`}
+              </span>
+            </>
+          )}
+          <Link
+            href={`/production/${order.id}`}
+            className={`underline underline-offset-2 ${TAP_AREA}`}
+          >
+            Open the production report
+          </Link>
+        </div>
 
         {order.layoutNote ? (
           <p className="mt-4 text-sm text-ink/80">
