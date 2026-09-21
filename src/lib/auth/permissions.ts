@@ -100,6 +100,28 @@ export function isOwnerOrAdmin(actor: Actor | null): boolean {
 }
 
 /** Only the Owner may create or remove Admins (spec 4.2). */
+/**
+ * How this person sees the three doors' money, for `doorVisibility`.
+ *
+ * Built here rather than at each call site so a screen, a Server Action and
+ * the Overview card cannot answer the same question three different ways -
+ * which is exactly how the counter came to be treated as fully visible on one
+ * screen and own-sales-only in the policies underneath it.
+ */
+export function doorViewer(actor: Actor | null): {
+  isOwnerOrAdmin: boolean;
+  canViewDailySalesReport: boolean;
+  canApparelJobOrders: boolean;
+  canDabztechTickets: boolean;
+} {
+  return {
+    isOwnerOrAdmin: isOwnerOrAdmin(actor),
+    canViewDailySalesReport: can(actor, "view_daily_sales_report"),
+    canApparelJobOrders: can(actor, "apparel_job_orders"),
+    canDabztechTickets: can(actor, "dabztech_tickets"),
+  };
+}
+
 export function canManageAdmins(actor: Actor | null): boolean {
   return !!actor && actor.status === "active" && actor.role === "owner";
 }

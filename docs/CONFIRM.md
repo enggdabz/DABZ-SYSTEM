@@ -1,16 +1,17 @@
 # Confirming what has been built
 
-Eight phases are finished and **waiting on you to confirm they work** — 4, 5,
-6, 7, 8, 9, 10 and 11. Until they are confirmed the build plan says the next phase does
-not start, so this page exists to make confirming them a job you can actually
-finish rather than a vague one you keep putting off.
+**Phases 4 to 10 were confirmed on 21 September 2026.** You used them and said
+they work, and the build plan records the date. Nothing on this page is
+outstanding for them any more.
 
-Each phase's full write-up lives in [PHASES.md](PHASES.md). This is only the
-checking part, pulled into one place and put in order.
+**Phase 11 — notifications — is the one still waiting.** Its steps are at the
+bottom, and it needs more setting up than the others did: two keys and a cron
+secret before anything can arrive.
 
-**It should take about an hour.** Do it in one sitting if you can, because the
-phases build on each other — the sale you ring up in Phase 4 is the one you
-look for in Phase 8's report.
+This page stays for two reasons beyond that. It is the shortest way to re-check
+an older phase if one ever starts behaving oddly, and it carries three
+corrections to the older instructions in [PHASES.md](PHASES.md) that would
+otherwise send you down a blind alley.
 
 ---
 
@@ -20,7 +21,7 @@ look for in Phase 8's report.
 git pull
 npm install
 npm run db:push     # applies all 17 migrations, in order
-npm test            # expect: 628 passed
+npm test            # expect: 645 passed
 npm run dev
 ```
 
@@ -33,31 +34,31 @@ written before these were true:
   migration in order and records each one, so none can run twice.
 - **Ignore the per-phase test counts in PHASES.md.** Each says what was true on
   the day it was written — 234, 270, 339, and so on. There is one number now
-  and it is **628**. A phase that says "expect: 270 passed" is not broken.
+  and it is **645**. A phase that says "expect: 270 passed" is not broken.
 
-If `npm test` does not say 628, stop and tell me before going further. Nothing
+If `npm test` does not say 645, stop and tell me before going further. Nothing
 below is worth checking against a broken build.
 
 ---
 
 ## How to use this page
 
-Work down it. After each phase, tick it off here or just tell me "4 to 7 are
-good" — what I need is the phases you have actually exercised, so the build
-plan stops saying *waiting on owner to confirm*.
+Only Phase 11 is outstanding. The seven above are kept as a record of what was
+checked, and as the quickest way back if one of them ever starts behaving
+oddly.
 
 **If something is wrong, stop at that phase and tell me what you saw.** Do not
 work around it. A phase that half works is worth more to me as a precise
 complaint than as a tick.
 
-- [ ] Phase 4 — Counter and customers
-- [ ] Phase 5 — Expenses, stocks, supplier payables
-- [ ] Phase 6 — Dabz Apparel job orders
-- [ ] Phase 7 — DabzTech repair tickets
-- [ ] Phase 8 — Reports
-- [ ] Phase 9 — The public page and customer messages
-- [ ] Phase 10 — One counter, all three divisions
-- [ ] Phase 11 — Notifications on your phone
+- [x] Phase 4 — Counter and customers — *confirmed 21 Sep 2026*
+- [x] Phase 5 — Expenses, stocks, supplier payables — *confirmed 21 Sep 2026*
+- [x] Phase 6 — Dabz Apparel job orders — *confirmed 21 Sep 2026*
+- [x] Phase 7 — DabzTech repair tickets — *confirmed 21 Sep 2026*
+- [x] Phase 8 — Reports — *confirmed 21 Sep 2026*
+- [x] Phase 9 — The public page and customer messages — *confirmed 21 Sep 2026*
+- [x] Phase 10 — One counter, all three divisions — *confirmed 21 Sep 2026*
+- [ ] **Phase 11 — Notifications on your phone**
 
 ---
 
@@ -281,7 +282,7 @@ things need your eyes, because no test can see either:
 - The **breakdown table** on End of day. At 390px it should be a stack of cards,
   one per division; from tablet width up, a real table.
 
-Everything else in Phase 10 is covered by the 628 unit tests and the 319
+Everything else in Phase 10 is covered by the 645 unit tests and the 319
 security checks.
 
 **Phase 11 has a bigger gap, and it is named in its own section of
@@ -293,9 +294,10 @@ real handset. Phase 11's steps walk you through it.
 
 ## When you are done
 
-Tell me which phases passed. I will mark them in the build plan, and then the
-next phase can start — the plan's own first line is *"a phase does not start
-until the owner has confirmed the previous one works."*
+Tell me whether Phase 11 works and I will record the date in the build plan,
+the way phases 4 to 10 were recorded.
 
-If any of them failed, tell me what you saw and I will fix that before anything
-new is built.
+If it failed, tell me what you saw. Notifications have more places to go wrong
+than anything built so far — the keys, the cron secret, the browser's
+permission, and on an iPhone the Home Screen step — so "it did not arrive" is
+worth reporting with which of those you got through.

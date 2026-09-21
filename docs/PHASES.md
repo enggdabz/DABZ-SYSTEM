@@ -11,25 +11,20 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ Done |
 | 2 | Bills, loans, ledger, Overview (the money side) | ✅ Done |
 | 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ Done |
-| 4 | Customers + Dabz Printshoppe POS | ✅ **Done — waiting on owner to confirm** |
-| 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — waiting on owner to confirm** |
-| 6 | Dabz Apparel job orders | ✅ **Done — waiting on owner to confirm** |
-| 7 | DabzTech Solutions job tickets | ✅ **Done — waiting on owner to confirm** |
-| 8 | Reports | ✅ **Done — waiting on owner to confirm** |
-| 9 | The public page and customer messages | ✅ **Done — waiting on owner to confirm** |
-| 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — waiting on owner to confirm** |
+| 4 | Customers + Dabz Printshoppe POS | ✅ **Done — confirmed 21 Sep 2026** |
+| 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — confirmed 21 Sep 2026** |
+| 6 | Dabz Apparel job orders | ✅ **Done — confirmed 21 Sep 2026** |
+| 7 | DabzTech Solutions job tickets | ✅ **Done — confirmed 21 Sep 2026** |
+| 8 | Reports | ✅ **Done — confirmed 21 Sep 2026** |
+| 9 | The public page and customer messages | ✅ **Done — confirmed 21 Sep 2026** |
+| 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — confirmed 21 Sep 2026** |
 | 11 | Notifications: the shop's warnings on your phone | ✅ **Done — waiting on owner to confirm** |
 | — | Later: Messenger API, Meta Ads tracking, chatbot | Not in first build |
 
-**Eight of those are waiting on you.** Phases 4 to 11 are built and tested but
-nobody has exercised them against the real shop data yet.
-[CONFIRM.md](CONFIRM.md) is every one of their "How to check it" steps pulled
-into a single ordered list, with the setup done once at the top instead of
-seven times — about an hour, start to finish. The per-phase steps further down
-this page are still correct about what to look at, but two things in them have
-since gone stale: the migration is applied with `npm run db:push` rather than
-pasted into the Supabase SQL editor, and the expected test count is 592, not
-the number each phase recorded on the day it was written.
+**"Confirmed" means the owner has used the phase and says it works.** It is not
+a claim that every hand-check under that phase has been done — where a phase
+ends with something still to check by hand, that note stands, and Phase 10's
+four-width browser check is one.
 
 ---
 
@@ -1725,7 +1720,7 @@ them was that **you had to open a screen to find out**.
 
 | What | How | Result |
 |---|---|---|
-| The digest logic: silence when quiet, order, plurals, truncation, the send verdicts | `npm test` | 628 tests (36 new in `notifications.test.ts`) |
+| The digest logic: silence when quiet, order, plurals, truncation, the send verdicts | `npm test` | 645 tests (36 new in `notifications.test.ts`) |
 | The security rules, against a real PostgreSQL | `npm run test:rls` | 319 checks (was 301) |
 | That every table and column the app asks for exists | `npm run check:schema` | 43 tables and one view |
 | Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
@@ -1747,7 +1742,7 @@ This is a bigger gap than usual, so it is worth being plain about:
 npm install
 npm run db:push     # applies 0016
 npm run push:keys   # ONCE - then paste both keys into .env.local and Vercel
-npm test            # expect: 628 passed
+npm test            # expect: 645 passed
 npm run dev
 ```
 

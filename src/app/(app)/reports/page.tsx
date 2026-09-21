@@ -282,6 +282,24 @@ export default async function ReportsPage({
           title="Collections by division and kind"
           description="Which door the money came through, and what it was for. The card above splits income by what was SOLD; this splits it by how it was taken."
         >
+          {/*
+            A short read is said out loud here, beside the figures, not left
+            for somebody to notice. The income card above covers the whole
+            range, so a truncated block below it would simply look like the
+            two disagreeing.
+          */}
+          {collections.partial ? (
+            <div className="mb-5">
+              <Notice tone="attention" title="These figures are not the whole period">
+                <p>
+                  There were more payments in this period than one report
+                  reads, so the amounts below are a floor rather than a total.
+                  The income figures above are unaffected. Run a shorter
+                  period to see all of it.
+                </p>
+              </Notice>
+            </div>
+          ) : null}
           {/* Phone: a block per line. Eight columns will not fit at 390px. */}
           <ul className="space-y-4 sm:hidden">
             {collections.lines.map((line) => (

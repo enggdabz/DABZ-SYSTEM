@@ -10,7 +10,11 @@ import "server-only";
  */
 import { cache } from "react";
 
-import { collectionsReport, type CollectionsReport } from "@/lib/collections";
+import {
+  collectionsReport,
+  isPartialRead,
+  type CollectionsReport,
+} from "@/lib/collections";
 import { getApparelOrders } from "@/lib/data/apparel";
 import { getCollections } from "@/lib/data/collections";
 import { getPayables } from "@/lib/data/expenses";
@@ -79,14 +83,28 @@ export async function getReport(range: ReportRange): Promise<PeriodReport> {
  * Both are readings of the same money, and they agree - the SQL suite asserts
  * that the feed's totals per method equal the ledger's for any day.
  */
+/** How many payments one report reads. Past this it says it is short. */
+export const COLLECTIONS_REPORT_LIMIT = 5000;
+
 export async function getCollectionsReport(
   range: ReportRange,
 ): Promise<CollectionsReport> {
   const window = utcWindow(range);
 
-  return collectionsReport(
-    await getCollections({ from: window.from, to: window.to, limit: 5000 }),
-  );
+  /*
+    The cap is a real limit, not a formality: a year of a busy shop can run
+    past it. So the read says whether it hit the cap, and that travels onto
+    the report as `partial` - the screen, the print view and the CSV all say
+    the figures are short rather than printing a total that is quietly wrong
+    beside income figures that cover the whole range.
+  */
+  const read = await getCollections({
+    from: window.from,
+    to: window.to,
+    limit: COLLECTIONS_REPORT_LIMIT,
+  });
+
+  return collectionsReport(read.rows, { partial: isPartialRead(read) });
 }
 
 /** The same report for the period before, so the two can be compared. */
