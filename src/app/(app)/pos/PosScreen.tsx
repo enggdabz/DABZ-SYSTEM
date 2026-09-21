@@ -91,6 +91,13 @@ export function PosScreen({
   const [showCustomer, setShowCustomer] = useState(false);
   const [customerId, setCustomerId] = useState<string>("");
   const [showNewProduct, setShowNewProduct] = useState(false);
+  /*
+    `useActionState` holds its result until the NEXT submit, so nothing the
+    screen does - a refresh included - takes the completed sale away by itself.
+    Remembering which sale has been acknowledged is what lets "Start the next
+    sale" get back to a blank counter.
+  */
+  const [finishedSaleId, setFinishedSaleId] = useState<string | null>(null);
 
   const totals = useMemo(() => {
     const discount =
@@ -139,6 +146,7 @@ export function PosScreen({
 
   function clearSale() {
     setLines([]);
+    setPendingProduct(null);
     setDiscountKind("none");
     setDiscountValue("");
     setMoneyGiven("");
@@ -146,9 +154,18 @@ export function PosScreen({
     setPaymentMethod("cash");
   }
 
+  // Back to a blank counter (spec 6): the last customer's items go, and the
+  // refresh picks up anything the sale changed on the server - stock levels,
+  // a product added mid-sale.
+  function startNextSale(saleId: string) {
+    clearSale();
+    setFinishedSaleId(saleId);
+    router.refresh();
+  }
+
   // Once the sale is saved the screen clears itself and offers the receipt
   // (spec 6), rather than leaving the last customer's items on screen.
-  if (state.completed) {
+  if (state.completed && state.completed.saleId !== finishedSaleId) {
     return (
       <div className="mx-auto max-w-lg space-y-5 py-10 text-center">
         <p className="text-sm font-medium text-muted">Sale complete</p>
@@ -170,7 +187,11 @@ export function PosScreen({
           >
             Print the receipt
           </Button>
-          <Button type="button" variant="secondary" onClick={() => router.refresh()}>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => startNextSale(state.completed!.saleId)}
+          >
             Start the next sale
           </Button>
         </div>
