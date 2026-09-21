@@ -14,6 +14,7 @@ import {
   partialReadWarning,
   paymentKindLabel,
   receiptFigures,
+  salesDay,
   searchPayableJobs,
   seesWholeDay,
   totalsByDivision,
@@ -726,5 +727,85 @@ describe("doorVisibility", () => {
         }),
       ),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Which day the Sales screen is showing
+// ---------------------------------------------------------------------------
+
+const TODAY = { year: 2026, month: 9, day: 21 };
+
+describe("salesDay", () => {
+  it("shows today when nothing is asked for", () => {
+    const day = salesDay(undefined, TODAY);
+
+    expect(day.date).toEqual(TODAY);
+    expect(day.iso).toBe("2026-09-21");
+    expect(day.isToday).toBe(true);
+    expect(day.isFuture).toBe(false);
+  });
+
+  it("falls back to today rather than refusing an unreadable date", () => {
+    // Somebody typed into an address bar. The heading says which day is being
+    // shown either way, so nothing is silently wrong.
+    for (const asked of ["", "yesterday", "21-09-2026", "2026-13-01", "2026-02-30"]) {
+      expect(salesDay(asked, TODAY).isToday).toBe(true);
+    }
+  });
+
+  it("opens the day it is asked for", () => {
+    const day = salesDay("2026-09-18", TODAY);
+
+    expect(day.date).toEqual({ year: 2026, month: 9, day: 18 });
+    expect(day.isToday).toBe(false);
+    expect(day.isFuture).toBe(false);
+  });
+
+  it("offers the day either side of a past day", () => {
+    const day = salesDay("2026-09-18", TODAY);
+
+    expect(day.previous).toEqual({ year: 2026, month: 9, day: 17 });
+    expect(day.next).toEqual({ year: 2026, month: 9, day: 19 });
+  });
+
+  it("walks forward to today and no further", () => {
+    // Tomorrow cannot have taken anything, so there is nothing to walk to.
+    expect(salesDay("2026-09-20", TODAY).next).toEqual(TODAY);
+    expect(salesDay("2026-09-21", TODAY).next).toBeNull();
+  });
+
+  it("always offers the day before, even on today", () => {
+    expect(salesDay(undefined, TODAY).previous).toEqual({
+      year: 2026,
+      month: 9,
+      day: 20,
+    });
+  });
+
+  it("crosses the end of a month backwards", () => {
+    expect(salesDay("2026-10-01", { year: 2026, month: 10, day: 5 }).previous).toEqual({
+      year: 2026,
+      month: 9,
+      day: 30,
+    });
+  });
+
+  it("crosses the end of a year backwards", () => {
+    expect(salesDay("2027-01-01", { year: 2027, month: 1, day: 3 }).previous).toEqual({
+      year: 2026,
+      month: 12,
+      day: 31,
+    });
+  });
+
+  it("marks a day that has not happened as future, not as empty", () => {
+    // An empty future day is empty because of the calendar, not because the
+    // shop took nothing - and the screen has to say the difference.
+    const day = salesDay("2026-09-22", TODAY);
+
+    expect(day.isFuture).toBe(true);
+    expect(day.isToday).toBe(false);
+    expect(day.next).toBeNull();
   });
 });

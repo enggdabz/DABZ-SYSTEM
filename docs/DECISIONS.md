@@ -378,6 +378,49 @@ a claim. `target.ts` has `unknown`, the closing columns are nullable, a bill
 with no due day stays empty. A read that could not see everything belongs in
 the same family, and now says so out loud.
 
+## Decided after Phase 10 — Sales shows one day, and says which
+
+**What happened.** The owner opened Sales on the morning of 21 September, saw
+**PHP 0.00** under Collected today, Counter, Apparel and DabzTech, and asked me
+to fix it because the sales "have been reset".
+
+Nothing had been reset. The screen read **today and only today**, with no way
+to ask for another day: no arrows, no date box, no `?on=` in the URL. Before the
+first customer of the day, every figure on a screen called "Sales" is honestly
+zero — and from the outside that is indistinguishable from the shop's takings
+having been wiped. The empty state made it worse by saying "Nothing has been
+taken yet today" and stopping there, which answers a question nobody was
+asking.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| Which day Sales shows | Whichever `?on=YYYY-MM-DD` names, and today when it names none | `salesDay` in `src/lib/collections.ts`, with tests beside it |
+| What a bare `/sales` means | **Today, always.** Today carries no parameter at all, so a link saved this morning still opens on the right day tomorrow and the sidebar needs no special case | `salesHref` in `src/app/(app)/sales/page.tsx` |
+| An unreadable date in the URL | Falls back to today rather than refusing to draw. The heading always names the day being shown, so nothing is silently wrong | `salesDay` |
+| How far forward you can go | **Today.** There is no forward arrow on today, because tomorrow cannot have taken anything and a button that leads nowhere is tapped once and trusted less afterwards | `next` in `salesDay` |
+| A day typed in that has not happened | Says "has not happened yet" — **not** "nothing was taken". One is about the calendar, the other is a claim about the shop | `EmptyDay` in the Sales page |
+| What an empty day says | Which day it was empty on, and that this screen shows one day at a time with the earlier days still on their own days | `EmptyDay` |
+| Whether a filter survives a change of day | Yes, both ways. The door and the method ride along in the URL and as hidden fields on the date form | `hrefFor` in the Sales page |
+
+**Why the wording carries as much weight as the arrows.** The arrows fix "I
+cannot look at yesterday". They do not fix "I think my money is gone" — that
+needed a sentence, in the empty state, saying out loud that this is **one day**
+of a book that still has all its other days in it. It is the same rule the rest
+of the system already follows: a zero is a claim, and a claim has to say what
+it is a claim about.
+
+**What this deliberately does not do.** It does not turn Sales into a range
+report. A range that crosses days would make "Collected today" meaningless, and
+Reports already adds up a month with a comparison against the period before it.
+Sales stays a day at a time; it just stopped pretending there is only one day.
+
+**One consequence worth knowing.** `partialReadWarning` no longer says
+"Today's payments could not be read" — it says "The payments for this day",
+because the screen can now be pointed at any day. Overview still shows today
+only, and the wording is true there too.
+
+---
+
 ---
 
 ## Decided for Phase 11 — Notifications
