@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 
 import { diffFields, recordAudit } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
+import { isColumnMissingFromApi } from "@/lib/postgrest";
 import {
   settingsToRow,
   validateSettingsForm,
@@ -19,6 +20,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface SettingsFormState {
   error?: string;
+  /** The longer half, when knowing what to DO needs more than one line. */
+  errorDetail?: string;
   fieldErrors?: Record<string, string>;
   success?: string;
 }
@@ -35,6 +38,8 @@ export async function saveSettingsAction(
     workDayStart: String(formData.get("workDayStart") ?? ""),
     workDayEnd: String(formData.get("workDayEnd") ?? ""),
     autoLogoutMinutes: String(formData.get("autoLogoutMinutes") ?? ""),
+    // A checkbox sends nothing at all when it is unticked.
+    staffStaySignedIn: formData.get("staffStaySignedIn") !== null,
     staffExpenseApprovalLimitPesos: String(
       formData.get("staffExpenseApprovalLimitPesos") ?? "",
     ),
@@ -78,6 +83,25 @@ export async function saveSettingsAction(
     .eq("id", 1);
 
   if (error) {
+    /*
+      The form writes every column at once, so one column the database has not
+      got yet stops the whole screen saving - a setting typed months ago
+      included. That is worth its own message: the app deploys when a branch
+      merges, `npm run db:push` is run by hand afterwards, and in between this
+      is exactly what the owner sees.
+    */
+    if (isColumnMissingFromApi(error)) {
+      return {
+        error:
+          "Could not save the settings: your database is missing a column this version stores.",
+        errorDetail:
+          "Nothing was changed. In the Supabase SQL editor run " +
+          "notify pgrst, 'reload schema'; and if that does not help, the " +
+          "migrations have not been applied, so run npm run db:push. Then save " +
+          `again. [${error.message}]`,
+      };
+    }
+
     return { error: `Could not save the settings: ${error.message}` };
   }
 

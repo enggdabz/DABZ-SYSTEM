@@ -1407,6 +1407,75 @@ No migration to run. Then, in the app:
 
 ---
 
+## 21 September 2026 — staff stay signed in until they sign out
+
+**What you asked for:** stop throwing the counter staff back to the login
+screen in the middle of the day.
+
+**What was happening:** spec 4.1 asks for an idle sign-out, and the system
+applied it to everybody — fifteen minutes with nobody touching the screen and
+you are out. On a counter machine that sits between customers, that is several
+times a day, and each one costs a re-typed username and password with somebody
+waiting.
+
+**What was done:** the timer is now a question of *who*, not just *how long*.
+
+- **Staff accounts stay signed in until somebody signs out.** No timer is
+  started for them at all, so there is nothing that can fire by mistake.
+- **Owner and admin accounts keep the timer**, unchanged. Those are the
+  accounts that can open payroll, the ledger and the bills, and the counter
+  computer is shared — so the screen that matters most is still the one that
+  locks itself.
+- It is a **switch, not a removal**. Settings → *Keep staff accounts signed in
+  until they sign out*. Untick it and staff go straight back on the timer; the
+  minutes box beside it still sets the length, up to 480.
+- The footer on every screen says which rule you are under, so nobody has to
+  guess whether they are about to be signed out.
+
+Staff still cannot change this for themselves — it is a shop setting, Owner and
+Admin only, and a security test proves a staff account cannot flip it.
+
+**The honest trade-off:** a staff account left signed in on the counter machine
+stays open to whoever walks up to it. That is why the exemption stops at staff:
+a staff account cannot see bills, loans, the ledger, payroll or an enquiry, so
+what is exposed is the counter itself. **Use *Switch user* when you leave it.**
+
+**How to check it**
+
+```bash
+npm install
+npm test          # expect: 526 passed (6 new)
+npm run test:rls  # expect: 268 checks (267 before this, plus its 1)
+npm run db:push   # applies 0014_staff_stay_signed_in.sql
+```
+
+`npm run db:push` matters here — the switch is a column, and until it exists
+every account keeps the old timer.
+
+It matters in one more way worth knowing, because the app deploys the moment a
+branch merges while `db:push` is run by hand afterwards. The Settings form
+writes every column at once, so in between the two, **Settings cannot save at
+all** — not just the new box, the whole screen, including a figure typed months
+ago. It now says so in those words and names the command, rather than showing
+the raw *could not find the column* message. Nothing is changed when it
+refuses.
+
+Then, in the app:
+
+1. Sign in as the **owner**. The footer still reads *Signed out automatically
+   after 15 minutes of no activity*.
+2. Open **Settings**. Under *Rules and limits*, the new tick box is already
+   ticked.
+3. Sign in as a **staff** member on another browser. The footer now reads *You
+   stay signed in until you sign out*. Leave it alone past the idle minutes —
+   it is still there.
+4. Back as the owner, untick the box and save. The staff screen goes back to
+   the countdown wording on its next load.
+5. Leave the owner's own screen idle past fifteen minutes with the box ticked.
+   It still signs out — that half is deliberately unchanged.
+
+---
+
 ## Phase 10 — One counter, all three divisions ✅
 
 **Built**
@@ -1492,7 +1561,7 @@ still reaches the ledger through `complete_sale`, `record_apparel_payment` or
 - **A deactivated account could still read its own old sales.** Sign-in already
   refused them, so nothing leaked through a screen — but Row Level Security is
   the boundary and must not lean on the layer in front of it. Found by the new
-  Phase 10 test, closed in `0014`.
+  Phase 10 test, closed in `0015`.
 
 **What I decided and how to change it**
 
@@ -1514,8 +1583,8 @@ is unchanged.
 
 | What | How | Result |
 |---|---|---|
-| Feed totals, filters, breakdown, receipt figures, the counter's refusals, the CSV block | `npm test` | 580 tests (47 new in `collections.test.ts`) |
-| The security rules, against a real PostgreSQL | `npm run test:rls` | 300 checks (was 267) |
+| Feed totals, filters, breakdown, receipt figures, the counter's refusals, the CSV block | `npm test` | 592 tests (47 new in `collections.test.ts`) |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 301 checks (was 268) |
 | That every table and column the app asks for exists | `npm run check:schema` | 43 tables |
 | Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
 
@@ -1545,8 +1614,8 @@ have to fit a 390px phone.
 
 ```bash
 npm install
-npm run db:push   # applies 0014
-npm test          # expect: 580 passed
+npm run db:push   # applies 0015
+npm test          # expect: 592 passed
 npm run dev
 ```
 

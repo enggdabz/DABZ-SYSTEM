@@ -617,7 +617,7 @@ $$;
   A deactivated account sees nothing at all, whatever it was allowed before
   (spec 13.1).
 
-  This is the test that found the gap `0014` closes: `sales_read_own` compared
+  This is the test that found the gap `0015` closes: `sales_read_own` compared
   `created_by` to `auth.uid()` and checked nothing else, so a dismissed staff
   member's own sales stayed readable. Sign-in already refused them, but RLS is
   the boundary and must not lean on the layer in front of it.

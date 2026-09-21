@@ -4,6 +4,7 @@ import {
   DEFAULT_SETTINGS,
   discountNeedsApproval,
   expenseNeedsApproval,
+  idleSignOutMinutes,
   settingsFromRow,
   settingsToRow,
   validateSettingsForm,
@@ -16,6 +17,7 @@ const goodForm = {
   workDayStart: "08:00",
   workDayEnd: "17:00",
   autoLogoutMinutes: "15",
+  staffStaySignedIn: true,
   staffExpenseApprovalLimitPesos: "2000",
   staffDiscountLimitPercent: "10",
   staffDiscountLimitPesos: "100",
@@ -117,23 +119,24 @@ describe("validateSettingsForm", () => {
   });
 });
 
-describe("reading and writing the settings row", () => {
-  const row: SettingsRow = {
-    working_days_per_month: 26,
-    week_starts_on: "monday",
-    // PostgreSQL hands back a full time; the form wants HH:MM.
-    work_day_start: "08:00:00",
-    work_day_end: "17:00:00",
-    auto_logout_minutes: 15,
-    staff_expense_approval_limit_centavos: 200000,
-    // numeric columns arrive as strings over the wire.
-    staff_discount_limit_percent: "10.00",
-    staff_discount_limit_centavos: 10000,
-    default_warranty_days: 30,
-    unclaimed_unit_days: 30,
-    receipt_paper: "thermal_58",
-  };
+const row: SettingsRow = {
+  working_days_per_month: 26,
+  week_starts_on: "monday",
+  // PostgreSQL hands back a full time; the form wants HH:MM.
+  work_day_start: "08:00:00",
+  work_day_end: "17:00:00",
+  auto_logout_minutes: 15,
+  staff_stay_signed_in: true,
+  staff_expense_approval_limit_centavos: 200000,
+  // numeric columns arrive as strings over the wire.
+  staff_discount_limit_percent: "10.00",
+  staff_discount_limit_centavos: 10000,
+  default_warranty_days: 30,
+  unclaimed_unit_days: 30,
+  receipt_paper: "thermal_58",
+};
 
+describe("reading and writing the settings row", () => {
   it("reads a database row into the shape screens use", () => {
     expect(settingsFromRow(row)).toEqual(DEFAULT_SETTINGS);
   });
@@ -161,6 +164,50 @@ describe("reading and writing the settings row", () => {
     const result = validateSettingsForm({ ...goodForm, receiptPaper: "papyrus" });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors).toHaveProperty("receiptPaper");
+  });
+});
+
+describe("who the idle timer applies to", () => {
+  const timed = { autoLogoutMinutes: 15, staffStaySignedIn: false };
+  const relaxed = { autoLogoutMinutes: 15, staffStaySignedIn: true };
+
+  it("leaves a staff account signed in when the owner has asked for that", () => {
+    expect(idleSignOutMinutes("staff", relaxed)).toBeNull();
+  });
+
+  it("puts staff back on the timer when the box is unticked", () => {
+    expect(idleSignOutMinutes("staff", timed)).toBe(15);
+  });
+
+  it("always times owner and admin accounts, which can open payroll", () => {
+    expect(idleSignOutMinutes("owner", relaxed)).toBe(15);
+    expect(idleSignOutMinutes("admin", relaxed)).toBe(15);
+    expect(idleSignOutMinutes("owner", timed)).toBe(15);
+    expect(idleSignOutMinutes("admin", timed)).toBe(15);
+  });
+
+  it("times a role it does not recognise rather than trusting it", () => {
+    expect(idleSignOutMinutes("manager", relaxed)).toBe(15);
+    expect(idleSignOutMinutes("", relaxed)).toBe(15);
+  });
+
+  it("treats a database that has not run migration 0014 as keeping staff in", () => {
+    expect(settingsFromRow({ ...row, staff_stay_signed_in: undefined }).staffStaySignedIn).toBe(
+      true,
+    );
+    expect(settingsFromRow({ ...row, staff_stay_signed_in: null }).staffStaySignedIn).toBe(
+      true,
+    );
+  });
+
+  it("carries an unticked box through to the database row and back", () => {
+    const result = validateSettingsForm({ ...goodForm, staffStaySignedIn: false });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const stored = settingsToRow(result.settings);
+    expect(stored.staff_stay_signed_in).toBe(false);
+    expect(settingsFromRow(stored).staffStaySignedIn).toBe(false);
   });
 });
 

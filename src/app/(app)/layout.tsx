@@ -10,6 +10,7 @@ import { getExpensePresets } from "@/lib/data/expenses";
 import { getBillsDueSoon } from "@/lib/data/reminder";
 import { describeApprovalRule } from "@/lib/expenses";
 import { formatPesos } from "@/lib/money";
+import { idleSignOutMinutes } from "@/lib/settings";
 
 /**
  * The frame around every signed-in screen.
@@ -43,6 +44,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     can(user, "record_expenses") ? getExpensePresets() : Promise.resolve(null),
   ]);
 
+  // Staff may be left signed in all day; owner and admin never are (spec 4.1,
+  // revised - see docs/DECISIONS.md).
+  const idleMinutes = idleSignOutMinutes(user.role, settings);
+
   return (
     /*
       The rail sits beside everything, so the top bar and the page scroll
@@ -63,7 +68,11 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
           formatAmount: formatPesos,
         })}
       />
-      <AutoLogout minutes={settings.autoLogoutMinutes} />
+      {/*
+        Not rendered at all for someone who stays signed in: no timer means
+        nothing that could fire by mistake.
+      */}
+      {idleMinutes !== null && <AutoLogout minutes={idleMinutes} />}
       <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8 sm:px-6 sm:py-10">
         {children}
       </main>
@@ -73,8 +82,10 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       >
         <div className="mx-auto max-w-6xl">
           Dabz Printshoppe &middot; Philippine peso ({"₱"}) &middot; Times
-          shown in Asia/Manila &middot; Signed out automatically after{" "}
-          {settings.autoLogoutMinutes} minutes of no activity
+          shown in Asia/Manila &middot;{" "}
+          {idleMinutes === null
+            ? "You stay signed in until you sign out"
+            : `Signed out automatically after ${idleMinutes} minutes of no activity`}
         </div>
       </footer>
       </div>

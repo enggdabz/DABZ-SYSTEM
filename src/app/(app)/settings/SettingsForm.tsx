@@ -132,7 +132,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
           <Field
             label="Sign out after this many idle minutes"
-            hint="For the shared counter computer."
+            hint="For the shared counter computer. Owner and admin accounts always follow this."
             error={errors.autoLogoutMinutes}
           >
             <Input
@@ -145,6 +145,27 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
             />
           </Field>
         </div>
+
+        {/*
+          Below the grid rather than in it: it qualifies the idle minutes just
+          above, and a sentence this long wraps badly in half a column.
+        */}
+        <label className="flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="staffStaySignedIn"
+            defaultChecked={settings.staffStaySignedIn}
+            className="mt-0.5 size-4 shrink-0 rounded border-line"
+          />
+          <span>
+            Keep staff accounts signed in until they sign out
+            <span className="mt-1 block text-xs text-muted">
+              When ticked, the idle minutes above apply to owner and admin
+              accounts only. Staff should still use Switch user or Sign out
+              when they leave the counter.
+            </span>
+          </span>
+        </label>
       </section>
 
       <section className="space-y-5">
@@ -322,7 +343,11 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
         </div>
       </section>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {state.error ? (
+        <Notice tone="attention" title={state.error}>
+          {state.errorDetail}
+        </Notice>
+      ) : null}
       {state.success ? <Notice tone="success" title={state.success} /> : null}
 
       <Button type="submit" disabled={pending}>

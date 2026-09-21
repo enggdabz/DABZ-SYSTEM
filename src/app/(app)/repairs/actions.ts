@@ -484,7 +484,7 @@ export async function recordPaymentAction(
 
   /*
     Down payment or balance (Phase 10). A DabzTech payment says which since
-    `0014`, the same as an apparel one has since `0007`.
+    `0015`, the same as an apparel one has since `0007`.
 
     The form always sends one, so an empty box is a fault rather than an old
     record: null is reserved for the payments taken before the column existed,

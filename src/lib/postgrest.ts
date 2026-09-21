@@ -35,3 +35,31 @@ export function isFunctionMissingFromApi(error: PostgrestLikeError): boolean {
   // Older PostgREST builds answer without the code but keep the phrase.
   return /schema cache/i.test(error.message ?? "");
 }
+
+/**
+ * True when PostgREST could not find a COLUMN the write was trying to set.
+ *
+ * The same two causes as above, and the same two fixes - a migration that was
+ * never applied, or a cache built before it was.
+ *
+ * Worth naming separately because of WHEN it happens: the app deploys the
+ * moment a branch merges, while `npm run db:push` is run by hand afterwards.
+ * In between, a screen whose form writes a column added by that migration
+ * cannot save AT ALL - not just the new box, the whole form - and the raw
+ * message ("Could not find the 'x' column of 'y' in the schema cache") reads
+ * like a bug in the system rather than a step not yet taken.
+ */
+export function isColumnMissingFromApi(error: PostgrestLikeError): boolean {
+  // What PostgREST answers when its own schema cache has no such column.
+  if (error.code === "PGRST204") return true;
+
+  // And PostgreSQL's own `undefined_column`, for the case where the error is
+  // passed straight through rather than caught by the cache first. Unambiguous
+  // - 42703 means this and nothing else.
+  if (error.code === "42703") return true;
+
+  // Older builds answer without the code. Matched narrowly: a column named in
+  // some OTHER kind of failure - a check constraint, a not-null violation -
+  // has a different fix and must not be reported as a missing migration.
+  return /could not find the .*column/i.test(error.message ?? "");
+}

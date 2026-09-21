@@ -302,7 +302,7 @@ of step with the rows underneath it.
 | A down payment under your policy | **Warned about with ⚠, never refused.** You may have agreed to take less | `checkPaymentAmount` refuses only nothing and too-much. With no percentage set, nothing is shown at all |
 | Takings paid into the **owner's pocket** | **Counted in the day's total, kept out of the drawer.** It is money the shop collected, so leaving it out of the total understated the day against its target; it never reached the drawer, so putting it in the cash figure would make an honest drawer read as short | `ownersPocketCentavos` in `computeClosing` (`src/lib/closing.ts`), with tests either side of it |
 | Which timestamp the feed calls "when" | **When the row was written**, not the "Paid on" date somebody typed | It has to be, because the matching ledger entry is stamped in the same transaction and the two are required to agree for any day. A backdated payment still says so on screen — the typed date rides along as `recordedForISO` |
-| What a closed day remembers | **Ten nullable per-division columns plus the owner's pocket**, frozen at the moment the drawer was counted | A day closed before Phase 10 stays **null** and the screen says "Breakdown not recorded for this day". Zero would be a claim; null is the truth. Columns are on `day_closings` in `0014` |
+| What a closed day remembers | **Ten nullable per-division columns plus the owner's pocket**, frozen at the moment the drawer was counted | A day closed before Phase 10 stays **null** and the screen says "Breakdown not recorded for this day". Zero would be a claim; null is the truth. Columns are on `day_closings` in `0015` |
 | Down payments held | **A view of existing data, not a new category.** Nothing about how income is recognised changed | `heldForUnfinishedWork` in `src/lib/collections.ts`. It must never be subtracted from anything, or the same peso is counted twice in opposite directions |
 | Which repairs count as "work still owed" | **Any ticket not released**, including **declined** and **cannot be repaired** | The unit is still on the shelf and nothing has been handed back — that is exactly the pile spec 9.4 is about. `getHeldMoney` in `src/lib/data/collections.ts` |
 | A DabzTech down payment percentage | **Not added.** The spec offers one only as a possibility, and inventing a policy would have staff turning a customer away over a rule nobody set | If you want one, add it as a **nullable** setting, leave it **empty**, and list it in `src/lib/data/checklist.ts` like every other figure only you can know |
@@ -322,7 +322,7 @@ of step with the rows underneath it.
   obey spec 13.1 the way every other policy does. Signing in already refused a
   deactivated account, so nothing leaked through a screen — but Row Level
   Security is the boundary, and a boundary that relies on the layer in front of
-  it is not one. `0014` adds `current_role_name() is not null` to that policy
+  it is not one. `0015` adds `current_role_name() is not null` to that policy
   and to the two beside it, which costs an active person nothing. The Phase 10
   test found it, and now guards it.
 
@@ -349,7 +349,27 @@ to ask:
 - **26 working days** per month for the daily target (spec 12.3).
 - Warranty period **30 days** (spec 9.3).
 - Unclaimed units flagged at **30 days** (spec 9.4).
-- Auto-logout after **15 minutes** idle (spec 4.1).
+- Auto-logout after **15 minutes** idle (spec 4.1) — **for owner and admin
+  accounts. Staff accounts stay signed in until they sign out** (owner's
+  request, 21 September 2026: the counter staff kept being thrown back to the
+  login screen mid-day). I kept the timer on owner and admin accounts because
+  those can open payroll, the ledger and the bills, and the counter computer is
+  shared. To change it: Settings → *Keep staff accounts signed in until they
+  sign out* (untick to put staff back on the timer); the minutes box beside it
+  still sets the timer, up to 480. Stored in `app_settings.staff_stay_signed_in`
+  (migration `0014`); the rule itself is `idleSignOutMinutes` in
+  `src/lib/settings.ts`.
+
+  **What "until they sign out" covers, and what it does not.** This system no
+  longer starts a timer for a staff account, so nothing in *our* code signs
+  them out. Supabase can still end the session itself, and that is set in the
+  **dashboard** — *Authentication → Sessions*, "time-box user sessions" and
+  "inactivity timeout" — which is somewhere nobody has looked yet. It is NOT
+  set by `supabase/config.toml`: that file configures the Supabase CLI running
+  locally, and `npm run db:push` sends migrations only, never auth settings.
+  So if a staff member is still signed out after a long gap, it is Supabase
+  doing it, not this system, and the fix is in the dashboard rather than in
+  the code.
 - New staff get **Add sales (POS)** permission by default, nothing else
   (spec 4.3).
 - Passwords need **at least 8 characters, with a letter and a number**. Supabase's
