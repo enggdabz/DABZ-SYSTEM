@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { DIVISION_LIST } from "@/lib/divisions";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString } from "@/lib/money";
@@ -214,16 +215,16 @@ export function CashAdvanceForm({
     giveCashAdvanceAction,
     {},
   );
-  const [open, setOpen] = useState(false);
-  const errors = state.fieldErrors ?? {};
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
+  const errors = answer.fieldErrors ?? {};
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+        <Button type="button" variant="secondary" onClick={openPanel}>
           Give a cash advance
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -268,13 +269,13 @@ export function CashAdvanceForm({
         <Input name="reason" placeholder="e.g. medicine" />
       </Field>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Recording…" : `Record advance to ${fullName}`}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

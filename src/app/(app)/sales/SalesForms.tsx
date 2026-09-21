@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 
 import {
   decideVoidAction,
@@ -15,13 +16,13 @@ export function RequestVoidForm({ saleId }: { saleId: string }) {
     requestVoidAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
-  if (state.success) return <Notice tone="success" title={state.success} />;
+  if (answer.success) return <Notice tone="success" title={answer.success} />;
 
   if (!open) {
     return (
-      <Button type="button" variant="quiet" onClick={() => setOpen(true)}>
+      <Button type="button" variant="quiet" onClick={openPanel}>
         Ask to void
       </Button>
     );
@@ -33,16 +34,16 @@ export function RequestVoidForm({ saleId }: { saleId: string }) {
       <Field
         label="What went wrong?"
         hint="The owner sees this and decides. The sale stands until then."
-        error={state.fieldErrors?.reason}
+        error={answer.fieldErrors?.reason}
       >
         <Input name="reason" required autoFocus placeholder="e.g. charged for 12 pages, only 10" />
       </Field>
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Sending…" : "Send the request"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

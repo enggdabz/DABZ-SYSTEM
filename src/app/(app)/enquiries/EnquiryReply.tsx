@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Notice } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import type { Enquiry } from "@/lib/enquiries";
 
 import { setEnquiryStatusAction, type EnquiryActionState } from "./actions";
@@ -25,7 +26,7 @@ export function EnquiryReply({ enquiry }: { enquiry: Enquiry }) {
     setEnquiryStatusAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (enquiry.status !== "new") {
     return (
@@ -41,7 +42,7 @@ export function EnquiryReply({ enquiry }: { enquiry: Enquiry }) {
         >
           {pending ? "Saving..." : "Put back on the list"}
         </Button>
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       </form>
     );
   }
@@ -49,11 +50,11 @@ export function EnquiryReply({ enquiry }: { enquiry: Enquiry }) {
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button type="button" onClick={openPanel}>
           Answer this
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       </div>
     );
   }
@@ -65,7 +66,7 @@ export function EnquiryReply({ enquiry }: { enquiry: Enquiry }) {
       <Field
         label="What did you tell them?"
         hint="For your own records — the customer never sees this."
-        error={state.fieldErrors?.replyNote}
+        error={answer.fieldErrors?.replyNote}
       >
         <textarea
           name="replyNote"
@@ -77,7 +78,7 @@ export function EnquiryReply({ enquiry }: { enquiry: Enquiry }) {
         />
       </Field>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" name="status" value="replied" disabled={pending}>
@@ -92,7 +93,7 @@ export function EnquiryReply({ enquiry }: { enquiry: Enquiry }) {
         >
           Close without replying
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

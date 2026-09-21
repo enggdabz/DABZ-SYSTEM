@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { DIVISION_IDS, divisionName } from "@/lib/divisions";
 import type { Supplier } from "@/lib/expenses";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
@@ -223,11 +224,11 @@ export function StockItemForm({
     saveStockItemAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         {item ? "Edit" : "Add a material"}
       </Button>
     );
@@ -238,19 +239,19 @@ export function StockItemForm({
       {item ? <input type="hidden" name="itemId" value={item.id} /> : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Name" error={state.fieldErrors?.name}>
+        <Field label="Name" error={answer.fieldErrors?.name}>
           <Input name="name" defaultValue={item?.name ?? ""} required />
         </Field>
 
         <Field
           label="Counted in"
           hint="ream, litre, piece, pack — your words."
-          error={state.fieldErrors?.unit}
+          error={answer.fieldErrors?.unit}
         >
           <Input name="unit" defaultValue={item?.unit ?? ""} placeholder="ream" required />
         </Field>
 
-        <Field label="Which part of the shop" error={state.fieldErrors?.tag}>
+        <Field label="Which part of the shop" error={answer.fieldErrors?.tag}>
           <Select name="tag" defaultValue={item?.tag ?? "whole_shop"}>
             {TAGS.map((tag) => (
               <option key={tag} value={tag}>
@@ -274,7 +275,7 @@ export function StockItemForm({
         <Field
           label="Warn me at"
           hint="Leave empty until you know. Nothing is guessed — an invented level warns on the wrong day."
-          error={state.fieldErrors?.reorderLevel}
+          error={answer.fieldErrors?.reorderLevel}
         >
           <Input
             name="reorderLevel"
@@ -289,7 +290,7 @@ export function StockItemForm({
         <Field
           label="Price per unit"
           hint="Leave empty until you know. Used to value what is on the shelf."
-          error={state.fieldErrors?.unitCost}
+          error={answer.fieldErrors?.unitCost}
         >
           <Input
             name="unitCost"
@@ -318,14 +319,14 @@ export function StockItemForm({
         <span>Still counting this</span>
       </label>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

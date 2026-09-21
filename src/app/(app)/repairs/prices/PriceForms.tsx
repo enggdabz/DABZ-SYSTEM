@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { centavosToDecimalString } from "@/lib/money";
 import { UNIT_KINDS, UNIT_KIND_LABELS, type UnitKind } from "@/lib/repairs";
 
@@ -26,11 +27,11 @@ export function ServiceForm({
     saveServiceAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         {service ? "Edit" : "Add a service"}
       </Button>
     );
@@ -40,7 +41,7 @@ export function ServiceForm({
     <form action={submit} className="space-y-3">
       {service ? <input type="hidden" name="serviceId" value={service.id} /> : null}
 
-      <Field label="Name" error={state.fieldErrors?.name}>
+      <Field label="Name" error={answer.fieldErrors?.name}>
         <Input name="name" defaultValue={service?.name ?? ""} required />
       </Field>
 
@@ -48,7 +49,7 @@ export function ServiceForm({
         <Field
           label="Applies to"
           hint="Pick one machine to price it differently, or Any to charge the same."
-          error={state.fieldErrors?.unitKind}
+          error={answer.fieldErrors?.unitKind}
         >
           <Select name="unitKind" defaultValue={service?.unitKind ?? "any"}>
             <option value="any">Any machine</option>
@@ -63,7 +64,7 @@ export function ServiceForm({
         <Field
           label="Price"
           hint="Leave empty until you decide. Tickets still work — the price is asked for."
-          error={state.fieldErrors?.price}
+          error={answer.fieldErrors?.price}
         >
           <Input
             name="price"
@@ -129,14 +130,14 @@ export function ServiceForm({
         </span>
       </label>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

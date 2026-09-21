@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString } from "@/lib/money";
 import {
@@ -75,21 +76,32 @@ export function NewTicketForm({
     createTicketAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
-  if (state.ticketId) {
+  /*
+    The link is offered rather than followed, so a second unit on the counter
+    is not lost on the way to the first one's stub - and for the same reason
+    there is a way straight into the next ticket. Until this button existed
+    the page had to be reloaded before one could be started.
+  */
+  if (answer.ticketId) {
     return (
-      <Notice tone="success" title={state.success ?? "Ticket opened."}>
-        <Link href={`/repairs/${state.ticketId}`} className={`underline ${TAP_AREA}`}>
-          Open it and print the claim stub
-        </Link>
+      <Notice tone="success" title={answer.success ?? "Ticket opened."}>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link href={`/repairs/${answer.ticketId}`} className={`underline ${TAP_AREA}`}>
+            Open it and print the claim stub
+          </Link>
+          <Button type="button" variant="secondary" onClick={openPanel}>
+            Take another unit in
+          </Button>
+        </div>
       </Notice>
     );
   }
 
   if (!open) {
     return (
-      <Button type="button" onClick={() => setOpen(true)}>
+      <Button type="button" onClick={openPanel}>
         Take a unit in
       </Button>
     );
@@ -98,7 +110,7 @@ export function NewTicketForm({
   return (
     <form action={submit} className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Who is leaving it" error={state.fieldErrors?.customerName}>
+        <Field label="Who is leaving it" error={answer.fieldErrors?.customerName}>
           <Input name="customerName" placeholder="e.g. Marcelo Uy" required autoFocus />
         </Field>
 
@@ -120,7 +132,7 @@ export function NewTicketForm({
         <Field
           label="What kind of machine"
           hint="DabzTech takes Epson printers, laptops and desktops."
-          error={state.fieldErrors?.unitKind}
+          error={answer.fieldErrors?.unitKind}
         >
           <Select name="unitKind" defaultValue="laptop">
             {UNIT_KINDS.map((kind) => (
@@ -154,7 +166,7 @@ export function NewTicketForm({
       <Field
         label="What is wrong with it"
         hint="The customer's own words, not a diagnosis."
-        error={state.fieldErrors?.problem}
+        error={answer.fieldErrors?.problem}
       >
         <Input name="problem" placeholder="e.g. will not turn on" required />
       </Field>
@@ -177,7 +189,7 @@ export function NewTicketForm({
 
       <Field
         label="How do we get into it?"
-        error={state.fieldErrors?.unlockMethod}
+        error={answer.fieldErrors?.unlockMethod}
       >
         <Select name="unlockMethod" defaultValue="not_needed">
           {UNLOCK_METHODS.map((method) => (
@@ -190,13 +202,13 @@ export function NewTicketForm({
 
       <NoPasswordNote />
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Opening..." : "Open the ticket"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -229,11 +241,11 @@ export function TicketDetailsForm({
     updateTicketAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         Edit the details
       </Button>
     );
@@ -288,7 +300,7 @@ export function TicketDetailsForm({
         <Input name="conditionNote" defaultValue={ticket.conditionNote ?? ""} />
       </Field>
 
-      <Field label="How do we get into it?" error={state.fieldErrors?.unlockMethod}>
+      <Field label="How do we get into it?" error={answer.fieldErrors?.unlockMethod}>
         <Select name="unlockMethod" defaultValue={ticket.unlockMethod}>
           {UNLOCK_METHODS.map((method) => (
             <option key={method} value={method}>
@@ -302,14 +314,14 @@ export function TicketDetailsForm({
         <Input name="note" defaultValue={ticket.note ?? ""} />
       </Field>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -438,16 +450,26 @@ export function AddLineForm({
     addLineAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
   const [picked, setPicked] = useState<ServiceChoice | null>(null);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            // The dropdown resets itself when the panel closes; the pick
+            // behind it has to go too, or the price box is filled in for an
+            // item the list no longer shows as chosen.
+            setPicked(null);
+            openPanel();
+          }}
+        >
           Add a charge
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -459,7 +481,7 @@ export function AddLineForm({
     >
       <input type="hidden" name="ticketId" value={ticketId} />
 
-      <Field label="What for" error={state.fieldErrors?.name}>
+      <Field label="What for" error={answer.fieldErrors?.name}>
         <Select
           name="serviceId"
           defaultValue=""
@@ -488,7 +510,7 @@ export function AddLineForm({
         <Field
           label="Price"
           hint="Leave empty if it is not priced yet - the ticket still works."
-          error={state.fieldErrors?.unitPrice}
+          error={answer.fieldErrors?.unitPrice}
         >
           <Input
             name="unitPrice"
@@ -503,18 +525,18 @@ export function AddLineForm({
           />
         </Field>
 
-        <Field label="How many" error={state.fieldErrors?.quantity}>
+        <Field label="How many" error={answer.fieldErrors?.quantity}>
           <Input name="quantity" inputMode="numeric" defaultValue="1" />
         </Field>
       </div>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Adding..." : "Add the charge"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -533,16 +555,26 @@ export function FitPartForm({
     fitPartAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
   const [picked, setPicked] = useState<StockChoice | null>(null);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => {
+            // The dropdown resets itself when the panel closes; the pick
+            // behind it has to go too, or the price box is filled in for an
+            // item the list no longer shows as chosen.
+            setPicked(null);
+            openPanel();
+          }}
+        >
           Fit a part
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -582,7 +614,7 @@ export function FitPartForm({
       <Field
         label="Part name"
         hint="Needed only when it did not come off your own shelf."
-        error={state.fieldErrors?.name}
+        error={answer.fieldErrors?.name}
       >
         <Input
           name="name"
@@ -593,26 +625,26 @@ export function FitPartForm({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="How many" error={state.fieldErrors?.quantity}>
+        <Field label="How many" error={answer.fieldErrors?.quantity}>
           <Input name="quantity" inputMode="numeric" defaultValue="1" />
         </Field>
 
         <Field
           label="Price to the customer"
           hint="What you are charging, not what it cost you."
-          error={state.fieldErrors?.unitPrice}
+          error={answer.fieldErrors?.unitPrice}
         >
           <Input name="unitPrice" inputMode="decimal" placeholder="e.g. 240" />
         </Field>
       </div>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Fit and charge it"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -667,15 +699,15 @@ export function PaymentForm({
     recordPaymentAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button type="button" onClick={openPanel}>
           {isFirstPayment ? "Take a down payment" : "Take a payment"}
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -687,7 +719,7 @@ export function PaymentForm({
       <Field
         label="Amount taken"
         hint={`${balanceLabel} is owed. Type what the customer actually handed over.`}
-        error={state.fieldErrors?.amount}
+        error={answer.fieldErrors?.amount}
       >
         <Input name="amount" inputMode="decimal" placeholder="e.g. 650" required autoFocus />
       </Field>
@@ -699,7 +731,7 @@ export function PaymentForm({
           that read as plain "Payment" - nobody can now say which they were,
           so nothing guesses on their behalf.
         */}
-        <Field label="This payment is a" error={state.fieldErrors?.paymentKind}>
+        <Field label="This payment is a" error={answer.fieldErrors?.paymentKind}>
           <Select
             name="paymentKind"
             defaultValue={isFirstPayment ? "down_payment" : "balance"}
@@ -709,7 +741,7 @@ export function PaymentForm({
           </Select>
         </Field>
 
-        <Field label="Paid with" error={state.fieldErrors?.source}>
+        <Field label="Paid with" error={answer.fieldErrors?.source}>
           <Select name="source" defaultValue="cash_drawer">
             {MONEY_SOURCES.map((source) => (
               <option key={source} value={source}>
@@ -732,13 +764,13 @@ export function PaymentForm({
         </Field>
       </div>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Record the payment"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -757,15 +789,15 @@ export function VoidPaymentForm({
     voidPaymentAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
-  if (state.success) return <Notice tone="success" title={state.success} />;
+  if (answer.success) return <Notice tone="success" title={answer.success} />;
 
   if (!open) {
     return (
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={openPanel}
         className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
       >
         Void
@@ -778,17 +810,17 @@ export function VoidPaymentForm({
       <input type="hidden" name="ticketId" value={ticketId} />
       <input type="hidden" name="paymentId" value={paymentId} />
 
-      <Field label="Why is it being taken back?" error={state.fieldErrors?.reason}>
+      <Field label="Why is it being taken back?" error={answer.fieldErrors?.reason}>
         <Input name="reason" placeholder="e.g. cheque bounced" required autoFocus />
       </Field>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" variant="danger" disabled={pending}>
           {pending ? "Saving..." : "Void the payment"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Keep it
         </Button>
       </div>

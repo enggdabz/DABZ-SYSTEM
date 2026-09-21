@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString } from "@/lib/money";
 
@@ -34,16 +35,16 @@ export function RecordPaymentForm({
     page into a wall of inputs and bury the figures that matter - the balance,
     the interest, and whether the debt is actually shrinking.
   */
-  const [open, setOpen] = useState(false);
-  const errors = state.fieldErrors ?? {};
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
+  const errors = answer.fieldErrors ?? {};
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button type="button" onClick={openPanel}>
           Record a payment
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -85,14 +86,14 @@ export function RecordPaymentForm({
         </Field>
       </div>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Recording…" : `Record payment to ${lender}`}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 
 import { Button, Field, Input, Notice, Select, Tag } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString, formatPesos } from "@/lib/money";
 import { DAY_TYPE_LABELS, formatHours, type DayType } from "@/lib/payroll";
@@ -260,12 +261,12 @@ export function MarkPaidForm({
     markPayrollPaidAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={() => setOpen(true)} disabled={netCentavos <= 0}>
+        <Button type="button" onClick={openPanel} disabled={netCentavos <= 0}>
           Mark {formatPesos(netCentavos)} paid
         </Button>
         {netCentavos <= 0 ? (
@@ -273,7 +274,7 @@ export function MarkPaidForm({
             Nothing to pay for this week yet. Save the days first.
           </p>
         ) : null}
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       </div>
     );
   }
@@ -302,13 +303,13 @@ export function MarkPaidForm({
         advance off what they owe, and locks the week.
       </p>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : "Confirm paid"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -321,15 +322,15 @@ export function UnlockWeekForm({ weekId }: { weekId: string }) {
     unlockWeekAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" variant="quiet" onClick={() => setOpen(true)}>
+        <Button type="button" variant="quiet" onClick={openPanel}>
           Unlock this week
         </Button>
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -340,16 +341,16 @@ export function UnlockWeekForm({ weekId }: { weekId: string }) {
       <Field
         label="Why is this being unlocked?"
         hint="Kept on the record. The wages entry is voided rather than erased."
-        error={state.fieldErrors?.reason}
+        error={answer.fieldErrors?.reason}
       >
         <Input name="reason" required autoFocus placeholder="e.g. overtime was missed" />
       </Field>
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       <div className="flex gap-2">
         <Button type="submit" variant="danger" disabled={pending}>
           {pending ? "Unlocking…" : "Unlock"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
