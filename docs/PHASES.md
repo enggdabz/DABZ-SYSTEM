@@ -19,6 +19,7 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 9 | The public page and customer messages | ✅ **Done — confirmed 21 Sep 2026** |
 | 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — confirmed 21 Sep 2026** |
 | 11 | Notifications: the shop's warnings on your phone | ✅ **Done — waiting on owner to confirm** |
+| 12 | Production report: where each item on a project has got to (the owner's request, not section 16) | ✅ **Done — waiting on owner to confirm** |
 | — | Later: Messenger API, Meta Ads tracking, chatbot | Not in first build |
 
 **"Confirmed" means the owner has used the phase and says it works.** It is not
@@ -1999,6 +2000,121 @@ notify pgrst, 'reload schema';
 The `notify` matters on its own: PostgREST keeps its own cache of what columns
 exist, and running SQL by hand does not always refresh it. A migration that
 *has* been applied can still produce this exact error until it does.
+
+---
+
+## Phase 12 — The production report ✅
+
+**What you asked for, 21 September 2026**
+
+> "Another category for Production Report, for every project, we can open it
+> and we can put a status of that item whether it is already OK in design,
+> Color Test, pattern, print, Heatpress, Fabric Cutting, sewing, quality
+> checking, Packaging, ready! And from this project it will sum up all status
+> per item to create a final status of this project."
+
+**Built**
+
+- A new section in the sidebar, **Production report**, under **Daily** beside
+  Apparel and the project calendar. Same door as the job orders: anyone with
+  the Apparel job orders checkbox, plus you and any admin.
+- **The ten benches**, in your order: Design · Colour test · Pattern · Print ·
+  Heat press · Fabric cutting · Sewing · Quality checking · Packaging · Ready.
+  The database refuses anything that is not one of them, and a test reads the
+  list out of the migration file and fails if the app and the database ever
+  stop agreeing about how they are spelled.
+- **A status per item, marked by whoever did the work.** An item is a line on
+  the job order — "18 full sublimation jerseys" — with its ten benches as ten
+  boxes and one **Save**. Ticking is not saving, and the screen says so: the
+  button counts the changes waiting in it and a ⚠ **Not saved yet** sits beside
+  it until they land.
+- **The project's own status, summed from its items.** A project is only as far
+  along as its **least advanced** item, because the customer collects all of it
+  at once. Eighteen jerseys packed and a jacket still waiting on its pattern is
+  a project at **Pattern**, and the screen names the jacket as the thing
+  holding it up.
+- **A skipped bench is shown, never assumed.** Ticking Sewing says the sewing
+  is done and says nothing about the printing. So an item with Print ticked and
+  the colour test blank reads as *"at Design — Colour test, Pattern are not
+  marked, but Print is"*, and it counts as being at Design until they are. The
+  report says how many projects have one.
+- **The disagreement between the counter and the shop floor is shown, not
+  resolved.** If the order says "Ready for pickup" while two items have benches
+  unmarked — or every bench is done while the order still says "In production" —
+  both screens say so and neither is changed. They are two people's statements
+  about the same job, and quietly picking one makes the other a lie.
+- On the **Apparel** screen, the production report sits beside the project
+  calendar as a second way in, with the same kind of live line: *"2 through
+  every bench · 3 not started · 1 with a bench skipped · 18 of 70 benches
+  marked"*. On a **job order**, one line says where it is on the bench and
+  links straight to its report.
+
+**The decisions inside it** (all recorded in `docs/DECISIONS.md`)
+
+- **An item is a line on the job order, not one player's shirt.** A batch of
+  one design is printed together, pressed together and sewn together — and ten
+  ticks against each of eighteen names is 180 boxes nobody would keep up at the
+  counter.
+- **Nothing about a project's status is stored.** There is no "project stage"
+  column anywhere, and the security test fails if one appears. It is worked out
+  from the marks every time the screen is opened, exactly like an order's
+  total, a payslip and a report.
+- **A tick is removed when it was wrong**, rather than answered with an
+  opposite row the way a ledger entry or a stock movement is. Those are money.
+  This is a statement about where the work is right now, and the honest
+  correction to "the printing is done" when it is not is to stop saying it. The
+  permanent record is the audit log, which is written on every change and which
+  nobody can edit.
+- **A failed read is not an empty one.** If the marks cannot be read the screen
+  says so and says nothing about where the work is — because "Not started"
+  against every project in the shop is exactly the confident wrong answer that
+  cost a day in September when a missing migration showed up as PHP 0.00 on
+  Sales.
+- **An order with no items is its own state** — "Nothing being made yet" — and
+  not "Not started" and not "Ready". There is no work on it to have started.
+
+**How to run it**
+
+```bash
+npm run db:push     # applies 0018, which creates the production marks
+npm run dev
+```
+
+Then: **Production report** in the sidebar, or the button on the Apparel
+screen.
+
+**How to check it**
+
+1. Open a job order with a couple of items on it, then open **Production
+   report** from the sidebar. Every project is listed with its status.
+2. Open one. Tick **Design** on the first item — the button says *Save 1
+   change* and ⚠ *Not saved yet* appears. Press Save.
+3. Watch the project's own status at the top: it stays at **Not started** until
+   *every* item has its Design ticked. That is the sum working.
+4. On one item, tick **Print** while leaving Colour test and Pattern blank. The
+   item says it is still at Design and names the two benches that are missing.
+5. Tick everything on every item. The project reads **Ready** — and if the job
+   order still says "In production", the screen tells you the two disagree and
+   changes neither.
+6. Clear a tick and save. It says what was cleared, and **Activity** shows the
+   before and after.
+7. Sign in as a staff member without **Apparel job orders**: the section is not
+   in the sidebar, and `/production` bounces back.
+
+| What | How | Result |
+|---|---|---|
+| The sum, the skipped bench, the labels, the counts, and that the app's ten benches match the migration's | `npm test` | 792 tests (27 new) |
+| The security rules on the marks, against a real PostgreSQL | `npm run test:rls` | 350 checks, 16 of them new |
+| Every table and column the app asks for | `npm run check:schema` | 214 table references and 832 column references, against 45 tables |
+| The screens at 390 / 768 / 1024 / 1440, both themes | headless browser | no sideways scroll anywhere; benches 2 / 3 / 5 / 5 to a row; smallest tap target 28px, smallest bench box 36px |
+| Contrast of a ticked bench and the "not saved yet" warning | headless browser | ticked 6.51:1 dark / 5.27:1 light; warning 7.92:1 / 5.66:1 — all above 4.5:1 |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+**Not checked here** — the screens were measured in a headless browser against
+the real compiled stylesheet, but they were not driven against a live Supabase,
+because this build environment has no project to sign in to. Marking a bench,
+clearing one and watching it appear in **Activity** is the first thing to try
+after `npm run db:push`.
 
 ---
 

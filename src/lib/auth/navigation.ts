@@ -59,6 +59,18 @@ export const NAV_SECTIONS: NavSection[] = [
     group: "Daily",
     phase: 6,
   },
+  /*
+    The production report: the same projects again, but by bench rather than
+    by day. It sits here for the same reason the calendar does - it is opened
+    on the shop floor, several times a day, and it is the same job orders.
+  */
+  {
+    href: "/production",
+    label: "Production report",
+    permission: "apparel_job_orders",
+    group: "Daily",
+    phase: 12,
+  },
   { href: "/repairs", label: "Repairs", permission: "dabztech_tickets", group: "Daily", phase: 7 },
   { href: "/customers", label: "Customers", group: "Daily", phase: 4 },
 

@@ -147,6 +147,11 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0016_phase11_notifications",
     breaks: "notifications on your phone",
   })),
+  ...["apparel_production_steps"].map((name) => ({
+    name,
+    migration: "0018_phase12_production",
+    breaks: "the production report - where each item on a project has got to",
+  })),
 ];
 
 /*
