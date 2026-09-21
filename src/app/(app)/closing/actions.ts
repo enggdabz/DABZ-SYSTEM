@@ -11,6 +11,9 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
+import { doorViewer } from "@/lib/auth/permissions";
+import { doorVisibility } from "@/lib/collections";
+import type { DivisionId } from "@/lib/divisions";
 import { computeClosing } from "@/lib/closing";
 import { getBills } from "@/lib/data/money";
 import { getEstimatedMonthlyPayroll } from "@/lib/data/staff";
@@ -44,12 +47,14 @@ export async function saveClosingAction(
   }
 
   const today = manilaToday();
-  const [totals, breakdown, bills, payroll] = await Promise.all([
+  const [totals, dayBreakdown, bills, payroll] = await Promise.all([
     readDayTotals(today),
     readDayBreakdown(today),
     getBills(),
     getEstimatedMonthlyPayroll(),
   ]);
+
+  const { breakdown, partial: breakdownPartial } = dayBreakdown;
 
   const target = computeDailyTarget({
     monthlyBillsCentavos: totalMonthlyBills(bills),
@@ -73,8 +78,25 @@ export async function saveClosingAction(
     too. A void tomorrow changes what the feed says about today, and the point
     of a closing is to record what was believed when the cash was counted.
   */
-  const door = (division: "printshoppe" | "apparel" | "dabztech") =>
-    breakdown.divisions.find((entry) => entry.division === division);
+  /*
+    A DOOR THIS PERSON CANNOT SEE IS STORED AS NULL, NEVER AS ZERO.
+
+    The feed is `security_invoker`, so a counter assistant with only Add sales
+    reads nothing from Apparel or DabzTech and only their OWN counter sales.
+    Writing `?? 0` for those froze a claim into the row - the owner opens End
+    of day next week and reads "Apparel PHP 0.00" for a day that took PHP
+    8,000, with nothing to say the closer simply could not see it. The columns
+    are nullable for exactly this, and null reads as "not recorded".
+
+    The same applies when the read failed or hit its cap: then nobody knows
+    what any door took, so every door goes in as null.
+  */
+  const viewer = doorViewer(user);
+
+  const door = (division: DivisionId) =>
+    !breakdownPartial && doorVisibility(division, viewer) === "all"
+      ? breakdown.divisions.find((entry) => entry.division === division) ?? null
+      : null;
 
   const counter = door("printshoppe");
   const apparel = door("apparel");
@@ -94,18 +116,18 @@ export async function saveClosingAction(
       target_centavos: result.targetCentavos,
       target_reached: result.targetReached,
 
-      counter_cash_centavos: counter?.bySource.cash_drawer ?? 0,
-      counter_total_centavos: counter?.totalCentavos ?? 0,
+      counter_cash_centavos: counter ? counter.bySource.cash_drawer : null,
+      counter_total_centavos: counter ? counter.totalCentavos : null,
 
-      apparel_cash_centavos: apparel?.bySource.cash_drawer ?? 0,
-      apparel_total_centavos: apparel?.totalCentavos ?? 0,
-      apparel_down_payment_centavos: apparel?.downPaymentCentavos ?? 0,
-      apparel_balance_centavos: apparel?.balanceCentavos ?? 0,
+      apparel_cash_centavos: apparel ? apparel.bySource.cash_drawer : null,
+      apparel_total_centavos: apparel ? apparel.totalCentavos : null,
+      apparel_down_payment_centavos: apparel ? apparel.downPaymentCentavos : null,
+      apparel_balance_centavos: apparel ? apparel.balanceCentavos : null,
 
-      dabztech_cash_centavos: dabztech?.bySource.cash_drawer ?? 0,
-      dabztech_total_centavos: dabztech?.totalCentavos ?? 0,
-      dabztech_down_payment_centavos: dabztech?.downPaymentCentavos ?? 0,
-      dabztech_balance_centavos: dabztech?.balanceCentavos ?? 0,
+      dabztech_cash_centavos: dabztech ? dabztech.bySource.cash_drawer : null,
+      dabztech_total_centavos: dabztech ? dabztech.totalCentavos : null,
+      dabztech_down_payment_centavos: dabztech ? dabztech.downPaymentCentavos : null,
+      dabztech_balance_centavos: dabztech ? dabztech.balanceCentavos : null,
 
       note: String(formData.get("note") ?? "").trim() || null,
       created_by: user.id,

@@ -104,6 +104,106 @@ export function paymentKindLabel(row: Pick<CollectionRow, "paymentKind">): strin
 export const COLLECTION_SOURCES: readonly MoneySource[] = MONEY_SOURCES;
 
 // ---------------------------------------------------------------------------
+// What a read of the feed actually came back with
+// ---------------------------------------------------------------------------
+
+/**
+ * A read of the collections feed, and whether it is the WHOLE of it.
+ *
+ * WHY THIS IS NOT JUST AN ARRAY
+ * `public.collections` is `security_invoker`, so what comes back depends on
+ * who asked, and the read can also fail outright or hit its row cap. In all
+ * three cases the rows still add up to a number, and that number reads on a
+ * screen as "this is what the shop took today". It is not. An empty array
+ * from a failed query says "nothing came in", which is the most confidently
+ * wrong thing this system could print beside money.
+ *
+ * So every read carries what it knows about itself, and the screens decide
+ * what to say. Same rule as `unknown` in `target.ts`: a zero is a claim.
+ */
+export interface CollectionsRead {
+  rows: CollectionRow[];
+  /** The query itself failed. The rows are UNKNOWN, not "none". */
+  failed: boolean;
+  /** The cap was reached, so these are only the newest of the window. */
+  truncated: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// How much of a door this person actually sees
+// ---------------------------------------------------------------------------
+
+/**
+ * What a given account sees of one door's money.
+ *
+ *   all  - every payment through that door
+ *   own  - only what this person took themselves
+ *   none - nothing at all
+ *
+ * WHY THIS IS NOT A BOOLEAN, AND WHY IT LIVES HERE
+ * `public.collections` is `security_invoker`, so the three tables' own
+ * policies decide what comes back, and they do not all say the same thing.
+ * Apparel and DabzTech are all-or-nothing on a permission. The COUNTER is
+ * not: without `view_daily_sales_report`, `sales_read_own` returns only the
+ * rows this person created, so the figure is real but it is theirs, not the
+ * counter's.
+ *
+ * That middle case is the one that went wrong. Treating the counter as simply
+ * "visible" printed one assistant's PHP 1,200 under the whole counter's name,
+ * with no warning - and End of day froze the same shortfall into the books.
+ * So the rule is written once, here, where it can be tested, rather than
+ * three times across two screens and a Server Action.
+ */
+export type DoorVisibility = "all" | "own" | "none";
+
+export interface DoorViewer {
+  isOwnerOrAdmin: boolean;
+  canViewDailySalesReport: boolean;
+  canApparelJobOrders: boolean;
+  canDabztechTickets: boolean;
+}
+
+export function doorVisibility(
+  division: DivisionId,
+  viewer: DoorViewer,
+): DoorVisibility {
+  if (viewer.isOwnerOrAdmin) return "all";
+
+  switch (division) {
+    case "apparel":
+      return viewer.canApparelJobOrders ? "all" : "none";
+    case "dabztech":
+      return viewer.canDabztechTickets ? "all" : "none";
+    default:
+      return viewer.canViewDailySalesReport ? "all" : "own";
+  }
+}
+
+/** True when every door is fully visible, so a total may be called the day's. */
+export function seesWholeDay(viewer: DoorViewer): boolean {
+  return DIVISION_IDS.every((id) => doorVisibility(id, viewer) === "all");
+}
+
+/** A read nobody should quote a total from without saying so. */
+export function isPartialRead(read: CollectionsRead): boolean {
+  return read.failed || read.truncated;
+}
+
+/**
+ * The one wording for a read that cannot be trusted whole, so every screen
+ * that shows one says the same thing - the reason `deletable.ts` exists.
+ */
+export function partialReadWarning(read: CollectionsRead): string | null {
+  if (read.failed) {
+    return "Today's payments could not be read, so the figures below are not the day's takings. This is a fault, not an empty day - show it to whoever maintains the system.";
+  }
+  if (read.truncated) {
+    return "There were more payments in this period than this screen reads at once, so the figures below are short. Ask for a shorter period.";
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // Filtering
 // ---------------------------------------------------------------------------
 
@@ -482,6 +582,13 @@ export interface CollectionsReport {
   lines: CollectionReportLine[];
   totalBySource: Record<MoneySource, Centavos>;
   totalCentavos: Centavos;
+  /**
+   * True when the read behind these figures was not the whole period - it
+   * failed, or it hit its row cap. The figures are then a floor, not a total,
+   * and the screen and the CSV both have to say so. A bookkeeper cannot tell
+   * a short total from a true one by looking at it.
+   */
+  partial: boolean;
 }
 
 /**
@@ -494,6 +601,7 @@ export interface CollectionsReport {
  */
 export function collectionsReport(
   rows: readonly CollectionRow[],
+  options: { partial?: boolean } = {},
 ): CollectionsReport {
   const lines = new Map<string, CollectionReportLine>();
 
@@ -535,5 +643,6 @@ export function collectionsReport(
     lines: ordered,
     totalBySource,
     totalCentavos: sumCentavos(ordered.map((line) => line.amountCentavos)),
+    partial: options.partial ?? false,
   };
 }

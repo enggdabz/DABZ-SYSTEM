@@ -19,6 +19,7 @@ import {
   heldForUnfinishedWork,
   type CollectionKind,
   type CollectionRow,
+  type CollectionsRead,
   type HeldMoney,
   type PayableJob,
   type PaymentKind,
@@ -104,37 +105,60 @@ async function displayNames(
   );
 }
 
-export const getCollections = cache(
-  async (options: {
-    /** UTC instants, from `manilaDayRangeUtc` - never a bare calendar date. */
-    from: string;
-    to: string;
-    limit?: number;
-  }): Promise<CollectionRow[]> => {
-    const supabase = await createSupabaseServerClient();
+/** How many rows one read of the feed will take, when nobody says otherwise. */
+export const COLLECTIONS_DEFAULT_LIMIT = 500;
 
-    // `lt` on the upper bound, never `lte`: the window from manilaDayRangeUtc
-    // ends at midnight of the NEXT Manila day, and including it would count a
-    // payment twice - once in each day.
-    const [{ data, error }, names] = await Promise.all([
-      supabase
-        .from("collections")
-        .select(COLUMNS)
-        .gte("taken_at", options.from)
-        .lt("taken_at", options.to)
-        .order("taken_at", { ascending: false })
-        .limit(options.limit ?? 500),
-      displayNames(supabase),
-    ]);
+/**
+ * Reads a window of the feed, and says whether it got all of it.
+ *
+ * Two things it will not do quietly. A failed query comes back as
+ * `failed: true` rather than as an empty day - `if (error) return []` turns a
+ * missing migration or a stale PostgREST cache into "nothing was taken today",
+ * printed in peso signs. And a window with more rows than the cap comes back
+ * as `truncated: true` rather than as a total that is short by however much
+ * was cut off.
+ *
+ * The cap is asked for as `limit + 1`: if the extra row arrives, there is more
+ * in the window than is being shown, and that is the only way to know.
+ */
+export async function getCollections(options: {
+  /** UTC instants, from `manilaDayRangeUtc` - never a bare calendar date. */
+  from: string;
+  to: string;
+  limit?: number;
+}): Promise<CollectionsRead> {
+  const supabase = await createSupabaseServerClient();
+  const limit = options.limit ?? COLLECTIONS_DEFAULT_LIMIT;
 
-    if (error || !data) return [];
+  // `lt` on the upper bound, never `lte`: the window from manilaDayRangeUtc
+  // ends at midnight of the NEXT Manila day, and including it would count a
+  // payment twice - once in each day.
+  const [{ data, error }, names] = await Promise.all([
+    supabase
+      .from("collections")
+      .select(COLUMNS)
+      .gte("taken_at", options.from)
+      .lt("taken_at", options.to)
+      .order("taken_at", { ascending: false })
+      .limit(limit + 1),
+    displayNames(supabase),
+  ]);
 
-    return data.flatMap((raw) => {
+  if (error || !data) return { rows: [], failed: true, truncated: false };
+
+  const truncated = data.length > limit;
+  // Ordered newest first, so the kept rows are the most recent ones.
+  const kept = truncated ? data.slice(0, limit) : data;
+
+  return {
+    rows: kept.flatMap((raw) => {
       const row = toRow(raw as Record<string, unknown>, names);
       return row ? [row] : [];
-    });
-  },
-);
+    }),
+    failed: false,
+    truncated,
+  };
+}
 
 /**
  * One Manila day's collections.
@@ -145,8 +169,8 @@ export const getCollections = cache(
  */
 export async function getCollectionsForDay(
   date: CivilDate,
-  limit = 500,
-): Promise<CollectionRow[]> {
+  limit = COLLECTIONS_DEFAULT_LIMIT,
+): Promise<CollectionsRead> {
   const range = manilaDayRangeUtc(date);
   return getCollections({ from: range.from, to: range.to, limit });
 }

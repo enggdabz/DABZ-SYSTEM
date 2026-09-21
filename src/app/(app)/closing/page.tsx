@@ -17,7 +17,7 @@ import { formatCivilDate, manilaToday } from "@/lib/period";
 import { computeDailyTarget } from "@/lib/target";
 
 import { ClosingForm } from "./ClosingForm";
-import { readDayBreakdown, readDayTotals } from "./totals";
+import { readDayBreakdown, readDayTotals, readFeedIncome } from "./totals";
 
 export const metadata = { title: "End of day · Dabz System" };
 
@@ -28,13 +28,18 @@ export default async function ClosingPage() {
   const settings = await getSettings();
   const today = manilaToday();
 
-  const [totals, breakdown, bills, payroll, existing] = await Promise.all([
-    readDayTotals(today),
-    readDayBreakdown(today),
-    getBills(),
-    getEstimatedMonthlyPayroll(),
-    getDayClosing(today),
-  ]);
+  const [totals, dayBreakdown, feedIncomeCentavos, bills, payroll, existing] =
+    await Promise.all([
+      readDayTotals(today),
+      readDayBreakdown(today),
+      // Only the income the feed is a view of - see readFeedIncome.
+      readFeedIncome(today),
+      getBills(),
+      getEstimatedMonthlyPayroll(),
+      getDayClosing(today),
+    ]);
+
+  const { breakdown, partial: breakdownPartial } = dayBreakdown;
 
   const target = computeDailyTarget({
     monthlyBillsCentavos: totalMonthlyBills(bills),
@@ -136,7 +141,8 @@ export default async function ClosingPage() {
 
       <DivisionBreakdown
         breakdown={breakdown}
-        ledgerTotalCentavos={expected.totalSalesCentavos}
+        ledgerTotalCentavos={feedIncomeCentavos}
+        partial={breakdownPartial}
       />
 
       <Card title="The rest of today">
@@ -217,18 +223,42 @@ export default async function ClosingPage() {
 function DivisionBreakdown({
   breakdown,
   ledgerTotalCentavos,
+  partial,
 }: {
   breakdown: CollectionsBreakdown;
+  /** Income from the three payment tables ONLY - not every income entry. */
   ledgerTotalCentavos: number;
+  partial: boolean;
 }) {
-  const disagrees = breakdown.totalCentavos !== ledgerTotalCentavos;
+  /*
+    Compared against the income the feed is a view of, never against all
+    income: a hand-typed entry on Money in/out is real income the feed has no
+    row for, and comparing against it raised this alarm every day such an
+    entry existed. An alarm that cries wolf daily is worse than none, because
+    the day it is right nobody looks.
+
+    And a read that could not see the whole day is EXPECTED to disagree, so it
+    says that instead - the disagreement is the permission, not a fault.
+  */
+  const disagrees =
+    !partial && breakdown.totalCentavos !== ledgerTotalCentavos;
 
   return (
     <Card
       title="Where today's money came from"
       description="Each door, and how it was paid. Down payments are shown apart from balances, because one is money for work not yet done."
     >
-      {breakdown.rowCount === 0 ? (
+      {partial ? (
+        <Notice tone="attention" title="This is not the whole day">
+          <p>
+            Today&apos;s payments could not all be read, so the figures below
+            are what this account can see rather than what the shop took. Close
+            the day on the drawer figures above, which come from the ledger.
+          </p>
+        </Notice>
+      ) : null}
+
+      {breakdown.rowCount === 0 && !partial ? (
         <p className="text-sm text-muted">
           Nothing has been collected today at any of the three doors.
         </p>

@@ -14,7 +14,11 @@ import "server-only";
  */
 import { getCollectionsForDay } from "@/lib/data/collections";
 import { getLedgerEntries, liveEntries } from "@/lib/data/money";
-import { breakdownCollections, type CollectionsBreakdown } from "@/lib/collections";
+import {
+  breakdownCollections,
+  isPartialRead,
+  type CollectionsBreakdown,
+} from "@/lib/collections";
 import { countsAsIncome } from "@/lib/ledger";
 import { sumCentavos, type Centavos } from "@/lib/money";
 import { manilaDayRangeUtc, type CivilDate } from "@/lib/period";
@@ -69,8 +73,48 @@ export async function readDayTotals(date: CivilDate): Promise<DayTotals> {
  * not whether it arrived as a job order down payment or as an apparel item
  * rung up at the counter.
  */
-export async function readDayBreakdown(
-  date: CivilDate,
-): Promise<CollectionsBreakdown> {
-  return breakdownCollections(await getCollectionsForDay(date));
+export interface DayBreakdown {
+  breakdown: CollectionsBreakdown;
+  /**
+   * The read behind it was not the whole day - it failed, or hit its cap.
+   * Nothing built on it may be presented, or stored, as the day's takings.
+   */
+  partial: boolean;
+}
+
+export async function readDayBreakdown(date: CivilDate): Promise<DayBreakdown> {
+  const read = await getCollectionsForDay(date);
+  return {
+    breakdown: breakdownCollections(read.rows),
+    partial: isPartialRead(read),
+  };
+}
+
+/**
+ * Income the collections feed is a view of - and only that.
+ *
+ * The feed covers sales, apparel payments and repair payments. The ledger
+ * holds those AND everything typed in by hand on Money in/out, so comparing
+ * the feed against all income raises a false alarm on every day somebody
+ * enters income manually. `12_phase10_rls.test.sql` restricts the ledger side
+ * the same way; this is the screen's copy of that rule.
+ */
+const FEED_SOURCE_TABLES = ["sales", "apparel_payments", "repair_payments"];
+
+export async function readFeedIncome(date: CivilDate): Promise<Centavos> {
+  const range = manilaDayRangeUtc(date);
+  const entries = liveEntries(
+    await getLedgerEntries({ from: range.from, to: range.to, limit: 2000 }),
+  );
+
+  return sumCentavos(
+    entries
+      .filter(countsAsIncome)
+      .filter(
+        (entry) =>
+          entry.sourceTable !== null &&
+          FEED_SOURCE_TABLES.includes(entry.sourceTable),
+      )
+      .map((entry) => entry.amountCentavos),
+  );
 }

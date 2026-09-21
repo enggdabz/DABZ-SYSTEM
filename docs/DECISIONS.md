@@ -340,6 +340,46 @@ of step with the rows underneath it.
 
 ---
 
+## Decided after Phase 10 — a short read is never a total
+
+Phase 10 made `public.collections` the one place the day's money is read from,
+and made it `security_invoker` so the three tables' own policies decide what
+comes back. That is the right design. What it also did was make **a partial
+read the normal case**, and six screens went on treating whatever came back as
+the whole day.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| A read that fails | Comes back as `failed: true`, and the screen says so. It used to `return []`, which prints as **PHP 0.00** and "Nothing has been taken yet today" — a missing migration or a stale PostgREST cache reading as a quiet, confident empty day | `getCollections` in `src/lib/data/collections.ts` |
+| A read that hits its row cap | Comes back as `truncated: true` and every screen, the print view and the CSV say the figures are a floor rather than a total. Detected by asking for `limit + 1` — there is no other way to know | `COLLECTIONS_DEFAULT_LIMIT` (500 a day) and `COLLECTIONS_REPORT_LIMIT` (5,000 a report) |
+| How much of a door somebody sees | Three answers, not two: **all**, **own**, or **none**. Apparel and DabzTech are all-or-nothing on a permission; the COUNTER is not — without `view_daily_sales_report`, `sales_read_own` returns only your own rows | `doorVisibility` in `src/lib/collections.ts`, with tests beside it |
+| What End of day stores for a door the closer cannot see | **Null, never zero.** The columns were made nullable for exactly this, and `toBreakdown` already treats one null as "no breakdown recorded" rather than a partly invented one | `saveClosingAction` in `src/app/(app)/closing/actions.ts` |
+| What the ledger is compared against | Only income from `sales`, `apparel_payments` and `repair_payments` — the three tables the feed is a view of | `readFeedIncome` in `src/app/(app)/closing/totals.ts` |
+
+**The counter one is the one worth reading twice.** `printshoppe` was treated as
+always visible, so an assistant with only Add sales saw their own PHP 1,200
+printed under the whole counter's name, with no warning — and End of day froze
+that same shortfall into `day_closings` as fact. The figure was never wrong;
+its *label* was. It now reads "Counter (your sales)" and the day total carries
+a ⚠ saying part of today is missing.
+
+**Why the ledger comparison was raising a false alarm every day.** End of day
+compares the collections table against the ledger and shouts if they disagree.
+It was comparing against *all* income — including anything typed in by hand on
+Money in/out, which the feed has no row for. So a shop that records one manual
+income entry saw "This table and the ledger do not agree" every single day.
+The SQL suite had it right all along (`12_phase10_rls.test.sql` restricts the
+ledger side to the three source tables); the screen did not. An alarm that
+cries wolf daily is worse than no alarm, because the day it is right nobody
+looks.
+
+**The general rule this all serves, which was already written down:** a zero is
+a claim. `target.ts` has `unknown`, the closing columns are nullable, a bill
+with no due day stays empty. A read that could not see everything belongs in
+the same family, and now says so out loud.
+
+---
+
 ## Assumptions I am working under
 
 Where the spec gives a default, I use it and note it here rather than stopping

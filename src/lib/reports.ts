@@ -418,6 +418,15 @@ export function toCsv(
   if (collections) {
     rows.push(
       [],
+      // A spreadsheet cannot tell a short total from a true one, so the row
+      // above the block says it outright rather than leaving it to the screen.
+      ...(collections.partial
+        ? [
+            [
+              "WARNING: not the whole period - there were more payments than one report reads, so the collections figures below are a floor, not a total",
+            ],
+          ]
+        : []),
       [
         "Collections by division and kind",
         "Cash",

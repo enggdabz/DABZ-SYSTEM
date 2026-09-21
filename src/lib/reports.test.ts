@@ -436,6 +436,30 @@ describe("the export's collections block", () => {
     expect(csv).toContain('"Apparel · Down payment","0.00","1200.00","0.00","0.00","0.00","1200.00","1"');
   });
 
+  it("says nothing about being short when the read was whole", () => {
+    expect(csv).not.toContain("WARNING");
+  });
+
+  it("warns above the block when the read did not cover the period", () => {
+    /*
+      A spreadsheet cannot show that a total is a floor rather than a total,
+      and the income figures above it DO cover the whole range - so without
+      this the two blocks simply look like they disagree.
+    */
+    const short = toCsv(
+      report,
+      collectionsReport(
+        [collectionRow({ id: "a", amountCentavos: parsePesos("5000") })],
+        { partial: true },
+      ),
+    );
+    expect(short).toContain("WARNING: not the whole period");
+    // And it comes before the figures it is warning about.
+    expect(short.indexOf("WARNING")).toBeLessThan(
+      short.indexOf("Collections by division and kind"),
+    );
+  });
+
   it("adds the doors back up to the period's collections", () => {
     expect(csv).toContain('"All collections","5000.00","1200.00","250.00","0.00","0.00","6450.00",""');
   });
