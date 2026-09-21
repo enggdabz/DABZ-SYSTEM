@@ -495,6 +495,48 @@ everybody.
 
 ---
 
+## Decided on 21 September 2026 — a tarpaulin rate can be typed in
+
+The four rates on the counter (₱30, ₱25, ₱20, ₱15) are the ones you quoted, and
+they stay the list. What was missing was the job none of them covers: a price
+agreed on the phone, a bulk order, an unusual material. The counter had to pick
+the nearest rate and then correct the total afterwards, and once that happens
+the receipt no longer says what was actually agreed — the line still reads
+"× 30.00" while the money says otherwise.
+
+So the rate picker now has a **Custom amount** entry. Choosing it opens a box
+for pesos per square foot, and the total, the receipt line and the sale all
+carry the figure typed there: 3 × 5 ft at ₱27.50 reads
+"Tarpaulin 3 × 5 ft — 15 sq ft × 27.50" and adds up to ₱412.50.
+
+Three choices inside it are worth keeping.
+
+**The box starts empty and no figure is suggested.** The placeholder is `0.00`,
+which is a format and not a price — what a square foot is worth is yours to
+say, the same rule as a bill's due day or a staff member's daily rate. Until
+something real is typed there is no total and no **Add to sale** button, and the
+warning under the calculator names the missing figure rather than blaming the
+measurements.
+
+**There is deliberately no upper limit on the rate.** A ceiling would be the
+code inventing a price rule, and the total is on screen before anything reaches
+a sale, so a typo is visible where it can be corrected.
+
+**A typed rate is not saved as a new preset.** It prices one job and is gone,
+because a rate that quietly joined the list would start being used by somebody
+who was not standing there when it was agreed. To change that: the presets are
+`TARPAULIN_RATES` in `src/lib/pos.ts` — tell me a rate to add and it becomes a
+permanent entry in the picker.
+
+The reading of the typed amount is `parseTarpaulinRate` in `src/lib/pos.ts`,
+beside the calculator rather than in the screen, because it is a money
+calculation: "30", "27.5" and "1,250.75" all have to land on the same centavo
+the presets do. `src/lib/pos.test.ts` proves that, and
+`src/app/(app)/pos/PosScreen.test.tsx` walks the counter through picking
+**Custom amount**, typing a rate and adding the banner to a sale.
+
+---
+
 ## Fixed on 21 September 2026 — a form that opened on last time's answer
 
 You recorded a ₱5.00 expense, and the next time you opened the pop-up it still
