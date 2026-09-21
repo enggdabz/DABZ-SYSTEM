@@ -209,6 +209,37 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0015_phase10_collections",
     breaks: "the breakdown kept with a closed day",
   },
+  /*
+    Phase 13 adds columns to four tables that every apparel screen reads, and
+    creates no table of its own - so without these four questions the System
+    check screen would report "everything the system needs is here" while a
+    project could not be encoded. `0014` taught that lesson on the Settings
+    screen; this is the same shape.
+  */
+  {
+    name: "apparel_orders",
+    column: "contact_person",
+    migration: "0019_phase13_encoding",
+    breaks: "a project's own contact person, number, address and Facebook link",
+  },
+  {
+    name: "apparel_products",
+    column: "uniform_type",
+    migration: "0019_phase13_encoding",
+    breaks: "pre-filling a row's price from the apparel price list",
+  },
+  {
+    name: "apparel_order_lines",
+    column: "uniform_type",
+    migration: "0019_phase13_encoding",
+    breaks: "grouping a project's people into one item per uniform type",
+  },
+  {
+    name: "apparel_order_names",
+    column: "uniform_type",
+    migration: "0019_phase13_encoding",
+    breaks: "encoding a project person by person, and the summary per size",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */

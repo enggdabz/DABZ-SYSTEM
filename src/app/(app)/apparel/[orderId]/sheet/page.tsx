@@ -3,13 +3,16 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
-import { ORDER_STATUS_LABELS } from "@/lib/apparel";
+import { ORDER_STATUS_LABELS, summariseOrder } from "@/lib/apparel";
 import { requirePermission } from "@/lib/auth/dal";
 import { getApparelOrder } from "@/lib/data/apparel";
 import { getCustomers } from "@/lib/data/pos";
 import { DIVISIONS } from "@/lib/divisions";
 import { formatPesos } from "@/lib/money";
 import { formatCivilDate, parseISODate } from "@/lib/period";
+import { rowPrice, rowTotal } from "@/lib/uniforms";
+
+import { UniformSummaryGrids } from "../../UniformSummary";
 
 export const metadata = { title: "Job order sheet · Dabz System" };
 
@@ -53,6 +56,10 @@ export default async function JobOrderSheetPage({
   const { order, totals } = detail;
   const customer = customers.find((entry) => entry.id === order.customerId);
 
+  // Counted from the rows on this very sheet, never stored - so the grid and
+  // the name lists above it cannot say two different numbers.
+  const summary = summariseOrder(totals.lines);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center gap-3 print:hidden">
@@ -89,11 +96,29 @@ export default async function JobOrderSheetPage({
               Team / customer
             </p>
             <p className="font-medium">{order.teamName ?? "—"}</p>
-            {customer ? (
+            {/*
+              The project's OWN contact details, and the linked customer's only
+              where the project has none - marked as such, because a sheet the
+              customer checks has to say where a figure came from.
+            */}
+            {order.contactPerson || customer ? (
               <p className="text-xs">
-                {customer.name}
-                {customer.contactNumber ? ` · ${customer.contactNumber}` : ""}
+                {order.contactPerson ?? `${customer?.name} (customer record)`}
               </p>
+            ) : null}
+            {order.contactNumber || customer?.contactNumber ? (
+              <p className="text-xs">
+                {order.contactNumber ??
+                  `${customer?.contactNumber} (customer record)`}
+              </p>
+            ) : null}
+            {order.address || customer?.address ? (
+              <p className="text-xs">
+                {order.address ?? `${customer?.address} (customer record)`}
+              </p>
+            ) : null}
+            {order.facebookLink ? (
+              <p className="break-all text-xs">{order.facebookLink}</p>
             ) : null}
           </div>
           <div>
@@ -116,8 +141,10 @@ export default async function JobOrderSheetPage({
           </section>
         ) : null}
 
-        {/* ---- The items and their name lists --------------------------- */}
-        {totals.lines.map((entry) => (
+        {/* ---- The items and the people on them ------------------------- */}
+        {totals.lines
+          .filter((entry) => !entry.retired)
+          .map((entry) => (
           <section key={entry.line.id} className="mt-5">
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-black pb-1">
               <h2 className="text-sm font-bold">
@@ -129,10 +156,7 @@ export default async function JobOrderSheetPage({
                 </span>
               </h2>
               <p className="text-xs">
-                {entry.quantity} &times;{" "}
-                {entry.line.unitPriceCentavos > 0
-                  ? formatPesos(entry.line.unitPriceCentavos)
-                  : "price not set"}
+                {entry.quantity} piece{entry.quantity === 1 ? "" : "s"}
               </p>
             </div>
 
@@ -140,42 +164,63 @@ export default async function JobOrderSheetPage({
               <table className="mt-2 w-full text-xs">
                 <thead>
                   <tr className="text-left">
-                    <th className="w-8 pb-1 font-semibold">#</th>
+                    <th className="w-6 pb-1 font-semibold">#</th>
                     <th className="pb-1 font-semibold">Name</th>
-                    <th className="w-16 pb-1 font-semibold">Number</th>
-                    <th className="w-16 pb-1 font-semibold">Size</th>
-                    <th className="w-24 pb-1 text-right font-semibold">Add-on</th>
+                    <th className="w-12 pb-1 font-semibold">No.</th>
+                    <th className="w-12 pb-1 font-semibold">Size</th>
+                    <th className="w-14 pb-1 font-semibold">Short</th>
+                    <th className="pb-1 font-semibold">Short name</th>
+                    <th className="w-20 pb-1 text-right font-semibold">Price</th>
+                    <th className="pb-1 font-semibold">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {entry.roster.map((player, index) => (
-                    <tr key={player.id} className="border-t border-black/20">
+                  {entry.roster.map((person, index) => (
+                    <tr key={person.id} className="border-t border-black/20">
                       <td className="py-1">{index + 1}</td>
-                      <td className="py-1">{player.playerName ?? "—"}</td>
-                      <td className="py-1">{player.playerNumber ?? "—"}</td>
-                      <td className="py-1 font-bold">{player.size}</td>
-                      <td className="py-1 text-right">
-                        {player.sizeExtraCentavos > 0
-                          ? formatPesos(player.sizeExtraCentavos)
-                          : "—"}
+                      <td className="py-1">
+                        {person.playerName ?? "—"}
+                        {person.quantity > 1 ? (
+                          <span className="font-bold"> ×{person.quantity}</span>
+                        ) : null}
                       </td>
+                      <td className="py-1">{person.playerNumber ?? "—"}</td>
+                      <td className="py-1 font-bold">
+                        {person.upperIncluded ? person.size ?? "—" : "shorts only"}
+                      </td>
+                      <td className="py-1 font-bold">{person.shortSize ?? "—"}</td>
+                      <td className="py-1">{person.shortName ?? "—"}</td>
+                      <td className="py-1 text-right">
+                        {/*
+                          What this ROW costs, added up from its own figures -
+                          never worked backwards from the item's total. A sheet
+                          the customer can check by hand is the only kind worth
+                          handing over.
+                        */}
+                        {formatPesos(rowTotal(person, entry.line))}
+                        {person.quantity > 1 ? (
+                          <span className="block">
+                            ({formatPesos(rowPrice(person, entry.line))} each)
+                          </span>
+                        ) : null}
+                      </td>
+                      <td className="py-1">{person.note ?? ""}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             ) : (
               <p className="mt-2 text-xs">
-                No name list &mdash; {entry.quantity} piece
+                Nobody encoded &mdash; {entry.quantity} piece
                 {entry.quantity === 1 ? "" : "s"}, plain.
               </p>
             )}
 
             <div className="mt-1 flex justify-between border-t border-black/40 pt-1 text-xs">
               <span>
-                {entry.quantity} &times;{" "}
-                {formatPesos(entry.line.unitPriceCentavos)}
+                {entry.quantity} piece{entry.quantity === 1 ? "" : "s"}
                 {entry.sizeExtrasCentavos > 0
-                  ? ` + ${formatPesos(entry.sizeExtrasCentavos)} size add-ons`
+                  ? ` · includes ${formatPesos(entry.sizeExtrasCentavos)} size add-ons`
                   : ""}
               </span>
               <span className="font-bold">
@@ -185,10 +230,19 @@ export default async function JobOrderSheetPage({
           </section>
         ))}
 
+        {/* ---- The summary cutting and sewing work from ------------------ */}
+        <section className="mt-6 border-t-2 border-black pt-2">
+          <UniformSummaryGrids summary={summary} title="Summary" print />
+        </section>
+
         {/* ---- The money ------------------------------------------------ */}
         <section className="mt-6 border-t-2 border-black pt-2 text-sm">
           <Row label="Order total" value={formatPesos(totals.totalCentavos)} bold />
-          <Row label="Paid" value={formatPesos(totals.paidCentavos)} />
+          <Row label="Down payment" value={formatPesos(totals.downPaymentCentavos)} />
+          <Row
+            label="Other payments"
+            value={formatPesos(totals.otherPaymentsCentavos)}
+          />
           <div className="border-t border-black pt-1">
             <Row
               label="BALANCE"

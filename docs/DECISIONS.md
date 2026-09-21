@@ -1017,3 +1017,167 @@ to ask:
   anybody had looked at the work, and a project forced to "In production"
   because the order says so would overwrite what the person at the bench
   actually reported.
+
+- **21 September 2026 — encoding a project person by person: what was decided,
+  and how to change each of it.** You asked for a project to hold one row per
+  person — type of uniform, name, jersey number, size, short size, short name,
+  price, remarks — with a summary per type per size underneath. Fourteen things
+  inside that were mine to decide.
+
+  **Rows of the same uniform type form ONE item.** Your own suggestion, and it
+  is what keeps everything already built working: the production report marks
+  an item (`apparel_production_steps.line_id`), the payment split books an
+  item's money (`splitPaymentByCategory`), the fabric and the collar belong to
+  an item, and the calendar counts an item's pieces. Each distinct Custom name
+  is its own item, so "Bib shorts" and "Cap" are two batches. Nobody chooses an
+  item any more — `save_apparel_encoding` in `0019` creates the one each row
+  implies, and removes one nobody is left on. To change it: that function is
+  the only place an item is created, and a unique index
+  (`apparel_order_lines_one_per_type_idx`) is what stops two of the same type.
+
+  **The contact person, number, address and Facebook link live ON THE ORDER**,
+  not on the customer record and not copied between the two. A team's contact
+  person is a fact about *this* project — next season it is a different
+  manager — and a job order sheet has to say who was actually spoken to when
+  the work came in. The rejected alternatives are both quietly wrong: reading
+  the customer record live would let a changed address rewrite last year's
+  sheet, and copying on save would either freeze a customer's details on to a
+  project or write a project's back over the customer. Where a project leaves
+  one empty and a customer is linked, the screen and the printed sheet show the
+  customer's value **labelled as coming from there**. To change it: the four
+  columns are on `apparel_orders` and the fallback is the `Detail` component in
+  `src/app/(app)/apparel/[orderId]/page.tsx`.
+
+  **A row carries its own price, and a row with none falls back to what its
+  item charges each plus that row's copied size add-on.** The fallback is not a
+  nicety — it is exactly the arithmetic every roster entry written before today
+  was totalled with, so **every project already in the system comes to the same
+  figure, to the centavo, with no data migration and nothing rewritten**. A test
+  asserts it row by row. The price box is pre-filled from the price list plus
+  the size add-on, but what is SAVED is the figure in the box, so next month's
+  price rise cannot rewrite a quote the customer agreed to — the same rule as
+  the size surcharge on a jersey, the daily rate on a payroll week and the
+  warranty on a repair ticket. A pre-fill only ever fills an EMPTY box. To
+  change it: `rowPrice` in `src/lib/uniforms.ts`, and `lineTotal` in
+  `src/lib/apparel.ts` which adds them up.
+
+  **The six types find a price through a TAG on the price list**
+  (`apparel_products.uniform_type`), set once by you, and null until you set
+  it. Guessing "Jersey" from the words "Sublimation jersey set" would have the
+  table pre-filling a price for something you never said it was. An untagged
+  type simply asks for the price, which still works. The gap is listed on the
+  **To fill in** screen, as an unimportant item — the shop runs perfectly well
+  without it. To change it: the tag is on the price form; the lookup is
+  `priceByType` on the project screen.
+
+  **Which book a type's money lands in is fixed in the code AND in the
+  database** (`UNIFORM_INCOME_CATEGORY` and `uniform_income_category` in
+  `0019`), never passed in by the caller and never read off the price list. A
+  Server Action is a public endpoint and the books are not its to choose, and
+  one type with two possible categories is how two reports start disagreeing. A
+  test reads the migration and fails if the two ever stop agreeing. **Custom
+  books to a new category, `other_apparel` ("Other apparel")**: a custom cap is
+  not a jersey, and filing it as one would overstate the jersey book every
+  time, quietly. To change it: both the map and the SQL function, plus the test
+  that holds them together.
+
+  **Fifty plain shirts are ONE row saying fifty** (`quantity` on the person
+  row), not fifty empty rows and not a separate concept. The price on such a
+  row is per piece, so a row is `price × pieces`. That answers "orders with no
+  names at all" without a second kind of row that the summary would have to
+  count differently. Items written before today that carry a typed quantity and
+  no names still work exactly as they did, and the summary reports their pieces
+  **separately** from the grid, because nothing says what type or size they
+  are and inventing a column for them is exactly what the person cutting would
+  follow. To change it: `quantity` in `EncodedRow`, and `unencoded` in
+  `summariseUniforms`.
+
+  **A size may be left empty while encoding**, so `apparel_order_names.size`
+  lost its NOT NULL. Twenty-five people are encoded in one sitting and three of
+  them have not said their size; refusing to save the other twenty-two is how a
+  list goes back on to paper. The summary counts those pieces in a **⚠ Not
+  set** column rather than folding them into M — a column somebody can go and
+  fix, instead of a wrong number nobody can see. To change it: `noSize` in
+  `summariseUniforms` and the column in `UniformSummary.tsx`.
+
+  **A shorts-only row is said out loud** (`upper_included`), never inferred
+  from an empty size. Inferring would make "this person's jersey size is not
+  decided yet" and "this person is only getting shorts" the same row, and the
+  summary would be wrong in one of the two directions with nothing to say
+  which. It is chosen in the Size box ("Shorts only") rather than as a separate
+  tick, so it costs no column. A check constraint refuses a row that is neither
+  an upper nor a pair of shorts, because that row is nothing at all.
+
+  **A short name with no short size is warned about.** The short size is what
+  makes a row a set, so without it no shorts are counted, printed or cut —
+  while the row plainly says somebody expects a name on a pair. It is the one
+  combination that would otherwise lose something silently.
+
+  **A down payment can be taken while the project is being written**, through
+  `record_apparel_payment` like every other apparel payment — never as a typed
+  figure on the order, and the balance is still total less payments, never
+  typed. There are no items yet at that moment, so the split has nothing to go
+  on and the money lands in the apparel fallback book. That is a guess, so it
+  is **said on the form before the money is taken** and again afterwards, with
+  the way to avoid it: encode the people first and take the payment on the
+  project, where it splits properly. To change it: `fallbackCategory` in
+  `splitPaymentByCategory`.
+
+  **Items are no longer added by hand.** `AddLineForm` became `ItemFabricForm`:
+  what is still chosen per item is the fabric and the collar, because one
+  design is cut from one cloth. Removing an item **refuses while people are on
+  it** and says where to do it instead — deleting one that still held people
+  would take them with it (`on delete cascade`) and a third of a team would
+  vanish from the table with no warning.
+
+  **An item the encoding empties is removed — unless the shop floor has marked
+  its benches.** Then one of two things happens, and neither throws work away.
+  If every one of its people went to ONE other item, the bench marks follow
+  them: it is the same batch under a new heading. If they scattered, there is
+  no single item the marks belong to any more, so the item is **retired**
+  (`retired_at`): it counts as NOTHING towards the project total, because its
+  pieces are counted elsewhere now, and both screens say so. The alternative —
+  leaving an emptied item behind — would silently put its typed quantity back
+  into the total.
+
+  **The whole table saves in one transaction**, through
+  `save_apparel_encoding`, which is **SECURITY INVOKER** — the default, and
+  deliberately so. Unlike `complete_sale` or `record_apparel_payment` there is
+  nothing here the caller may not do for themselves: no ledger, no money, no
+  table with a narrower door. Running as the caller means Row Level Security
+  still decides every row and the function cannot become a way round it.
+  `16_phase13_rls.test.sql` checks the flag directly and then proves it, as
+  five different people. To change it: never add `security definer` to it.
+
+  **The summary under the table counts what is ON the table**, including
+  changes nobody has saved yet, and says so with a ⚠. The printed sheet counts
+  the saved rows. The alternative — a summary one save behind the table above
+  it — is worse: somebody encodes fifteen people, reads fifteen off the grid,
+  and cuts fifteen when the table says eighteen.
+
+  **Enter moves DOWN a column, not along a row**, and adds a row at the bottom;
+  Tab still moves along. That is how a list is read out — thirty names, then
+  thirty sizes. Enter never submits: half a team encoded and saved by accident
+  is worse than no shortcut at all. **Copy** duplicates everything except the
+  name, the number and the short name, which are the three things that are
+  never the same twice — and a name left behind by mistake goes on a shirt.
+
+  **A read that fails ONLY because Phase 13's columns are not there yet is sent
+  again without them** (`readPast13` in `src/lib/data/apparel.ts`). The app
+  deploys the moment a branch merges while `npm run db:push` is run by hand
+  afterwards, and in between a read asking for `uniform_type` fails outright —
+  which comes back as an empty list, the exact shape of the bug that cost a day
+  in September when a missing `0015` showed up as PHP 0.00 on Sales. The
+  project still opens, totals the same and prints; what the new columns would
+  have said reads as "not recorded". The System check screen still names `0019`
+  as the migration to apply, because that is where a database being behind
+  belongs.
+
+  **The table becomes a row of ten boxes at a new `wide` breakpoint of 85rem**,
+  and below that each row is a card with its own labels. The number was
+  measured, not chosen: the rail is 15rem and the page is capped at 72rem, so a
+  row gets `min(viewport − 15rem, 72rem) − 6rem`. At Tailwind's `xl` that is
+  59rem against a row that wants 60.75rem — four pixels of slack at the default
+  font size and an overflow at any larger one. It is declared in rem rather
+  than pixels so the fit is identical at any browser font size. To change it:
+  `--breakpoint-wide` in `src/app/globals.css`.

@@ -64,6 +64,13 @@ export const INCOME_CATEGORIES = [
   "jackets",
   "long_sleeves",
   "dtf_prints",
+  /*
+    Anything Dabz Apparel makes that is none of the four above - which is what
+    the "Custom" uniform type means (Phase 13). A custom cap filed under
+    jerseys would overstate the jersey book every time, quietly, which is the
+    worst way for a book to be wrong.
+  */
+  "other_apparel",
   // DabzTech Solutions
   "epson_printer_repair",
   "laptop_repair",
@@ -127,6 +134,7 @@ export const CATEGORY_LABELS: Record<LedgerCategory, string> = {
   jackets: "Jackets",
   long_sleeves: "Long sleeves",
   dtf_prints: "DTF prints",
+  other_apparel: "Other apparel",
   epson_printer_repair: "Epson printer repair",
   laptop_repair: "Laptop repair",
   desktop_repair: "Desktop repair",

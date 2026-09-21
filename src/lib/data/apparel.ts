@@ -23,7 +23,50 @@ import {
   type SizePrice,
 } from "@/lib/apparel";
 import { civilDateToISO, manilaToday } from "@/lib/period";
+import { isColumnMissingFromApi, type PostgrestLikeError } from "@/lib/postgrest";
+import { isApparelSize, isUniformType, type UniformType } from "@/lib/uniforms";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+/*
+  Phase 13 added columns to four tables that every apparel screen reads, and
+  the app deploys the moment a branch merges while `npm run db:push` is run by
+  hand afterwards. In between, a read asking for `uniform_type` fails outright -
+  and a failed read here comes back as an empty list, which is the shape of the
+  bug that cost the owner a day in September: "no job orders" and "PHP 0.00"
+  where the truth was "the database is behind".
+
+  So a read that fails ONLY because a column is not there yet is sent again
+  without the Phase 13 columns. The project opens, totals to the same centavo
+  and prints; what the new columns would have said reads as "not recorded",
+  which is true. The System check screen still names `0019` as the migration to
+  apply, because that is where a database being behind belongs.
+*/
+type Read = { data: unknown[] | null; error: PostgrestLikeError | null };
+
+async function readPast13<T extends Read>(
+  withPhase13: () => PromiseLike<T>,
+  withoutIt: () => PromiseLike<T>,
+): Promise<T> {
+  const first = await withPhase13();
+  if (!first.error || !isColumnMissingFromApi(first.error)) return first;
+  return withoutIt();
+}
+
+const PRODUCT_COLUMNS_BEFORE_13 =
+  "id, name, base_price_centavos, income_category, sort_order, active, note";
+const PRODUCT_COLUMNS = `${PRODUCT_COLUMNS_BEFORE_13}, uniform_type`;
+
+const ORDER_COLUMNS_BEFORE_13 =
+  "id, order_number, ordered_on, customer_id, team_name, status, promised_on, layout_note, note, cancel_reason, created_by";
+const ORDER_COLUMNS = `${ORDER_COLUMNS_BEFORE_13}, contact_person, contact_number, address, facebook_link`;
+
+const LINE_COLUMNS_BEFORE_13 =
+  "id, order_id, name, fabric, collar, unit_price_centavos, quantity, income_category";
+const LINE_COLUMNS = `${LINE_COLUMNS_BEFORE_13}, uniform_type, custom_type_name, retired_at`;
+
+const ROSTER_COLUMNS_BEFORE_13 =
+  "id, line_id, player_name, player_number, size, size_extra_centavos, sort_order";
+const ROSTER_COLUMNS = `${ROSTER_COLUMNS_BEFORE_13}, uniform_type, custom_type_name, short_size, short_name, price_centavos, note, quantity, upper_included`;
 
 export interface ApparelProduct {
   id: string;
@@ -33,6 +76,13 @@ export interface ApparelProduct {
   sortOrder: number;
   active: boolean;
   note: string | null;
+  /**
+   * Which of the six uniform types this priced item is (Phase 13), so the
+   * encoding table can pre-fill a row's price. Null until the owner tags it -
+   * guessing "Jersey" from the words "Sublimation jersey set" is exactly the
+   * confident wrong answer this system does not give.
+   */
+  uniformType: UniformType | null;
 }
 
 /**
@@ -77,6 +127,18 @@ export interface ApparelOrder {
   note: string | null;
   cancelReason: string | null;
   createdBy: string | null;
+  /*
+    The project's OWN contact details (Phase 13). On the order rather than on
+    the customer record, because a team's contact person is a fact about this
+    project: next season it is a different manager, and the sheet has to say
+    who was actually spoken to. Where one is empty the screen shows the linked
+    customer's value, clearly labelled as coming from there - shown, never
+    copied in, and never written back.
+  */
+  contactPerson: string | null;
+  contactNumber: string | null;
+  address: string | null;
+  facebookLink: string | null;
 }
 
 export interface ApparelOrderDetail {
@@ -90,24 +152,40 @@ export interface ApparelOrderDetail {
 
 export const getApparelProducts = cache(async (): Promise<ApparelProduct[]> => {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("apparel_products")
-    .select("id, name, base_price_centavos, income_category, sort_order, active, note")
-    .order("active", { ascending: false })
-    .order("sort_order")
-    .order("name");
+  const { data, error } = await readPast13(
+    () =>
+      supabase
+        .from("apparel_products")
+        .select(PRODUCT_COLUMNS)
+        .order("active", { ascending: false })
+        .order("sort_order")
+        .order("name"),
+    () =>
+      supabase
+        .from("apparel_products")
+        .select(PRODUCT_COLUMNS_BEFORE_13)
+        .order("active", { ascending: false })
+        .order("sort_order")
+        .order("name"),
+  );
 
   if (error || !data) return [];
 
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
+  return (data as Record<string, unknown>[]).map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
     basePriceCentavos:
-      row.base_price_centavos === null ? null : Number(row.base_price_centavos),
-    incomeCategory: row.income_category,
+      row.base_price_centavos === null || row.base_price_centavos === undefined
+        ? null
+        : Number(row.base_price_centavos),
+    incomeCategory: String(row.income_category),
     sortOrder: Number(row.sort_order),
-    active: row.active,
-    note: row.note,
+    active: row.active !== false,
+    note: (row.note as string | null) ?? null,
+    uniformType:
+      typeof row.uniform_type === "string" && isUniformType(row.uniform_type)
+        ? row.uniform_type
+        : null,
   }));
 });
 
@@ -146,9 +224,6 @@ export const getApparelOptions = cache(async (): Promise<ApparelOption[]> => {
   }));
 });
 
-const ORDER_COLUMNS =
-  "id, order_number, ordered_on, customer_id, team_name, status, promised_on, layout_note, note, cancel_reason, created_by";
-
 function toOrder(
   row: Record<string, unknown>,
   customerNames: Map<string, string>,
@@ -167,10 +242,15 @@ function toOrder(
     note: (row.note as string | null) ?? null,
     cancelReason: (row.cancel_reason as string | null) ?? null,
     createdBy: (row.created_by as string | null) ?? null,
+    contactPerson: (row.contact_person as string | null) ?? null,
+    contactNumber: (row.contact_number as string | null) ?? null,
+    address: (row.address as string | null) ?? null,
+    facebookLink: (row.facebook_link as string | null) ?? null,
   };
 }
 
 function toLine(row: Record<string, unknown>): OrderLine {
+  const type = (row.uniform_type as string | null) ?? null;
   return {
     id: String(row.id),
     orderId: String(row.order_id),
@@ -180,16 +260,39 @@ function toLine(row: Record<string, unknown>): OrderLine {
     unitPriceCentavos: Number(row.unit_price_centavos),
     quantity: Number(row.quantity),
     incomeCategory: String(row.income_category),
+    // A type this app does not know is impossible - a check constraint refuses
+    // one - but a row written by a newer copy of the app would be, and reading
+    // it as "not recorded" is safer than drawing a line nothing can label.
+    uniformType: type !== null && isUniformType(type) ? type : null,
+    customTypeName: (row.custom_type_name as string | null) ?? null,
+    retiredAt: (row.retired_at as string | null) ?? null,
   };
 }
 
 function toRoster(row: Record<string, unknown>): RosterEntry {
+  const type = (row.uniform_type as string | null) ?? null;
+  const size = (row.size as string | null) ?? null;
+  const shortSize = (row.short_size as string | null) ?? null;
+  const price = row.price_centavos;
+
   return {
     id: String(row.id),
     lineId: String(row.line_id),
+    uniformType: type !== null && isUniformType(type) ? type : null,
+    customTypeName: (row.custom_type_name as string | null) ?? null,
     playerName: (row.player_name as string | null) ?? null,
     playerNumber: (row.player_number as string | null) ?? null,
-    size: String(row.size) as ApparelSize,
+    // A size may now be left empty while encoding, so null is a real answer
+    // rather than a read that went wrong.
+    size: size !== null && isApparelSize(size) ? size : null,
+    shortSize: shortSize !== null && isApparelSize(shortSize) ? shortSize : null,
+    shortName: (row.short_name as string | null) ?? null,
+    // Null is what makes a row fall back to its item's price each, which is
+    // how every order written before Phase 13 still totals the same.
+    priceCentavos: price === null || price === undefined ? null : Number(price),
+    note: (row.note as string | null) ?? null,
+    quantity: Number(row.quantity ?? 1),
+    upperIncluded: row.upper_included !== false,
     sizeExtraCentavos: Number(row.size_extra_centavos),
   };
 }
@@ -217,25 +320,43 @@ export const getApparelOrders = cache(
     const supabase = await createSupabaseServerClient();
     const today = civilDateToISO(manilaToday());
 
-    const { data: orderRows, error } = await supabase
-      .from("apparel_orders")
-      .select(ORDER_COLUMNS)
-      .order("ordered_on", { ascending: false })
-      .limit(options?.limit ?? 200);
+    const limit = options?.limit ?? 200;
+
+    const { data: orderRows, error } = await readPast13(
+      () =>
+        supabase
+          .from("apparel_orders")
+          .select(ORDER_COLUMNS)
+          .order("ordered_on", { ascending: false })
+          .limit(limit),
+      () =>
+        supabase
+          .from("apparel_orders")
+          .select(ORDER_COLUMNS_BEFORE_13)
+          .order("ordered_on", { ascending: false })
+          .limit(limit),
+    );
 
     if (error || !orderRows || orderRows.length === 0) return [];
 
     const [{ data: lineRows }, { data: rosterRows }, { data: paymentRows }, { data: customerRows }] =
       await Promise.all([
-        supabase
-          .from("apparel_order_lines")
-          .select(
-            "id, order_id, name, fabric, collar, unit_price_centavos, quantity, income_category",
-          ),
-        supabase
-          .from("apparel_order_names")
-          .select("id, line_id, player_name, player_number, size, size_extra_centavos, sort_order")
-          .order("sort_order"),
+        readPast13(
+          () => supabase.from("apparel_order_lines").select(LINE_COLUMNS),
+          () => supabase.from("apparel_order_lines").select(LINE_COLUMNS_BEFORE_13),
+        ),
+        readPast13(
+          () =>
+            supabase
+              .from("apparel_order_names")
+              .select(ROSTER_COLUMNS)
+              .order("sort_order"),
+          () =>
+            supabase
+              .from("apparel_order_names")
+              .select(ROSTER_COLUMNS_BEFORE_13)
+              .order("sort_order"),
+        ),
         // Voided payments are skipped, exactly as voided ledger entries are:
         // a balance that still counts money handed back is a wrong balance.
         supabase

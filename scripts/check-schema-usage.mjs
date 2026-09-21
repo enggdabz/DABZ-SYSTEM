@@ -40,12 +40,53 @@ function walk(dir, out = []) {
 }
 
 /**
+ * The file's own column-list constants, resolved to their text.
+ *
+ * A long select is often given a name - `const ORDER_COLUMNS = "id, ..."` -
+ * and a `.select(ORDER_COLUMNS)` would otherwise be invisible to this script,
+ * which is exactly the coverage worth keeping: the longer the list, the more
+ * chances there are to misspell one of it. Two forms are understood, a plain
+ * string and a template literal built from another constant in the same file:
+ *
+ *   const LINE_COLUMNS_BEFORE_13 = "id, order_id, name";
+ *   const LINE_COLUMNS = `${LINE_COLUMNS_BEFORE_13}, uniform_type`;
+ *
+ * Anything cleverer than that is left alone rather than guessed at - a wrong
+ * guess here would report a column that does not exist and send somebody
+ * hunting for a bug that is not there.
+ */
+function columnConstants(source) {
+  const constants = new Map();
+
+  for (const match of source.matchAll(
+    /(?:const|let)\s+([A-Z][A-Z0-9_]*)\s*=\s*(["'`])([^"'`]*)\2\s*;/g,
+  )) {
+    constants.set(match[1], match[3]);
+  }
+
+  // A second pass, so a constant built from one declared above it resolves.
+  for (const match of source.matchAll(
+    /(?:const|let)\s+([A-Z][A-Z0-9_]*)\s*=\s*`([^`]*)`\s*;/g,
+  )) {
+    const text = match[2].replace(
+      /\$\{\s*([A-Z][A-Z0-9_]*)\s*\}/g,
+      (whole, name) => constants.get(name) ?? whole,
+    );
+    // Anything still carrying an unresolved ${...} is not understood.
+    if (!text.includes("${")) constants.set(match[1], text);
+  }
+
+  return constants;
+}
+
+/**
  * Finds every `.from("table")` and the calls chained after it, up to the next
  * `.from(` or the end of the statement. Good enough for the query style this
  * project uses, and it errs towards reporting rather than staying silent.
  */
 function extractUsages(source, file) {
   const usages = [];
+  const constants = columnConstants(source);
   const fromPattern = /\.from\(\s*["'`]([a-z_]+)["'`]\s*\)/g;
 
   let match;
@@ -60,6 +101,16 @@ function extractUsages(source, file) {
     // .select("a, b, c") - ignoring count/head options and "*"
     for (const select of chain.matchAll(/\.select\(\s*["'`]([^"'`]*)["'`]/g)) {
       for (const raw of select[1].split(",")) {
+        const name = raw.trim();
+        if (name && name !== "*") columns.add(name);
+      }
+    }
+
+    // .select(ORDER_COLUMNS) - a named list declared in the same file.
+    for (const select of chain.matchAll(/\.select\(\s*([A-Z][A-Z0-9_]*)\s*\)/g)) {
+      const list = constants.get(select[1]);
+      if (list === undefined) continue;
+      for (const raw of list.split(",")) {
         const name = raw.trim();
         if (name && name !== "*") columns.add(name);
       }

@@ -100,6 +100,21 @@
   --radius-control: var(--radius-control);
 
   --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+
+  /*
+    One breakpoint above Tailwind's own, for the ONE screen that needs a row
+    of ten boxes side by side: a project's encoding table (Phase 13).
+
+    In rem rather than pixels, and that is the point. The rail is 15rem, the
+    page is capped at 72rem and the row's own columns are in rem, so a
+    rem breakpoint keeps the fit identical at any browser font size - where a
+    pixel one would let a person who reads at 20px arrive at the wide layout
+    with two thirds of the room it needs.
+
+    85rem leaves the row 64rem to fill against the 60.75rem it wants. At
+    Tailwind's `xl` it would have 59rem, which is four pixels short of enough.
+  */
+  --breakpoint-wide: 85rem;
 }
 
 body {

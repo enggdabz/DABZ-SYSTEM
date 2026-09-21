@@ -98,6 +98,7 @@ export function toProductionItems(
     lineId: entry.line.id,
     name: entry.line.name,
     quantity: entry.quantity,
+    retired: entry.retired,
   }));
 }
 

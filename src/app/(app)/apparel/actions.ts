@@ -17,10 +17,15 @@ import {
   orderTotals,
   splitPaymentByCategory,
   APPAREL_SIZES,
-  sizeExtra,
   type ApparelSize,
   type OrderStatus,
 } from "@/lib/apparel";
+import {
+  isApparelSize,
+  isUniformType,
+  uniformLabel,
+  type UniformType,
+} from "@/lib/uniforms";
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requireOwnerOrAdmin, requirePermission } from "@/lib/auth/dal";
 import {
@@ -28,11 +33,7 @@ import {
   deleteVanished,
   historyCheckUnavailable,
 } from "@/lib/deletable";
-import {
-  getApparelOrder,
-  getApparelProducts,
-  getSizePrices,
-} from "@/lib/data/apparel";
+import { getApparelOrder } from "@/lib/data/apparel";
 import { MONEY_SOURCES } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
 import { isFunctionMissingFromApi } from "@/lib/postgrest";
@@ -74,6 +75,44 @@ export async function createOrderAction(
   const promisedOn = String(formData.get("promisedOn") ?? "").trim() || null;
   const note = String(formData.get("note") ?? "").trim() || null;
 
+  /*
+    The project's own contact details (Phase 13). All optional: only the team
+    name is required to open a project, because the alternative is a counter
+    that cannot write an order down until somebody remembers a Facebook link.
+  */
+  const contact = {
+    contact_person: String(formData.get("contactPerson") ?? "").trim() || null,
+    contact_number: String(formData.get("contactNumber") ?? "").trim() || null,
+    address: String(formData.get("address") ?? "").trim() || null,
+    facebook_link: String(formData.get("facebookLink") ?? "").trim() || null,
+  };
+
+  /*
+    The down payment usually arrives with the project, so it can be taken here.
+    It goes through `record_apparel_payment` exactly like every other apparel
+    payment - never as a typed figure sitting on the order - so the ledger
+    entry is written in the same transaction.
+  */
+  const downPaymentText = String(formData.get("downPayment") ?? "").trim();
+  let downPaymentCentavos: number | null = null;
+  if (downPaymentText) {
+    try {
+      downPaymentCentavos = parsePesos(downPaymentText);
+      if (downPaymentCentavos <= 0) throw new Error("not positive");
+    } catch {
+      return {
+        fieldErrors: {
+          downPayment: "Leave empty, or enter what was handed over, like 3000.",
+        },
+      };
+    }
+  }
+
+  const downPaymentSource = String(formData.get("downPaymentSource") ?? "cash_drawer");
+  if (downPaymentCentavos !== null && !MONEY_SOURCES.includes(downPaymentSource as never)) {
+    return { fieldErrors: { downPaymentSource: "Choose where the money went." } };
+  }
+
   const supabase = await createSupabaseServerClient();
   const today = manilaToday();
   const todayISO = civilDateToISO(today);
@@ -107,6 +146,7 @@ export async function createOrderAction(
         team_name: teamName,
         promised_on: promisedOn,
         note,
+        ...contact,
         created_by: user.id,
       })
       .select("id")
@@ -128,11 +168,66 @@ export async function createOrderAction(
     entity: "apparel_order",
     entityId: orderId,
     summary: `Opened apparel order ${orderNumber} for ${teamName}`,
-    after: { team_name: teamName, promised_on: promisedOn },
+    after: { team_name: teamName, promised_on: promisedOn, ...contact },
   });
 
+  let paymentNote = "";
+
+  if (downPaymentCentavos !== null) {
+    /*
+      Nothing is encoded yet, so there are no items to split the payment
+      across and it lands in the apparel fallback book. That is a guess, so it
+      is SAID - on the form before it is taken, and here afterwards - rather
+      than left for the owner to find in a report next month. Encoding the
+      people first and taking the payment on the project splits it properly.
+    */
+    const ledger = splitPaymentByCategory({
+      lines: [],
+      amountCentavos: downPaymentCentavos,
+    });
+
+    const { error: paymentError } = await supabase.rpc("record_apparel_payment", {
+      p_order_id: orderId,
+      p_amount_centavos: downPaymentCentavos,
+      p_paid_on: todayISO,
+      p_source: downPaymentSource,
+      p_kind: "down_payment",
+      p_reference_number:
+        String(formData.get("downPaymentReference") ?? "").trim() || null,
+      p_note: null,
+      p_ledger: ledger.map((part) => ({
+        category: part.category,
+        amount_centavos: part.amountCentavos,
+      })),
+    });
+
+    if (paymentError) {
+      // The project IS open - refusing to say so would have staff writing it
+      // twice. What failed is named, and the payment can be taken again on the
+      // project itself.
+      paymentNote = ` The down payment could not be recorded: ${paymentError.message} Take it again on the project.`;
+    } else {
+      await recordAudit({
+        actorId: user.id,
+        actorUsername: user.username,
+        action: "create",
+        entity: "apparel_payment",
+        entityId: orderId,
+        summary: `Took ${formatPesos(
+          downPaymentCentavos,
+        )} as a down payment when apparel order ${orderNumber} was opened`,
+        after: {
+          amount_centavos: downPaymentCentavos,
+          source: downPaymentSource,
+          kind: "down_payment",
+        },
+      });
+      paymentNote = ` ${formatPesos(downPaymentCentavos)} down payment recorded.`;
+    }
+  }
+
   revalidateOrder(orderId);
-  return { success: `Order ${orderNumber} opened.`, orderId };
+  return { success: `Order ${orderNumber} opened.${paymentNote}`, orderId };
 }
 
 export async function updateOrderAction(
@@ -156,6 +251,10 @@ export async function updateOrderAction(
     promised_on: String(formData.get("promisedOn") ?? "").trim() || null,
     layout_note: String(formData.get("layoutNote") ?? "").trim() || null,
     note: String(formData.get("note") ?? "").trim() || null,
+    contact_person: String(formData.get("contactPerson") ?? "").trim() || null,
+    contact_number: String(formData.get("contactNumber") ?? "").trim() || null,
+    address: String(formData.get("address") ?? "").trim() || null,
+    facebook_link: String(formData.get("facebookLink") ?? "").trim() || null,
   };
 
   const supabase = await createSupabaseServerClient();
@@ -176,6 +275,10 @@ export async function updateOrderAction(
     before: {
       team_name: detail.order.teamName,
       promised_on: detail.order.promisedOn,
+      contact_person: detail.order.contactPerson,
+      contact_number: detail.order.contactNumber,
+      address: detail.order.address,
+      facebook_link: detail.order.facebookLink,
     },
     after: row,
   });
@@ -250,7 +353,180 @@ export async function setOrderStatusAction(
 // Lines and the roster
 // ---------------------------------------------------------------------------
 
-export async function addLineAction(
+/**
+ * Fabric and collar on an item (Phase 13).
+ *
+ * Items are no longer ADDED by hand: they follow from the encoding table - one
+ * item per uniform type, created by `save_apparel_encoding`. What is still
+ * chosen per item is what it is made of, because that is a property of the
+ * batch and not of a person.
+ */
+export async function updateLineAction(
+  _previous: ApparelState,
+  formData: FormData,
+): Promise<ApparelState> {
+  const user = await requirePermission("apparel_job_orders");
+
+  const orderId = String(formData.get("orderId") ?? "");
+  const lineId = String(formData.get("lineId") ?? "");
+
+  const detail = await getApparelOrder(orderId);
+  if (!detail) return { error: "That project could not be found." };
+
+  const line = detail.lines.find((entry) => entry.id === lineId);
+  if (!line) return { error: "That item is no longer on this project." };
+
+  const row = {
+    fabric: String(formData.get("fabric") ?? "").trim() || null,
+    collar: String(formData.get("collar") ?? "").trim() || null,
+  };
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("apparel_order_lines")
+    .update(row)
+    .eq("id", lineId);
+
+  if (error) return { error: `That could not be saved: ${error.message}` };
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "update",
+    entity: "apparel_order_line",
+    entityId: lineId,
+    summary: `Set the fabric and collar on "${line.name}" (order ${detail.order.orderNumber})`,
+    before: { fabric: line.fabric, collar: line.collar },
+    after: row,
+  });
+
+  revalidateOrder(orderId);
+  return { success: "Saved." };
+}
+
+/**
+ * Removing an item.
+ *
+ * Only an item nobody is left on. Deleting one that still holds people would
+ * take those people with it (`on delete cascade`) and the table above would
+ * silently lose a third of a team - so it refuses and says where to do it
+ * instead. Emptying the table is how an item goes; this is for the ones the
+ * encoding could not tidy away by itself.
+ */
+export async function removeLineAction(
+  _previous: ApparelState,
+  formData: FormData,
+): Promise<ApparelState> {
+  const user = await requirePermission("apparel_job_orders");
+
+  const orderId = String(formData.get("orderId") ?? "");
+  const lineId = String(formData.get("lineId") ?? "");
+
+  const detail = await getApparelOrder(orderId);
+  if (!detail) return { error: "That project could not be found." };
+
+  const line = detail.lines.find((entry) => entry.id === lineId);
+  if (!line) return { error: "That item is no longer on this project." };
+
+  const people = detail.roster.filter((entry) => entry.lineId === lineId);
+  if (people.length > 0) {
+    return {
+      error: `"${line.name}" still has ${people.length} ${
+        people.length === 1 ? "person" : "people"
+      } on it. Take their rows off the table above and save; the item goes with them.`,
+    };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: removed, error } = await supabase
+    .from("apparel_order_lines")
+    .delete()
+    .eq("id", lineId)
+    .select("id");
+
+  if (error) return { error: `That could not be removed: ${error.message}` };
+  if (!removed || removed.length === 0) {
+    // A DELETE that matches no policy raises nothing, so `.select()` is how a
+    // refusal is told apart from a success.
+    return {
+      error:
+        "Nothing was removed. Either somebody else removed it first, or your account may not change this project.",
+    };
+  }
+
+  // The whole row, because its bench marks cascade away with it and there is
+  // nothing left to reconstruct them from afterwards.
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "delete",
+    entity: "apparel_order_line",
+    entityId: lineId,
+    summary: `Removed "${line.name}" from apparel order ${detail.order.orderNumber}`,
+    before: {
+      name: line.name,
+      uniform_type: line.uniformType,
+      fabric: line.fabric,
+      collar: line.collar,
+      unit_price_centavos: line.unitPriceCentavos,
+      quantity: line.quantity,
+      retired_at: line.retiredAt,
+    },
+  });
+
+  revalidateOrder(orderId);
+  revalidatePath(`/production/${orderId}`);
+  return { success: `Removed ${line.name}.` };
+}
+
+/** One row of the encoding table, as the browser sends it. */
+interface EncodingInput {
+  id?: string | null;
+  uniformType?: string | null;
+  customTypeName?: string | null;
+  playerName?: string | null;
+  playerNumber?: string | null;
+  size?: string | null;
+  shortSize?: string | null;
+  shortName?: string | null;
+  /** In pesos, as typed. Empty means nobody has priced this row. */
+  price?: string | null;
+  note?: string | null;
+  quantity?: string | number | null;
+  upperIncluded?: boolean | null;
+}
+
+/** What goes to the database, and what goes in the audit log. */
+interface EncodingRow {
+  id: string | null;
+  uniform_type: UniformType;
+  custom_type_name: string | null;
+  player_name: string | null;
+  player_number: string | null;
+  size: ApparelSize | null;
+  short_size: ApparelSize | null;
+  short_name: string | null;
+  price_centavos: number | null;
+  note: string | null;
+  quantity: number;
+  upper_included: boolean;
+}
+
+/**
+ * Saves the whole encoding table for a project (Phase 13).
+ *
+ * THE WHOLE TABLE, in one call and one transaction. Thirty people sent as
+ * thirty requests can fail halfway and leave half a team encoded, so the
+ * database does it all or none of it - `save_apparel_encoding` in `0019`,
+ * which also creates the one item per uniform type the rows imply and tidies
+ * up an item nobody is left on.
+ *
+ * Nothing is guessed on the way through. A row with an empty price box is
+ * saved with NO price and shown with a warning; a row with no size is saved
+ * with no size. The only things refused are the two that cannot mean anything:
+ * a row with no type of uniform, and a Custom row nobody named.
+ */
+export async function saveEncodingAction(
   _previous: ApparelState,
   formData: FormData,
 ): Promise<ApparelState> {
@@ -258,180 +534,183 @@ export async function addLineAction(
 
   const orderId = String(formData.get("orderId") ?? "");
   const detail = await getApparelOrder(orderId);
-  if (!detail) return { error: "That order could not be found." };
+  if (!detail) return { error: "That project could not be found." };
 
-  const productId = String(formData.get("productId") ?? "").trim() || null;
-  const products = await getApparelProducts();
-  const product = products.find((entry) => entry.id === productId);
+  let input: EncodingInput[];
+  try {
+    const parsed = JSON.parse(String(formData.get("rows") ?? "[]"));
+    if (!Array.isArray(parsed)) throw new Error("not a list");
+    input = parsed as EncodingInput[];
+  } catch {
+    return { error: "The table could not be read. Reload the project and try again." };
+  }
 
-  const name = String(formData.get("name") ?? "").trim() || product?.name || "";
-  if (!name) return { fieldErrors: { name: "What is being made?" } };
+  const rows: EncodingRow[] = [];
 
-  // Blank price is allowed and means nobody has priced it. The line still goes
-  // on the order, and the screen warns - a made-up price would be quoted to a
-  // real customer.
-  const priceText = String(formData.get("unitPrice") ?? "").trim();
-  let unitPriceCentavos = 0;
-  if (priceText) {
-    try {
-      unitPriceCentavos = parsePesos(priceText);
-      if (unitPriceCentavos < 0) throw new Error("negative");
-    } catch {
-      return { fieldErrors: { unitPrice: "Leave empty, or enter a price like 650." } };
+  for (const [index, raw] of input.entries()) {
+    const at = `Row ${index + 1}`;
+
+    const type = String(raw.uniformType ?? "").trim();
+    if (!type) return { error: `${at} has no type of uniform.` };
+    if (!isUniformType(type)) {
+      return { error: `${at} has a type of uniform this system does not know.` };
     }
-  } else if (product?.basePriceCentavos != null) {
-    unitPriceCentavos = product.basePriceCentavos;
-  }
 
-  const quantity = Number(String(formData.get("quantity") ?? "1"));
-  if (!Number.isInteger(quantity) || quantity < 1) {
-    return { fieldErrors: { quantity: "Enter a whole number, at least 1." } };
-  }
+    const customName =
+      type === "custom" ? String(raw.customTypeName ?? "").trim() : "";
+    if (type === "custom" && !customName) {
+      return { error: `${at} is Custom, so type in what the uniform is.` };
+    }
 
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("apparel_order_lines").insert({
-    order_id: orderId,
-    name,
-    apparel_product_id: productId,
-    fabric: String(formData.get("fabric") ?? "").trim() || null,
-    collar: String(formData.get("collar") ?? "").trim() || null,
-    unit_price_centavos: unitPriceCentavos,
-    quantity,
-    income_category: product?.incomeCategory ?? "sublimation_jerseys",
-    created_by: user.id,
-  });
+    const size = String(raw.size ?? "").trim().toUpperCase();
+    if (size && !isApparelSize(size)) {
+      return { error: `${at} has a size that is not on the ladder: "${size}".` };
+    }
 
-  if (error) return { error: `That could not be saved: ${error.message}` };
+    const shortSize = String(raw.shortSize ?? "").trim().toUpperCase();
+    if (shortSize && !isApparelSize(shortSize)) {
+      return { error: `${at} has a short size that is not on the ladder: "${shortSize}".` };
+    }
 
-  revalidateOrder(orderId);
-  return { success: `${name} added.` };
-}
+    // Blank stays blank. A price is a figure only the shop can know, and a
+    // row with none is a real state that the screen warns about.
+    const priceText = String(raw.price ?? "").trim();
+    let priceCentavos: number | null = null;
+    if (priceText) {
+      try {
+        priceCentavos = parsePesos(priceText);
+        if (priceCentavos < 0) throw new Error("negative");
+      } catch {
+        return { error: `${at} has a price that could not be read: "${priceText}".` };
+      }
+    }
 
-export async function removeLineAction(
-  _previous: ApparelState,
-  formData: FormData,
-): Promise<ApparelState> {
-  await requirePermission("apparel_job_orders");
+    const quantity = Number(raw.quantity ?? 1);
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return { error: `${at} needs a whole number of pieces, at least 1.` };
+    }
 
-  const orderId = String(formData.get("orderId") ?? "");
-  const lineId = String(formData.get("lineId") ?? "");
-
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("apparel_order_lines")
-    .delete()
-    .eq("id", lineId);
-
-  if (error) return { error: `That could not be removed: ${error.message}` };
-
-  revalidateOrder(orderId);
-  return { success: "Removed." };
-}
-
-/**
- * Adds players to a line.
- *
- * Takes the whole roster as pasted text - one player per line, "name, number,
- * size" - because a team captain sends a list, and typing fifteen names into
- * fifteen little forms is how a shop ends up keeping the list on paper instead.
- */
-export async function addRosterAction(
-  _previous: ApparelState,
-  formData: FormData,
-): Promise<ApparelState> {
-  const user = await requirePermission("apparel_job_orders");
-
-  const orderId = String(formData.get("orderId") ?? "");
-  const lineId = String(formData.get("lineId") ?? "");
-  const text = String(formData.get("roster") ?? "").trim();
-
-  if (!text) {
-    return { fieldErrors: { roster: "Paste the list, one player per line." } };
-  }
-
-  const sizes = await getSizePrices();
-  const rows: {
-    line_id: string;
-    player_name: string | null;
-    player_number: string | null;
-    size: ApparelSize;
-    size_extra_centavos: number;
-    sort_order: number;
-    created_by: string;
-  }[] = [];
-
-  const problems: string[] = [];
-
-  text.split("\n").forEach((rawLine, index) => {
-    const trimmed = rawLine.trim();
-    if (!trimmed) return;
-
-    const parts = trimmed.split(",").map((part) => part.trim());
-    const size = (parts[parts.length - 1] ?? "").toUpperCase() as ApparelSize;
-
-    if (!APPAREL_SIZES.includes(size)) {
-      problems.push(`Line ${index + 1}: "${trimmed}" does not end in a size.`);
-      return;
+    const upperIncluded = raw.upperIncluded !== false;
+    if (!upperIncluded && !shortSize) {
+      return {
+        error: `${at} is shorts only, so it needs a short size - otherwise it is nothing at all.`,
+      };
     }
 
     rows.push({
-      line_id: lineId,
-      player_name: parts[0] || null,
-      player_number: parts.length >= 3 ? parts[1] || null : null,
-      size,
-      // Copied now, so a later price rise never rewrites this quote. An unset
-      // surcharge counts as nothing extra HERE because the order has to total
-      // something - the screen warns that the size has no price set.
-      size_extra_centavos: sizeExtra(sizes, size) ?? 0,
-      sort_order: rows.length + 1,
-      created_by: user.id,
+      id: String(raw.id ?? "").trim() || null,
+      uniform_type: type,
+      custom_type_name: customName || null,
+      player_name: String(raw.playerName ?? "").trim() || null,
+      player_number: String(raw.playerNumber ?? "").trim() || null,
+      size: size ? (size as ApparelSize) : null,
+      short_size: shortSize ? (shortSize as ApparelSize) : null,
+      short_name: String(raw.shortName ?? "").trim() || null,
+      price_centavos: priceCentavos,
+      note: String(raw.note ?? "").trim() || null,
+      quantity,
+      upper_included: upperIncluded,
     });
-  });
-
-  if (rows.length === 0) {
-    return {
-      fieldErrors: {
-        roster: problems[0] ?? "Nothing was read. Use: name, number, size",
-      },
-    };
   }
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("apparel_order_names").insert(rows);
 
-  if (error) return { error: `That could not be saved: ${error.message}` };
+  const { data, error } = await supabase.rpc("save_apparel_encoding", {
+    p_order_id: orderId,
+    p_rows: rows.map((row) => ({ ...row })),
+  });
+
+  if (error) {
+    /*
+      Named separately because the fix is different and the raw message reads
+      like a bug: the app deploys the moment a branch merges, while
+      `npm run db:push` is run by hand afterwards, so for a while this screen
+      exists and the function it saves through does not.
+    */
+    return {
+      error: isFunctionMissingFromApi(error)
+        ? "The system could not reach save_apparel_encoding, so nothing was saved. Show this to the owner: migration 0019 has not been applied - run npm run db:push. If it HAS been applied, run notify pgrst, 'reload schema'; in the Supabase SQL editor."
+        : `The table could not be saved: ${error.message}`,
+    };
+  }
+
+  /*
+    Before and after, both. A row that was changed or taken off the table is
+    the one thing on this screen with no other record of it - the rows
+    themselves are overwritten - so the audit log carries what the table said
+    before this save and what it says now.
+  */
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "update",
+    entity: "apparel_encoding",
+    entityId: orderId,
+    summary: `Encoded ${rows.length} row${
+      rows.length === 1 ? "" : "s"
+    } on apparel order ${detail.order.orderNumber}`,
+    before: detail.roster.map(auditShape),
+    after: rows.map((row) => ({
+      name: row.player_name,
+      number: row.player_number,
+      type: uniformLabel(row.uniform_type, row.custom_type_name),
+      size: row.size,
+      short_size: row.short_size,
+      short_name: row.short_name,
+      price_centavos: row.price_centavos,
+      quantity: row.quantity,
+      note: row.note,
+    })),
+  });
 
   revalidateOrder(orderId);
+  revalidatePath(`/production/${orderId}`);
+  revalidatePath("/production");
+
+  const counts = (data ?? {}) as Record<string, number>;
+  const parts: string[] = [];
+  if (counts.rows_added) parts.push(`${counts.rows_added} added`);
+  if (counts.rows_updated) parts.push(`${counts.rows_updated} changed`);
+  if (counts.rows_removed) parts.push(`${counts.rows_removed} removed`);
+  if (counts.items_retired) {
+    // Said out loud: an item nobody is left on, kept because the shop floor
+    // has marked its benches and those marks are somebody's work.
+    parts.push(
+      `${counts.items_retired} item${
+        counts.items_retired === 1 ? "" : "s"
+      } kept for their bench marks`,
+    );
+  }
 
   return {
-    success:
-      problems.length > 0
-        ? `${rows.length} added. ${problems.length} line${
-            problems.length === 1 ? "" : "s"
-          } skipped: ${problems[0]}`
-        : `${rows.length} added.`,
+    success: parts.length > 0 ? `Saved: ${parts.join(", ")}.` : "Saved.",
   };
 }
 
-export async function removeRosterEntryAction(
-  _previous: ApparelState,
-  formData: FormData,
-): Promise<ApparelState> {
-  await requirePermission("apparel_job_orders");
-
-  const orderId = String(formData.get("orderId") ?? "");
-  const entryId = String(formData.get("entryId") ?? "");
-
-  const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("apparel_order_names")
-    .delete()
-    .eq("id", entryId);
-
-  if (error) return { error: `That could not be removed: ${error.message}` };
-
-  revalidateOrder(orderId);
-  return { success: "Removed." };
+/** What a row looked like before a save, for the audit log. */
+function auditShape(entry: {
+  playerName: string | null;
+  playerNumber: string | null;
+  uniformType: UniformType | null;
+  customTypeName: string | null;
+  size: string | null;
+  shortSize: string | null;
+  shortName: string | null;
+  priceCentavos: number | null;
+  quantity: number;
+  note: string | null;
+}) {
+  return {
+    name: entry.playerName,
+    number: entry.playerNumber,
+    type: uniformLabel(entry.uniformType, entry.customTypeName),
+    size: entry.size,
+    short_size: entry.shortSize,
+    short_name: entry.shortName,
+    price_centavos: entry.priceCentavos,
+    quantity: entry.quantity,
+    note: entry.note,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -603,12 +882,25 @@ export async function saveApparelProductAction(
     }
   }
 
+  /*
+    Which of the six uniform types this priced item is (Phase 13). Optional,
+    and null is the honest default: guessing "Jersey" from the words
+    "Sublimation jersey set" would have the encoding table pre-filling a price
+    for something the owner never said it was. Untagged simply means the
+    encoding table asks for the price instead.
+  */
+  const taggedType = String(formData.get("uniformType") ?? "").trim();
+  if (taggedType && !isUniformType(taggedType)) {
+    return { fieldErrors: { uniformType: "Choose one of the six, or leave it." } };
+  }
+
   const row = {
     name,
     base_price_centavos: basePriceCentavos,
     income_category: String(formData.get("incomeCategory") ?? "sublimation_jerseys"),
     active: formData.get("active") !== null,
     note: String(formData.get("note") ?? "").trim() || null,
+    uniform_type: taggedType || null,
   };
 
   const supabase = await createSupabaseServerClient();
