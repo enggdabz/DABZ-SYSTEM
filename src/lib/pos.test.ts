@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { formatPesos, parsePesos } from "./money";
+import { centavosToDecimalString, formatPesos, parsePesos } from "./money";
 import {
   DEFAULT_TARPAULIN_RATE,
   PosError,
+  TARPAULIN_RATES,
   computeCashPayment,
   computeSale,
   formatSaleNumber,
+  parseTarpaulinRate,
   quoteTarpaulin,
   totalsByDivision,
   unitPriceFor,
@@ -67,6 +69,19 @@ describe("quoteTarpaulin", () => {
     }
   });
 
+  it("prices a job at a rate that is not one of the presets", () => {
+    // PHP 27.50 agreed on the phone: 15 sq ft x 27.50 = PHP 412.50, and the
+    // description has to carry the rate that was actually agreed, because that
+    // line is what the customer reads off the receipt.
+    const quote = quoteTarpaulin({
+      widthFeet: 3,
+      heightFeet: 5,
+      ratePerSquareFootCentavos: parseTarpaulinRate("27.50"),
+    });
+    expect(quote.totalCentavos).toBe(parsePesos("412.50"));
+    expect(quote.description).toBe("Tarpaulin 3 × 5 ft — 15 sq ft × 27.50");
+  });
+
   it("always gives a whole number of centavos", () => {
     for (const width of [1.1, 2.33, 3.7, 5.05]) {
       for (const height of [1.1, 2.9, 4.25]) {
@@ -82,6 +97,43 @@ describe("quoteTarpaulin", () => {
     expect(() => quoteTarpaulin({ widthFeet: 3, heightFeet: 0 })).toThrow(PosError);
     expect(() => quoteTarpaulin({ widthFeet: 5000, heightFeet: 5 })).toThrow(PosError);
     expect(() => quoteTarpaulin({ widthFeet: Number.NaN, heightFeet: 5 })).toThrow(PosError);
+  });
+});
+
+describe("parseTarpaulinRate", () => {
+  it("reads a typed rate to the centavo", () => {
+    expect(parseTarpaulinRate("30")).toBe(parsePesos("30"));
+    expect(parseTarpaulinRate("27.50")).toBe(parsePesos("27.50"));
+    expect(parseTarpaulinRate("27.5")).toBe(parsePesos("27.50"));
+    // Someone typing a big rate out of habit, with a separator in it.
+    expect(parseTarpaulinRate("1,250.75")).toBe(parsePesos("1250.75"));
+    expect(parseTarpaulinRate(" 30 ")).toBe(parsePesos("30"));
+  });
+
+  it("agrees with the presets, so a typed 30 is the same sale as a chosen 30", () => {
+    for (const preset of TARPAULIN_RATES) {
+      expect(parseTarpaulinRate(centavosToDecimalString(preset))).toBe(preset);
+    }
+  });
+
+  it("refuses an amount that is not money", () => {
+    for (const bad of ["", " ", "abc", "30.555", "3o", "12.5.5"]) {
+      expect(() => parseTarpaulinRate(bad), bad).toThrow(PosError);
+    }
+  });
+
+  it("refuses a rate of zero or less", () => {
+    // A free tarpaulin is not a rate the counter can have typed on purpose, and
+    // a negative one would hand money back on a sale.
+    expect(() => parseTarpaulinRate("0")).toThrow(PosError);
+    expect(() => parseTarpaulinRate("0.00")).toThrow(PosError);
+    expect(() => parseTarpaulinRate("-30")).toThrow(PosError);
+  });
+
+  it("never returns a fraction of a centavo", () => {
+    for (const input of ["1", "0.01", "27.5", "999.99"]) {
+      expect(Number.isInteger(parseTarpaulinRate(input)), input).toBe(true);
+    }
   });
 });
 

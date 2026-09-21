@@ -7,9 +7,12 @@ import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui"
 import type { DivisionId } from "@/lib/divisions";
 import { centavosToDecimalString, formatPesos, parsePesos } from "@/lib/money";
 import {
+  CUSTOM_TARPAULIN_RATE,
   DEFAULT_TARPAULIN_RATE,
+  PosError,
   TARPAULIN_RATES,
   computeSale,
+  parseTarpaulinRate,
   quoteTarpaulin,
   unitPriceFor,
   type PriceTier,
@@ -665,19 +668,43 @@ function TarpaulinCalculator({
 }) {
   const [width, setWidth] = useState("3");
   const [height, setHeight] = useState("5");
-  const [rate, setRate] = useState(String(DEFAULT_TARPAULIN_RATE));
+  const [choice, setChoice] = useState(String(DEFAULT_TARPAULIN_RATE));
+  const [typedRate, setTypedRate] = useState("");
+
+  const custom = choice === CUSTOM_TARPAULIN_RATE;
+
+  /*
+    The typed rate is read by `parseTarpaulinRate`, not by `Number()`: a rate is
+    money, and money in this system is only ever parsed in one place.
+  */
+  const rate = useMemo<{ centavos: number | null; error: string | null }>(() => {
+    if (!custom) return { centavos: Number(choice), error: null };
+    try {
+      return { centavos: parseTarpaulinRate(typedRate), error: null };
+    } catch (thrown) {
+      return {
+        centavos: null,
+        error: thrown instanceof PosError ? thrown.message : "That is not a peso amount.",
+      };
+    }
+  }, [custom, choice, typedRate]);
+
+  // An empty box is not a mistake - it is a box that has only just been opened -
+  // so the warning under the Field waits until something has been typed into it.
+  const rateError = typedRate.trim() === "" ? undefined : (rate.error ?? undefined);
 
   const quote = useMemo(() => {
+    if (rate.centavos === null) return null;
     try {
       return quoteTarpaulin({
         widthFeet: Number(width),
         heightFeet: Number(height),
-        ratePerSquareFootCentavos: Number(rate),
+        ratePerSquareFootCentavos: rate.centavos,
       });
     } catch {
       return null;
     }
-  }, [width, height, rate]);
+  }, [width, height, rate.centavos]);
 
   return (
     <section className="rounded-card bg-surface p-5 ring-1 ring-line/60">
@@ -701,15 +728,36 @@ function TarpaulinCalculator({
             onChange={(event) => setHeight(event.target.value)}
           />
         </Field>
-        <Field label="Rate per sq ft">
-          <Select value={rate} onChange={(event) => setRate(event.target.value)}>
-            {TARPAULIN_RATES.map((option) => (
-              <option key={option} value={option}>
-                {formatPesos(option)}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        {/*
+          The typed rate sits in the SAME grid cell as the picker rather than
+          becoming a fourth column, so it stays directly under the thing it
+          belongs to at every width - beside it on a phone, under it on a tablet.
+        */}
+        <div className="space-y-3">
+          <Field label="Rate per sq ft">
+            <Select value={choice} onChange={(event) => setChoice(event.target.value)}>
+              {TARPAULIN_RATES.map((option) => (
+                <option key={option} value={option}>
+                  {formatPesos(option)}
+                </option>
+              ))}
+              <option value={CUSTOM_TARPAULIN_RATE}>Custom amount</option>
+            </Select>
+          </Field>
+          {custom ? (
+            <Field label="Amount per sq ft" hint="In pesos" error={rateError}>
+              <Input
+                autoFocus
+                inputMode="decimal"
+                // A format, not a suggestion: what a square foot is worth is
+                // the owner's to say, so no figure is put in this box.
+                placeholder="0.00"
+                value={typedRate}
+                onChange={(event) => setTypedRate(event.target.value)}
+              />
+            </Field>
+          ) : null}
+        </div>
       </div>
 
       {quote ? (
@@ -738,7 +786,9 @@ function TarpaulinCalculator({
       ) : (
         <p className="mt-4 text-sm text-attention">
           <span aria-hidden="true">{"⚠"} </span>
-          Enter a width and height in feet.
+          {rate.centavos === null
+            ? "Enter the amount per sq ft."
+            : "Enter a width and height in feet."}
         </p>
       )}
     </section>
