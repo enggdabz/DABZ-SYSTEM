@@ -3,9 +3,10 @@ import { connection } from "next/server";
 
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { ORDER_STATUS_LABELS, isOpenOrder } from "@/lib/apparel";
+import { scheduleNote, scheduleProject } from "@/lib/apparel-calendar";
 import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
-import { getApparelOrders } from "@/lib/data/apparel";
+import { getApparelOrders, toCalendarOrder } from "@/lib/data/apparel";
 import { getCustomers } from "@/lib/data/pos";
 import { DIVISIONS } from "@/lib/divisions";
 import { formatPesos, sumCentavos } from "@/lib/money";
@@ -43,6 +44,17 @@ export default async function ApparelPage() {
       entry.order.status === "released" && entry.totals.balanceCentavos > 0,
   );
 
+  /*
+    What the production calendar says about today, worked out from the orders
+    already read rather than by asking again. A project whose target day
+    passed with work left on it has been carried forward, and this screen is
+    where the shop looks first in the morning.
+  */
+  const priority = orders
+    .filter((entry) => entry.order.status !== "cancelled")
+    .map((entry) => scheduleProject({ order: toCalendarOrder(entry), today }))
+    .filter((project) => project.priority);
+
   const outstanding = sumCentavos(
     orders
       .filter((entry) => entry.order.status !== "cancelled")
@@ -59,12 +71,20 @@ export default async function ApparelPage() {
             is still owed.
           </p>
         </div>
-        <NewOrderForm
-          customers={customers
-            .filter((customer) => customer.active)
-            .map((customer) => ({ id: customer.id, name: customer.name }))}
-          today={civilDateToISO(today)}
-        />
+        <div className="flex flex-wrap items-center gap-4">
+          <Link
+            href="/apparel/calendar"
+            className={`text-sm underline underline-offset-2 ${TAP_AREA}`}
+          >
+            Production calendar
+          </Link>
+          <NewOrderForm
+            customers={customers
+              .filter((customer) => customer.active)
+              .map((customer) => ({ id: customer.id, name: customer.name }))}
+            today={civilDateToISO(today)}
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -93,6 +113,42 @@ export default async function ApparelPage() {
           </p>
         </Card>
       </div>
+
+      {priority.length > 0 ? (
+        <Notice
+          tone="attention"
+          title={`${priority.length} priority project${
+            priority.length === 1 ? "" : "s"
+          } today`}
+        >
+          <p>
+            {priority.length === 1 ? "This one" : "These"} should have been
+            finished by now, so {priority.length === 1 ? "it has" : "they have"}{" "}
+            been carried on to today.
+          </p>
+          <ul className="mt-2 space-y-1">
+            {priority.map((project) => (
+              <li key={project.id} className="text-sm">
+                <Link
+                  href={`/apparel/${project.id}`}
+                  className={`font-medium underline underline-offset-2 ${TAP_AREA}`}
+                >
+                  {project.teamName ?? project.orderNumber}
+                </Link>
+                <span className="text-muted"> &middot; {scheduleNote(project)}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2">
+            <Link
+              href="/apparel/calendar"
+              className={`underline underline-offset-2 ${TAP_AREA}`}
+            >
+              Open the apparel calendar
+            </Link>
+          </p>
+        </Notice>
+      ) : null}
 
       {canSetPrices ? (
         <Notice tone="info" title="Nothing here is priced yet">

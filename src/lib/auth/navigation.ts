@@ -46,6 +46,13 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/expenses", label: "Expenses", permission: "record_expenses", group: "Daily", phase: 5 },
   { href: "/stocks", label: "Stocks", permission: "stock_in_out", group: "Daily", phase: 5 },
   { href: "/apparel", label: "Apparel", permission: "apparel_job_orders", group: "Daily", phase: 6 },
+  {
+    href: "/apparel/calendar",
+    label: "Apparel calendar",
+    permission: "apparel_job_orders",
+    group: "Daily",
+    phase: 6,
+  },
   { href: "/repairs", label: "Repairs", permission: "dabztech_tickets", group: "Daily", phase: 7 },
   { href: "/customers", label: "Customers", group: "Daily", phase: 4 },
 
