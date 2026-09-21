@@ -24,6 +24,13 @@ import "server-only";
 import { cache } from "react";
 
 import { parseISODate, type CivilDate } from "@/lib/period";
+import { getPublicSettings } from "@/lib/data/public";
+import {
+  DEFAULT_SETTINGS,
+  settingsFromRow,
+  type AppSettings,
+  type SettingsRow,
+} from "@/lib/settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type {
   Category,
@@ -60,6 +67,21 @@ async function client() {
 function toCivilDate(value: string | null): CivilDate | null {
   return value === null ? null : parseISODate(value);
 }
+
+/**
+ * The shop's settings, for a visitor who is nobody.
+ *
+ * `getSettings()` in the DAL reads through the signed-in client, which hands a
+ * stranger nothing at all - so the shop needs its own reader, the same way the
+ * Phase 9 public page does. It comes back TYPED rather than as a raw row so
+ * the pages read `settings.messengerUsername`, which is what the guard in
+ * `src/lib/data/checklist.test.ts` looks for: a field printed on a page the
+ * customer sees has to be one the To fill in screen knows about.
+ */
+export const getShopSettings = cache(async (): Promise<AppSettings> => {
+  const row = await getPublicSettings();
+  return row ? settingsFromRow(row as SettingsRow) : DEFAULT_SETTINGS;
+});
 
 // ---------------------------------------------------------------------------
 // The catalogue

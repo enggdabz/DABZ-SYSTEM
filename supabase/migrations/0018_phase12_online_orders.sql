@@ -304,6 +304,11 @@ create table if not exists public.online_orders (
   -- is guessable and the page carries a name and a phone number.
   receipt_token text not null unique,
 
+  -- Kept for rate limiting only, exactly as `enquiries` and `login_events`
+  -- keep one. Never shown, never exported, and null for an order staff typed
+  -- in themselves.
+  ip_address text,
+
   completed_at timestamptz,
   cancelled_at timestamptz,
   cancel_reason text,
@@ -326,6 +331,43 @@ create index if not exists online_orders_status_idx on public.online_orders (sta
 create index if not exists online_orders_needed_idx on public.online_orders (date_needed);
 create index if not exists online_orders_created_idx on public.online_orders (created_at desc);
 create index if not exists online_orders_mobile_idx on public.online_orders (mobile);
+create index if not exists online_orders_rate_idx
+  on public.online_orders (ip_address, created_at desc);
+
+/*
+  The server's own notebook of what strangers have been doing.
+
+  Two kinds of row, and both exist so a limit can be counted per address the
+  way the enquiry form counts messages:
+
+    'upload' - a file a customer attached, written before the order exists.
+               It is also what the purge reads: a file in `tmp/` that no order
+               picked up is found here by its date, rather than by listing a
+               bucket that will one day be large.
+    'track'  - somebody looking an order up. Guessing an order number has to
+               cost the guesser something, or the lookup is an index of every
+               order in the shop.
+
+  No policy of any kind, for anybody. Only the server writes it, and nothing
+  reads it but those two limits and the purge.
+*/
+create table if not exists public.online_rate_events (
+  id uuid primary key default gen_random_uuid(),
+  kind text not null check (kind in ('upload', 'track')),
+  -- Kept for the limit only, the same as `enquiries` and `login_events`.
+  ip_address text,
+  -- Only an upload has one.
+  storage_path text,
+  -- Set when order creation takes the file, so the purge can skip it without
+  -- having to ask whether an order points at it.
+  claimed_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists online_rate_events_rate_idx
+  on public.online_rate_events (kind, ip_address, created_at desc);
+create index if not exists online_rate_events_purge_idx
+  on public.online_rate_events (kind, claimed_at, created_at);
 
 create table if not exists public.online_order_items (
   id uuid primary key default gen_random_uuid(),
@@ -599,6 +641,15 @@ alter table public.online_order_files enable row level security;
 alter table public.online_payments enable row level security;
 alter table public.online_order_production enable row level security;
 alter table public.online_status_log enable row level security;
+alter table public.online_rate_events enable row level security;
+
+/*
+  `online_rate_events` gets NO policy at all - not read, not write, not for
+  anybody signed in. It is the server's own notebook: an address and a storage
+  path, kept only long enough to stop one person filling the bucket and to
+  find the files nobody claimed. Nothing in the app reads it, so nothing needs
+  to be allowed to.
+*/
 
 -- ---- The catalogue: the one thing a stranger may read ---------------------
 --
@@ -823,7 +874,8 @@ create or replace function public.create_online_order(
   p_address text,
   p_date_needed date,
   p_notes text,
-  p_items jsonb
+  p_items jsonb,
+  p_ip_address text default null
 )
 returns jsonb
 language plpgsql
@@ -935,12 +987,17 @@ begin
 
   insert into public.online_orders (
     order_no, customer_id, customer_name, mobile, facebook_name,
-    method, address, date_needed, notes, source, receipt_token, created_by
+    method, address, date_needed, notes, source, receipt_token,
+    ip_address, created_by
   ) values (
     v_order_no, v_customer_id, btrim(p_customer_name), p_mobile,
     nullif(btrim(coalesce(p_facebook_name, '')), ''),
     p_method, nullif(btrim(coalesce(p_address, '')), ''), p_date_needed,
-    nullif(btrim(coalesce(p_notes, '')), ''), v_source, v_token, v_actor
+    nullif(btrim(coalesce(p_notes, '')), ''), v_source, v_token,
+    -- Only for a website order. Staff typing one in are not a stranger to be
+    -- rate limited, and their address is nobody's business.
+    case when v_source = 'website' then p_ip_address else null end,
+    v_actor
   )
   returning id into v_order_id;
 
@@ -1087,6 +1144,11 @@ begin
         v_entry ->> 'mime_type',
         nullif(v_entry ->> 'size_bytes', '')::bigint
       );
+
+      -- The purge leaves a claimed file alone: an order points at it now.
+      update public.online_rate_events
+      set claimed_at = now()
+      where kind = 'upload' and storage_path = v_entry ->> 'storage_path';
     end loop;
   end loop;
 
@@ -1591,7 +1653,7 @@ $$;
     * everything else      -> signed-in staff only. Each one re-checks the
                               caller anyway; this is the belt beside it.
 */
-revoke all on function public.create_online_order(text, text, text, text, text, date, text, jsonb) from public;
+revoke all on function public.create_online_order(text, text, text, text, text, date, text, jsonb, text) from public;
 revoke all on function public.online_staff_label() from public;
 revoke all on function public.online_order_path(uuid) from public;
 revoke all on function public.online_pesos(bigint) from public;
@@ -1603,7 +1665,7 @@ revoke all on function public.online_undo_stage(uuid) from public;
 revoke all on function public.online_record_payment(uuid, bigint, text, date, text) from public;
 revoke all on function public.online_void_payment(uuid, text) from public;
 
-grant execute on function public.create_online_order(text, text, text, text, text, date, text, jsonb)
+grant execute on function public.create_online_order(text, text, text, text, text, date, text, jsonb, text)
   to authenticated, service_role;
 grant execute on function public.online_staff_label() to authenticated;
 -- The server reads the path too, when it puts an order's steps in an email.

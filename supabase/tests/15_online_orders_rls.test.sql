@@ -46,7 +46,8 @@ begin
     'online_product_prices', 'online_product_options', 'online_designs',
     'online_design_products', 'online_production_stages', 'online_orders',
     'online_order_items', 'online_order_roster', 'online_order_files',
-    'online_payments', 'online_order_production', 'online_status_log'
+    'online_payments', 'online_order_production', 'online_status_log',
+    'online_rate_events'
   ]
   loop
     if to_regclass('public.' || v_table) is null then
@@ -56,7 +57,14 @@ begin
       raise exception 'FAIL: public.% has Row Level Security switched off', v_table;
     end if;
   end loop;
-  raise notice 'PASS: all fifteen tables exist, every one with RLS on';
+  raise notice 'PASS: all sixteen tables exist, every one with RLS on';
+
+  -- The server's own notebook: an address and a storage path, and nobody at
+  -- all may read or write it through the API.
+  if (select count(*) from pg_policies where tablename = 'online_rate_events') <> 0 then
+    raise exception 'FAIL: online_rate_events has a policy - it is meant to have none';
+  end if;
+  raise notice 'PASS: online_rate_events is closed to everybody';
 
   /*
     The flag on online_order_totals, checked directly.
@@ -112,7 +120,7 @@ begin
   -- The whole point of the Server Action in front of the function.
   if has_function_privilege(
     'anon',
-    'public.create_online_order(text, text, text, text, text, date, text, jsonb)',
+    'public.create_online_order(text, text, text, text, text, date, text, jsonb, text)',
     'execute'
   ) then
     raise exception 'FAIL: anon can call create_online_order, so the rate limit in front of it is decoration';

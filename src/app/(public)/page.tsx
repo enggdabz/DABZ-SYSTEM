@@ -89,9 +89,21 @@ export default async function PublicHomePage() {
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
+          {/*
+            The way into the online shop (Phase 12). First, and shaped like the
+            main action, because it is the one thing on this page a customer
+            can finish by themselves - everything else here ends in a message
+            somebody has to answer.
+          */}
+          <Link
+            href="/shop"
+            className="rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
+          >
+            Order jerseys online
+          </Link>
           <a
             href="#contact"
-            className="rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
+            className="rounded-control bg-ink/5 px-5 py-3 text-sm font-medium ring-1 ring-line hover:bg-ink/10"
           >
             Ask us about a job
           </a>

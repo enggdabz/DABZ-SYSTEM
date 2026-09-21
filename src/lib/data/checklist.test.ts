@@ -19,15 +19,36 @@ import { describe, expect, it } from "vitest";
  * the page and forgotten here.
  */
 
-const PUBLIC_PAGE = join(process.cwd(), "src/app/(public)/page.tsx");
+/**
+ * Every page a CUSTOMER sees. The online shop (Phase 12) is on this list for
+ * the same reason the public page is: it prints what the owner has filled in
+ * and leaves out what they have not, and the gap has to surface somewhere
+ * they will look.
+ */
+const CUSTOMER_PAGES = [
+  join(process.cwd(), "src/app/(public)/page.tsx"),
+  join(process.cwd(), "src/app/(shop)/shop/page.tsx"),
+  join(process.cwd(), "src/app/(shop)/shop/order/details/page.tsx"),
+  join(process.cwd(), "src/app/(shop)/shop/order/received/[token]/page.tsx"),
+];
+
 const CHECKLIST = join(process.cwd(), "src/lib/data/checklist.ts");
 
 /**
- * Not a detail anyone fills in - it is the switch that takes the whole page
- * down, and it ships as true. A checklist entry for it would read as an
- * instruction to turn your own page off.
+ * Not details anyone fills in.
+ *
+ * `publicPageEnabled` and `onlineShopEnabled` are the switches that take a
+ * page down, and both ship as true - a checklist entry for either would read
+ * as an instruction to turn your own shop off. `onlineMinDaysAhead` and
+ * `onlineShowStepsToCustomers` are policies with a default the specification
+ * itself gives, not figures only the owner can know.
  */
-const NOT_A_FILL_IN_FIELD = new Set(["publicPageEnabled"]);
+const NOT_A_FILL_IN_FIELD = new Set([
+  "publicPageEnabled",
+  "onlineShopEnabled",
+  "onlineMinDaysAhead",
+  "onlineShowStepsToCustomers",
+]);
 
 function settingsFieldsReadBy(path: string): string[] {
   const source = readFileSync(path, "utf8");
@@ -39,15 +60,17 @@ function settingsFieldsReadBy(path: string): string[] {
   return [...found].filter((field) => !NOT_A_FILL_IN_FIELD.has(field));
 }
 
-describe("the public page and the To fill in screen", () => {
-  const fields = settingsFieldsReadBy(PUBLIC_PAGE);
+describe("the pages a customer sees, and the To fill in screen", () => {
+  const fields = [
+    ...new Set(CUSTOMER_PAGES.flatMap((page) => settingsFieldsReadBy(page))),
+  ];
 
   it("finds the fields to check", () => {
     // A guard that silently checks nothing is worse than no guard.
     expect(fields.length).toBeGreaterThan(5);
   });
 
-  it("lists every shop detail the public page prints", () => {
+  it("lists every shop detail a customer-facing page prints", () => {
     const checklist = readFileSync(CHECKLIST, "utf8");
     const missing = fields.filter(
       (field) => !checklist.includes(`settings.${field}`),
@@ -55,7 +78,7 @@ describe("the public page and the To fill in screen", () => {
 
     expect(
       missing,
-      `The public page prints ${missing.join(", ")}, but src/lib/data/checklist.ts never mentions that. A customer would see the gap and the owner would never be told.`,
+      `A page the customer sees prints ${missing.join(", ")}, but src/lib/data/checklist.ts never mentions that. A customer would see the gap and the owner would never be told.`,
     ).toEqual([]);
   });
 });

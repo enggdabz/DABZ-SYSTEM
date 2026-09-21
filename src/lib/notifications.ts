@@ -239,6 +239,31 @@ export function enquiryAlert(options: { waiting: number }): EnquiryAlert {
   };
 }
 
+/**
+ * A new online order (Phase 12).
+ *
+ * The second immediate notification in the system, and it earns it for the
+ * same reason the first one does: there is a person at the other end. A
+ * customer who orders at nine in the evening and hears nothing until the
+ * morning has already messaged the next shop.
+ *
+ * It carries NO name, NO number and NO figure - only that an order arrived and
+ * how many are waiting. A push payload is encrypted end to end, and it still
+ * lands on a lock screen anybody standing near the phone can read.
+ */
+export function onlineOrderAlert(options: { waiting: number }): EnquiryAlert {
+  const waiting = Math.max(1, options.waiting);
+
+  return {
+    title: "A new order came in from the shop",
+    body:
+      waiting === 1
+        ? "Tap to open it."
+        : `${waiting} online orders are now waiting.`,
+    url: "/online-orders",
+  };
+}
+
 // ---------------------------------------------------------------------------
 // When the morning is
 // ---------------------------------------------------------------------------

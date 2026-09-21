@@ -20,6 +20,7 @@ import { getStaff } from "@/lib/data/staff";
 import { getStockItems } from "@/lib/data/stocks";
 import { getApparelProducts, getSizePrices } from "@/lib/data/apparel";
 import { getRepairServices } from "@/lib/data/repairs";
+import { getOnlineProducts } from "@/lib/data/online";
 import { getSettings } from "@/lib/auth/dal";
 
 export interface ChecklistItem {
@@ -52,6 +53,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     sizes,
     settings,
     repairServices,
+    onlineProducts,
   ] =
     await Promise.all([
       getBills(),
@@ -63,6 +65,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       getSizePrices(),
       getSettings(),
       getRepairServices(),
+      getOnlineProducts(true),
     ]);
 
   const items: ChecklistItem[] = [];
@@ -408,6 +411,34 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       href: "/settings",
       linkLabel: "Open Settings",
       important: false,
+    });
+  }
+
+  /*
+    The online shop's catalogue (Phase 12). An empty shop is a real state and
+    the page says so honestly to a customer - but it is also the one gap that
+    cannot show up as a missing FIGURE, because there is no row to hang a
+    warning on. Same reason the three lists above are here.
+  */
+  if (onlineProducts.length === 0) {
+    items.push({
+      id: "no-online-products",
+      title: "Nothing on the online shop yet",
+      why: "A customer who taps Order jerseys online is shown an empty shop. Nothing was put there for you: a price is something only you can decide. Add what you already make, and price anything you quote after seeing the design as Price on quote — that is a real answer, not a gap.",
+      names: [],
+      href: "/online-orders/products",
+      linkLabel: "Open the online shop",
+      important: true,
+    });
+  } else if (onlineProducts.every((product) => !product.isVisible)) {
+    items.push({
+      id: "online-products-all-hidden",
+      title: "Every online product is hidden",
+      why: "The products are there, but every one of them is switched off, so a customer still sees an empty shop.",
+      names: [],
+      href: "/online-orders/products",
+      linkLabel: "Open the online shop",
+      important: true,
     });
   }
 

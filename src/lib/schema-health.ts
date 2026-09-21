@@ -165,6 +165,7 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     "online_production_stages",
     "online_products",
     "online_status_log",
+    "online_rate_events",
   ].map((name) => ({
     name,
     migration: "0018_phase12_online_orders",
