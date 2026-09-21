@@ -17,10 +17,21 @@ import { sumCentavos, type Centavos } from "./money";
 
 export type LedgerDirection = "in" | "out";
 
-/** Where the money physically came from or went (spec 10.3). */
+/**
+ * Where the money physically came from or went (spec 10.3).
+ *
+ * Maya belongs here and was missing until Phase 10. The database has accepted
+ * it on every money table since `0005` (open decision 17.12, decided), and the
+ * counter has offered it as a payment method ever since - but this list is
+ * what builds every OTHER form in the system, so a Maya apparel down payment,
+ * a Maya bill payment and a Maya expense were all impossible to record. The
+ * End of day screen was meanwhile counting a "Maya" line that only a counter
+ * sale could ever fill.
+ */
 export const MONEY_SOURCES = [
   "cash_drawer",
   "gcash",
+  "maya",
   "bank",
   "owners_pocket",
 ] as const;
@@ -29,6 +40,7 @@ export type MoneySource = (typeof MONEY_SOURCES)[number];
 export const MONEY_SOURCE_LABELS: Record<MoneySource, string> = {
   cash_drawer: "Cash drawer",
   gcash: "GCash",
+  maya: "Maya",
   bank: "Bank",
   owners_pocket: "Owner's pocket",
 };

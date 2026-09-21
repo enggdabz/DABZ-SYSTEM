@@ -11,6 +11,7 @@ import {
 } from "@/lib/apparel";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { paymentKindLabel } from "@/lib/collections";
 import {
   getApparelOptions,
   getApparelOrder,
@@ -397,7 +398,7 @@ export default async function ApparelOrderPage({
                     {formatPesos(payment.amountCentavos)}
                   </span>
                   <span className="ml-2 text-xs text-muted">
-                    {payment.kind === "down_payment" ? "Down payment" : "Payment"}
+                    {paymentKindLabel({ paymentKind: payment.kind })}
                     {" · "}
                     {showDate(payment.paidOn)}
                     {" · "}
@@ -406,9 +407,17 @@ export default async function ApparelOrderPage({
                     ] ?? payment.source}
                   </span>
                 </span>
-                {canVoid ? (
-                  <VoidPaymentForm orderId={order.id} paymentId={payment.id} />
-                ) : null}
+                <span className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={`/apparel/${order.id}/payment/${payment.id}/receipt`}
+                    className={`text-sm underline ${TAP_AREA}`}
+                  >
+                    Receipt
+                  </Link>
+                  {canVoid ? (
+                    <VoidPaymentForm orderId={order.id} paymentId={payment.id} />
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>

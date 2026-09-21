@@ -10,7 +10,9 @@ import "server-only";
  */
 import { cache } from "react";
 
+import { collectionsReport, type CollectionsReport } from "@/lib/collections";
 import { getApparelOrders } from "@/lib/data/apparel";
+import { getCollections } from "@/lib/data/collections";
 import { getPayables } from "@/lib/data/expenses";
 import {
   getBillPayments,
@@ -63,6 +65,28 @@ export async function getReport(range: ReportRange): Promise<PeriodReport> {
   );
 
   return buildReport(entries, range);
+}
+
+/**
+ * Collections by division and kind, for the same period (Phase 10).
+ *
+ * Kept apart from `getReport` rather than folded into it, because the two read
+ * different things: a report is the LEDGER added up, and this is the three
+ * payment tables. The ledger cannot answer "how much of September's apparel
+ * income was down payments", because a ledger entry knows only that it was
+ * tagged `apparel`.
+ *
+ * Both are readings of the same money, and they agree - the SQL suite asserts
+ * that the feed's totals per method equal the ledger's for any day.
+ */
+export async function getCollectionsReport(
+  range: ReportRange,
+): Promise<CollectionsReport> {
+  const window = utcWindow(range);
+
+  return collectionsReport(
+    await getCollections({ from: window.from, to: window.to, limit: 5000 }),
+  );
 }
 
 /** The same report for the period before, so the two can be compared. */

@@ -483,6 +483,23 @@ export async function recordPaymentAction(
   }
 
   /*
+    Down payment or balance (Phase 10). A DabzTech payment says which since
+    `0014`, the same as an apparel one has since `0007`.
+
+    The form always sends one, so an empty box is a fault rather than an old
+    record: null is reserved for the payments taken before the column existed,
+    and inventing more of those would blur the one honest gap in the data.
+  */
+  const kind = String(formData.get("paymentKind") ?? "");
+  if (kind !== "down_payment" && kind !== "balance") {
+    return {
+      fieldErrors: {
+        paymentKind: "Say whether this is a down payment or a balance.",
+      },
+    };
+  }
+
+  /*
     The split is worked out HERE, on the server, from the ticket's own lines -
     never from anything the browser sent. The database then refuses any split
     that does not add back up to the payment.
@@ -508,6 +525,7 @@ export async function recordPaymentAction(
       category: part.category,
       amount_centavos: part.amountCentavos,
     })),
+    p_kind: kind,
   });
 
   if (error) return { error: `The payment could not be saved: ${error.message}` };
@@ -521,7 +539,7 @@ export async function recordPaymentAction(
     summary: `Took ${formatPesos(amountCentavos)} on repair ${
       detail.ticket.ticketNumber
     }`,
-    after: { amount_centavos: amountCentavos, source },
+    after: { amount_centavos: amountCentavos, source, kind },
   });
 
   revalidateTicket(ticketId);

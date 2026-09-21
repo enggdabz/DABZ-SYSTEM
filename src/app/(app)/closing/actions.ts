@@ -20,7 +20,7 @@ import { civilDateToISO, manilaToday } from "@/lib/period";
 import { computeDailyTarget } from "@/lib/target";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-import { readDayTotals } from "./totals";
+import { readDayBreakdown, readDayTotals } from "./totals";
 
 export interface ClosingState {
   error?: string;
@@ -44,8 +44,9 @@ export async function saveClosingAction(
   }
 
   const today = manilaToday();
-  const [totals, bills, payroll] = await Promise.all([
+  const [totals, breakdown, bills, payroll] = await Promise.all([
     readDayTotals(today),
+    readDayBreakdown(today),
     getBills(),
     getEstimatedMonthlyPayroll(),
   ]);
@@ -64,6 +65,21 @@ export async function saveClosingAction(
 
   const supabase = await createSupabaseServerClient();
 
+  /*
+    The breakdown is frozen onto the row alongside the count (Phase 10).
+
+    Everything else here is already a snapshot - the day's figures as they were
+    at the moment somebody counted the drawer - and the breakdown has to be one
+    too. A void tomorrow changes what the feed says about today, and the point
+    of a closing is to record what was believed when the cash was counted.
+  */
+  const door = (division: "printshoppe" | "apparel" | "dabztech") =>
+    breakdown.divisions.find((entry) => entry.division === division);
+
+  const counter = door("printshoppe");
+  const apparel = door("apparel");
+  const dabztech = door("dabztech");
+
   const { error } = await supabase.from("day_closings").upsert(
     {
       closing_date: civilDateToISO(today),
@@ -73,9 +89,24 @@ export async function saveClosingAction(
       gcash_centavos: totals.gcashCentavos,
       maya_centavos: totals.mayaCentavos,
       bank_centavos: totals.bankCentavos,
+      owners_pocket_centavos: totals.ownersPocketCentavos,
       total_sales_centavos: result.totalSalesCentavos,
       target_centavos: result.targetCentavos,
       target_reached: result.targetReached,
+
+      counter_cash_centavos: counter?.bySource.cash_drawer ?? 0,
+      counter_total_centavos: counter?.totalCentavos ?? 0,
+
+      apparel_cash_centavos: apparel?.bySource.cash_drawer ?? 0,
+      apparel_total_centavos: apparel?.totalCentavos ?? 0,
+      apparel_down_payment_centavos: apparel?.downPaymentCentavos ?? 0,
+      apparel_balance_centavos: apparel?.balanceCentavos ?? 0,
+
+      dabztech_cash_centavos: dabztech?.bySource.cash_drawer ?? 0,
+      dabztech_total_centavos: dabztech?.totalCentavos ?? 0,
+      dabztech_down_payment_centavos: dabztech?.downPaymentCentavos ?? 0,
+      dabztech_balance_centavos: dabztech?.balanceCentavos ?? 0,
+
       note: String(formData.get("note") ?? "").trim() || null,
       created_by: user.id,
     },

@@ -355,6 +355,29 @@ export interface DayClosingRow {
   bankCentavos: Centavos;
   totalSalesCentavos: Centavos;
   note: string | null;
+  /**
+   * Which door the day's money came through, frozen at the moment it was
+   * counted (Phase 10).
+   *
+   * Null for every day closed before Phase 10, and it stays null: nobody can
+   * reconstruct it, and a row of zeroes beside a day that took PHP 8,000 would
+   * read as a fault rather than as an absence.
+   */
+  breakdown: DayClosingBreakdown | null;
+}
+
+export interface DayClosingBreakdown {
+  ownersPocketCentavos: Centavos;
+  counterCashCentavos: Centavos;
+  counterTotalCentavos: Centavos;
+  apparelCashCentavos: Centavos;
+  apparelTotalCentavos: Centavos;
+  apparelDownPaymentCentavos: Centavos;
+  apparelBalanceCentavos: Centavos;
+  dabztechCashCentavos: Centavos;
+  dabztechTotalCentavos: Centavos;
+  dabztechDownPaymentCentavos: Centavos;
+  dabztechBalanceCentavos: Centavos;
 }
 
 export const getDayClosing = cache(
@@ -365,7 +388,7 @@ export const getDayClosing = cache(
     const { data, error } = await supabase
       .from("day_closings")
       .select(
-        "id, closing_date, expected_cash_centavos, counted_cash_centavos, difference_centavos, gcash_centavos, maya_centavos, bank_centavos, total_sales_centavos, note",
+        "id, closing_date, expected_cash_centavos, counted_cash_centavos, difference_centavos, gcash_centavos, maya_centavos, bank_centavos, total_sales_centavos, note, owners_pocket_centavos, counter_cash_centavos, counter_total_centavos, apparel_cash_centavos, apparel_total_centavos, apparel_down_payment_centavos, apparel_balance_centavos, dabztech_cash_centavos, dabztech_total_centavos, dabztech_down_payment_centavos, dabztech_balance_centavos",
       )
       .eq("closing_date", civilDateToISO(on))
       .maybeSingle();
@@ -386,6 +409,48 @@ export const getDayClosing = cache(
       bankCentavos: Number(data.bank_centavos),
       totalSalesCentavos: Number(data.total_sales_centavos),
       note: data.note,
+      breakdown: toBreakdown(data as Record<string, unknown>),
     };
   },
 );
+
+/**
+ * The stored breakdown, or null when the day predates Phase 10.
+ *
+ * One null column is enough to make the whole breakdown absent rather than
+ * partly invented: the writer fills all eleven together, so any missing one
+ * means no breakdown was ever recorded.
+ */
+function toBreakdown(row: Record<string, unknown>): DayClosingBreakdown | null {
+  const columns = [
+    "owners_pocket_centavos",
+    "counter_cash_centavos",
+    "counter_total_centavos",
+    "apparel_cash_centavos",
+    "apparel_total_centavos",
+    "apparel_down_payment_centavos",
+    "apparel_balance_centavos",
+    "dabztech_cash_centavos",
+    "dabztech_total_centavos",
+    "dabztech_down_payment_centavos",
+    "dabztech_balance_centavos",
+  ] as const;
+
+  if (columns.some((column) => row[column] === null || row[column] === undefined)) {
+    return null;
+  }
+
+  return {
+    ownersPocketCentavos: Number(row.owners_pocket_centavos),
+    counterCashCentavos: Number(row.counter_cash_centavos),
+    counterTotalCentavos: Number(row.counter_total_centavos),
+    apparelCashCentavos: Number(row.apparel_cash_centavos),
+    apparelTotalCentavos: Number(row.apparel_total_centavos),
+    apparelDownPaymentCentavos: Number(row.apparel_down_payment_centavos),
+    apparelBalanceCentavos: Number(row.apparel_balance_centavos),
+    dabztechCashCentavos: Number(row.dabztech_cash_centavos),
+    dabztechTotalCentavos: Number(row.dabztech_total_centavos),
+    dabztechDownPaymentCentavos: Number(row.dabztech_down_payment_centavos),
+    dabztechBalanceCentavos: Number(row.dabztech_balance_centavos),
+  };
+}

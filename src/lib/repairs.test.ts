@@ -38,6 +38,7 @@ function payment(overrides: Partial<TicketPayment> = {}): TicketPayment {
     amountCentavos: parsePesos("300"),
     paidOn: "2026-09-18",
     source: "cash_drawer",
+    kind: "down_payment",
     note: null,
     ...overrides,
   };

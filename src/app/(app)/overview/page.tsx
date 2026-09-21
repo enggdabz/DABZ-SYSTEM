@@ -5,8 +5,21 @@ import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { formatManilaDateTime } from "@/lib/datetime";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
-import { PERMISSION_INFO, isOwnerOrAdmin, type Permission } from "@/lib/auth/permissions";
+import {
+  PERMISSION_INFO,
+  can,
+  isOwnerOrAdmin,
+  type Permission,
+} from "@/lib/auth/permissions";
 import { monthTotals } from "@/lib/bills";
+import {
+  DIVISION_DOOR_LABELS,
+  collectedTotal,
+  totalsByDivision as collectionTotalsByDivision,
+} from "@/lib/collections";
+import { getCollectionsForDay, getHeldMoney } from "@/lib/data/collections";
+import { getStanding } from "@/lib/data/reports";
+import { DIVISION_IDS, type DivisionId } from "@/lib/divisions";
 import { getChecklist } from "@/lib/data/checklist";
 import { getEnquiries } from "@/lib/data/enquiries";
 import { unansweredCount } from "@/lib/enquiries";
@@ -78,6 +91,17 @@ export default async function HomePage({
       ) : null}
 
       {isOwnerOrAdmin(user) ? <OwnerOverview /> : <StaffHome user={user} />}
+
+      {/*
+        The day's takings, for whoever is allowed to see them: Owner, Admin, or
+        a staff member with the daily sales report permission (spec 4.3). Below
+        the role-specific home on purpose - the owner's target card is the first
+        thing that should be read, and a staff member's list of what they may do
+        is theirs.
+      */}
+      {isOwnerOrAdmin(user) || can(user, "view_daily_sales_report") ? (
+        <CollectedToday user={user} />
+      ) : null}
 
       {/*
         Only while something IS still being built. Every section is finished as
@@ -725,6 +749,129 @@ async function OwnerOverview() {
         </Link>
       </Card>
     </>
+  );
+}
+
+/**
+ * What the shop has collected today, and what it is still owed (Phase 10).
+ *
+ * Three figures, and each of them answers a different question:
+ *
+ *   Collected today     - what came in, through which door.
+ *   Down payments held  - how much of that is for work not yet handed over.
+ *   Still to collect    - what customers owe on jobs already under way.
+ *
+ * The second and third are Owner/Admin only. The first is shown to anyone with
+ * the daily sales report permission, but only for the doors that person can
+ * actually see: a counter assistant without the apparel permission gets an
+ * incomplete total, and the card says so rather than letting it read as the
+ * whole day.
+ */
+async function CollectedToday({
+  user,
+}: {
+  user: Awaited<ReturnType<typeof requireUser>>;
+}) {
+  const owner = isOwnerOrAdmin(user);
+  const today = manilaToday();
+
+  const [rows, held, standing] = await Promise.all([
+    getCollectionsForDay(today),
+    owner ? getHeldMoney() : Promise.resolve(null),
+    owner ? getStanding() : Promise.resolve(null),
+  ]);
+
+  const byDivision = collectionTotalsByDivision(rows);
+
+  const canSee = (id: DivisionId) => {
+    if (owner) return true;
+    if (id === "apparel") return can(user, "apparel_job_orders");
+    if (id === "dabztech") return can(user, "dabztech_tickets");
+    return true;
+  };
+
+  const hidden = DIVISION_IDS.filter((id) => !canSee(id));
+
+  return (
+    <div className="grid gap-5 lg:grid-cols-2">
+      <Card title="Collected today">
+        <p className="text-3xl font-semibold tracking-tight">
+          {formatPesos(collectedTotal(rows))}
+        </p>
+
+        <dl className="mt-4 space-y-2 text-sm">
+          {DIVISION_IDS.filter(canSee).map((id) => (
+            <div key={id} className="flex items-baseline justify-between gap-2">
+              <dt className="text-muted">{DIVISION_DOOR_LABELS[id]}</dt>
+              <dd className="font-medium">
+                {formatPesos(byDivision[id])}{" "}
+                <Link
+                  href={`/sales?division=${id}`}
+                  className={`ml-1 text-xs underline ${TAP_AREA}`}
+                >
+                  See
+                </Link>
+              </dd>
+            </div>
+          ))}
+        </dl>
+
+        {hidden.length > 0 ? (
+          <p className="mt-4 flex items-start gap-1.5 text-xs text-attention">
+            <span aria-hidden="true">{"⚠"}</span>
+            <span>
+              {hidden.map((id) => DIVISION_DOOR_LABELS[id]).join(" and ")} money
+              is not shown to your account, so this is not the whole day.
+            </span>
+          </p>
+        ) : null}
+
+        <Link href="/sales" className={`mt-4 inline-block text-sm underline ${TAP_AREA}`}>
+          See every payment
+        </Link>
+      </Card>
+
+      {owner && held && standing ? (
+        <Card title="Money held, money owed">
+          <dl className="space-y-4">
+            <div>
+              <dt className="text-xs font-medium text-muted">
+                Down payments held
+              </dt>
+              <dd className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatPesos(held.centavos)}
+              </dd>
+              <p className="mt-1 text-xs text-muted">
+                Money already received for work the shop still owes &mdash;{" "}
+                {held.orderCount} job order{held.orderCount === 1 ? "" : "s"} and{" "}
+                {held.ticketCount} repair{held.ticketCount === 1 ? "" : "s"}.
+              </p>
+            </div>
+
+            <div className="border-t border-line/60 pt-4">
+              <dt className="text-xs font-medium text-muted">Still to collect</dt>
+              <dd className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatPesos(standing.owedToShopCentavos)}
+              </dd>
+              <p className="mt-1 text-xs text-muted">
+                Balances on open job orders and repair tickets. Already counted
+                as income when the work was done, so it is not added to a
+                month&apos;s takings.
+              </p>
+            </div>
+          </dl>
+
+          <div className="mt-4 flex flex-wrap gap-4">
+            <Link href="/apparel" className={`text-sm underline ${TAP_AREA}`}>
+              Open Dabz Apparel
+            </Link>
+            <Link href="/repairs" className={`text-sm underline ${TAP_AREA}`}>
+              Open DabzTech
+            </Link>
+          </div>
+        </Card>
+      ) : null}
+    </div>
   );
 }
 

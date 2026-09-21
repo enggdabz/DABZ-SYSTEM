@@ -5,17 +5,27 @@ import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { getReportWithComparison, getStanding } from "@/lib/data/reports";
+import {
+  getCollectionsReport,
+  getReportWithComparison,
+  getStanding,
+} from "@/lib/data/reports";
+import { MONEY_SOURCES, MONEY_SOURCE_LABELS, type MoneySource } from "@/lib/ledger";
 import { formatPesos } from "@/lib/money";
 import { civilDateToISO, formatCivilDate, manilaToday, parseISODate } from "@/lib/period";
 import {
   RANGE_PRESETS,
+  categoryAmount,
   compareTo,
   rangeForPreset,
   type RangePreset,
 } from "@/lib/reports";
 
 export const metadata = { title: "Report · Dabz System" };
+
+function methodLabel(source: MoneySource): string {
+  return source === "cash_drawer" ? "Cash" : MONEY_SOURCE_LABELS[source];
+}
 
 function showDate(iso: string): string {
   const date = parseISODate(iso);
@@ -51,10 +61,17 @@ export default async function PrintReportPage({
     settings.weekStartsOn,
   );
 
-  const [{ current, previous }, standing] = await Promise.all([
+  const [{ current, previous }, standing, collections] = await Promise.all([
     getReportWithComparison(range),
     getStanding(),
+    getCollectionsReport(range),
   ]);
+
+  // Only the methods that actually took money, so a printed sheet does not
+  // spend a third of its width on three columns of PHP 0.00.
+  const usedMethods = MONEY_SOURCES.filter(
+    (source) => collections.totalBySource[source] !== 0,
+  );
 
   const profitChange = compareTo(current.profitCentavos, previous.profitCentavos);
 
@@ -186,6 +203,73 @@ export default async function PrintReportPage({
             </table>
             <p className="mt-1 text-[10px]">
               Percentages are rounded, so they may not total 100. The amounts do.
+            </p>
+          </section>
+        ) : null}
+
+        {/*
+          Which door the money came through (Phase 10). Narrower than the
+          screen's table on purpose: an A4 sheet has room for the methods that
+          were actually used, and a column of zeroes wastes the width the peso
+          figures need.
+        */}
+        {collections.lines.length > 0 ? (
+          <section className="mt-5">
+            <h2 className="border-b border-black pb-1 text-sm font-bold">
+              Collections by division and kind
+            </h2>
+            <table className="mt-2 w-full text-sm">
+              <thead>
+                <tr className="text-xs">
+                  <th scope="col" className="py-1 text-left font-normal">
+                    Door and kind
+                  </th>
+                  {usedMethods.map((source) => (
+                    <th
+                      key={source}
+                      scope="col"
+                      className="py-1 text-right font-normal"
+                    >
+                      {methodLabel(source)}
+                    </th>
+                  ))}
+                  <th scope="col" className="w-28 py-1 text-right font-normal">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {collections.lines.map((line) => (
+                  <tr key={line.key} className="border-t border-black/20">
+                    <td className="py-1">{line.label}</td>
+                    {usedMethods.map((source) => (
+                      <td key={source} className="py-1 text-right">
+                        {formatPesos(line.bySource[source])}
+                      </td>
+                    ))}
+                    <td className="py-1 text-right font-semibold">
+                      {formatPesos(line.amountCentavos)}
+                    </td>
+                  </tr>
+                ))}
+                <tr className="border-t border-black font-bold">
+                  <td className="py-1">All collections</td>
+                  {usedMethods.map((source) => (
+                    <td key={source} className="py-1 text-right">
+                      {formatPesos(collections.totalBySource[source])}
+                    </td>
+                  ))}
+                  <td className="py-1 text-right">
+                    {formatPesos(collections.totalCentavos)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="mt-1 text-[10px]">
+              DabzTech checking fees in this period:{" "}
+              {formatPesos(categoryAmount(current, "checking_fee"))}, already
+              inside the DabzTech figures above. A DabzTech payment taken before
+              the kind was recorded reads as &ldquo;Payment&rdquo;.
             </p>
           </section>
         ) : null}

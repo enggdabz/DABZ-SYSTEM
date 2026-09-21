@@ -3,17 +3,27 @@ import { connection } from "next/server";
 
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { getReportWithComparison, getStanding } from "@/lib/data/reports";
+import {
+  getCollectionsReport,
+  getReportWithComparison,
+  getStanding,
+} from "@/lib/data/reports";
+import { MONEY_SOURCES, MONEY_SOURCE_LABELS, type MoneySource } from "@/lib/ledger";
 import { formatPesos } from "@/lib/money";
 import { civilDateToISO, formatCivilDate, manilaToday, parseISODate } from "@/lib/period";
 import {
   RANGE_PRESETS,
   RANGE_PRESET_LABELS,
+  categoryAmount,
   compareTo,
   rangeForPreset,
   type RangePreset,
   type ReportRange,
 } from "@/lib/reports";
+
+function methodLabel(source: MoneySource): string {
+  return source === "cash_drawer" ? "Cash" : MONEY_SOURCE_LABELS[source];
+}
 
 export const metadata = { title: "Reports · Dabz System" };
 
@@ -92,9 +102,10 @@ export default async function ReportsPage({
     settings.weekStartsOn,
   );
 
-  const [{ current, previous }, standing] = await Promise.all([
+  const [{ current, previous }, standing, collections] = await Promise.all([
     getReportWithComparison(range),
     getStanding(),
+    getCollectionsReport(range),
   ]);
 
   const nothingYet = current.entryCount === 0;
@@ -261,6 +272,128 @@ export default async function ReportsPage({
           <p className="mt-5 text-xs text-muted">
             The percentages are rounded to whole numbers, so they may not add up
             to exactly 100. The amounts do.
+          </p>
+        </Card>
+      ) : null}
+
+      {/* ---- Collections by division and kind (Phase 10) ------------------- */}
+      {collections.lines.length > 0 ? (
+        <Card
+          title="Collections by division and kind"
+          description="Which door the money came through, and what it was for. The card above splits income by what was SOLD; this splits it by how it was taken."
+        >
+          {/* Phone: a block per line. Eight columns will not fit at 390px. */}
+          <ul className="space-y-4 sm:hidden">
+            {collections.lines.map((line) => (
+              <li
+                key={line.key}
+                className="rounded-card bg-surface-sunken p-4 ring-1 ring-line/60"
+              >
+                <div className="flex flex-wrap items-baseline justify-between gap-2">
+                  <span className="font-medium">{line.label}</span>
+                  <span className="text-lg font-semibold tracking-tight">
+                    {formatPesos(line.amountCentavos)}
+                  </span>
+                </div>
+                <dl className="mt-2 space-y-1 text-sm">
+                  {MONEY_SOURCES.filter((source) => line.bySource[source] !== 0).map(
+                    (source) => (
+                      <div key={source} className="flex justify-between gap-2">
+                        <dt className="text-muted">{methodLabel(source)}</dt>
+                        <dd>{formatPesos(line.bySource[source])}</dd>
+                      </div>
+                    ),
+                  )}
+                </dl>
+                <p className="mt-2 text-xs text-muted">
+                  {line.count} payment{line.count === 1 ? "" : "s"}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <div className="hidden sm:block">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-line/60 text-left">
+                  <th scope="col" className="pb-2 font-medium text-muted">
+                    Door and kind
+                  </th>
+                  {MONEY_SOURCES.map((source) => (
+                    <th
+                      key={source}
+                      scope="col"
+                      className="pb-2 text-right font-medium text-muted"
+                    >
+                      {methodLabel(source)}
+                    </th>
+                  ))}
+                  <th scope="col" className="pb-2 text-right font-medium">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {collections.lines.map((line) => (
+                  <tr key={line.key} className="border-b border-line/60">
+                    <th scope="row" className="py-2.5 text-left font-normal">
+                      {line.label}
+                    </th>
+                    {MONEY_SOURCES.map((source) => (
+                      <td
+                        key={source}
+                        className={`py-2.5 text-right whitespace-nowrap ${
+                          line.bySource[source] === 0 ? "text-muted" : ""
+                        }`}
+                      >
+                        {formatPesos(line.bySource[source])}
+                      </td>
+                    ))}
+                    <td className="py-2.5 text-right font-semibold whitespace-nowrap">
+                      {formatPesos(line.amountCentavos)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th scope="row" className="pt-3 text-left font-semibold">
+                    All collections
+                  </th>
+                  {MONEY_SOURCES.map((source) => (
+                    <td
+                      key={source}
+                      className="pt-3 text-right font-semibold whitespace-nowrap"
+                    >
+                      {formatPesos(collections.totalBySource[source])}
+                    </td>
+                  ))}
+                  <td className="pt-3 text-right text-base font-semibold whitespace-nowrap">
+                    {formatPesos(collections.totalCentavos)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {/*
+            Beside the table rather than in it: the checking fee is a slice of
+            DabzTech income by CATEGORY, and putting it in a column of doors
+            would invite somebody to add it to the total twice.
+          */}
+          <p className="mt-5 text-sm text-muted">
+            DabzTech checking fees in this period:{" "}
+            <span className="font-medium text-ink">
+              {formatPesos(categoryAmount(current, "checking_fee"))}
+            </span>
+            . Charged even when the customer decides not to go ahead, so it is
+            already inside the DabzTech figures above.
+          </p>
+
+          <p className="mt-2 text-xs text-muted">
+            A DabzTech payment taken before this was recorded reads as
+            &ldquo;Payment&rdquo;: nobody can now say whether it was a down
+            payment or a balance, so nothing guesses.
           </p>
         </Card>
       ) : null}

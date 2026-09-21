@@ -572,6 +572,25 @@ export function PaymentForm({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        {/*
+          Starts on whichever this payment usually is - the first money on an
+          order is a down payment - but it is a choice, not a deduction: a
+          customer can hand over a second down payment on a job that has not
+          started yet.
+        */}
+        <Field
+          label="This payment is a"
+          error={state.fieldErrors?.paymentKind}
+        >
+          <Select
+            name="paymentKind"
+            defaultValue={isFirstPayment ? "down_payment" : "balance"}
+          >
+            <option value="down_payment">Down payment</option>
+            <option value="balance">Balance</option>
+          </Select>
+        </Field>
+
         <Field label="Paid with" error={state.fieldErrors?.source}>
           <Select name="source" defaultValue="cash_drawer">
             {MONEY_SOURCES.map((source) => (

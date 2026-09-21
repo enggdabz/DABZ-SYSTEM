@@ -655,10 +655,13 @@ export function PaymentForm({
   ticketId,
   balanceLabel,
   today,
+  isFirstPayment,
 }: {
   ticketId: string;
   balanceLabel: string;
   today: string;
+  /** Decides which way the down payment / balance choice starts. */
+  isFirstPayment: boolean;
 }) {
   const [state, submit, pending] = useActionState<RepairState, FormData>(
     recordPaymentAction,
@@ -670,7 +673,7 @@ export function PaymentForm({
     return (
       <div className="space-y-2">
         <Button type="button" onClick={() => setOpen(true)}>
-          Take a payment
+          {isFirstPayment ? "Take a down payment" : "Take a payment"}
         </Button>
         {state.success ? <Notice tone="success" title={state.success} /> : null}
       </div>
@@ -690,6 +693,22 @@ export function PaymentForm({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
+        {/*
+          A DabzTech payment says whether it is a down payment or a balance
+          since Phase 10, the same as an apparel one. Payments taken before
+          that read as plain "Payment" - nobody can now say which they were,
+          so nothing guesses on their behalf.
+        */}
+        <Field label="This payment is a" error={state.fieldErrors?.paymentKind}>
+          <Select
+            name="paymentKind"
+            defaultValue={isFirstPayment ? "down_payment" : "balance"}
+          >
+            <option value="down_payment">Down payment</option>
+            <option value="balance">Balance</option>
+          </Select>
+        </Field>
+
         <Field label="Paid with" error={state.fieldErrors?.source}>
           <Select name="source" defaultValue="cash_drawer">
             {MONEY_SOURCES.map((source) => (

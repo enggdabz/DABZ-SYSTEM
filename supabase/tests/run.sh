@@ -44,6 +44,9 @@ quiet "$HERE/../migrations/0012_clear_apparel_and_repair_prices.sql"
 # fixtures below. The suite proves the POLICIES; that migration is checked by
 # applying it to a throwaway copy, not by running it here.
 
+# 0014 adds the collections feed, so it has to be here - 12 tests it.
+quiet "$HERE/../migrations/0014_phase10_collections.sql"
+
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
 # read now bring their own.
@@ -58,3 +61,4 @@ run "$HERE/08_phase6_rls.test.sql"
 run "$HERE/09_phase7_rls.test.sql"
 run "$HERE/10_phase9_rls.test.sql"
 run "$HERE/11_delete_rules.test.sql"
+run "$HERE/12_phase10_rls.test.sql"

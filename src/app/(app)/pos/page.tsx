@@ -2,10 +2,12 @@ import { connection } from "next/server";
 
 import { Notice } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
-import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { getPayableJobs } from "@/lib/data/collections";
 import { getCustomers, getProducts } from "@/lib/data/pos";
 
 import { PosScreen } from "./PosScreen";
+import { TakeOrderPayment } from "./TakeOrderPayment";
 
 export const metadata = { title: "POS · Dabz System" };
 
@@ -16,18 +18,44 @@ export default async function PosPage() {
   const user = await requirePermission("add_sales");
   const settings = await getSettings();
 
-  const [products, customers] = await Promise.all([getProducts(), getCustomers()]);
+  /*
+    Taking an Apparel or DabzTech payment needs THAT division's permission -
+    `add_sales` on its own gives neither (Phase 10, spec 3.2). Somebody with
+    only Add sales never sees the button, and the Server Action re-checks
+    anyway, because a hidden button is not a rule.
+  */
+  const canTakeApparel = can(user, "apparel_job_orders");
+  const canTakeRepairs = can(user, "dabztech_tickets");
+
+  const [products, customers, payableJobs] = await Promise.all([
+    getProducts(),
+    getCustomers(),
+    getPayableJobs({
+      apparel: canTakeApparel,
+      dabztech: canTakeRepairs,
+      unclaimedAfterDays: settings.unclaimedUnitDays,
+    }),
+  ]);
 
   const unpriced = products.filter((product) => product.priceCentavos === null);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Counter</h1>
-        <p className="mt-2 text-muted">
-          Tap a button, confirm the quantity, then complete the sale. Nothing is
-          added until you confirm it.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-semibold tracking-tight">Counter</h1>
+          <p className="mt-2 text-muted">
+            Tap a button, confirm the quantity, then complete the sale. Nothing
+            is added until you confirm it.
+          </p>
+        </div>
+
+        {canTakeApparel || canTakeRepairs ? (
+          <TakeOrderPayment
+            jobs={payableJobs}
+            downPaymentPercent={settings.apparelDownPaymentPercent}
+          />
+        ) : null}
       </div>
 
       {products.length === 0 ? (

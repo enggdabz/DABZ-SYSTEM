@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import { collectionsReport, type CollectionRow } from "./collections";
 import {
   buildReport,
+  categoryAmount,
   compareTo,
   inRange,
   previousRange,
@@ -355,6 +357,103 @@ describe("toCsv", () => {
   it("survives a quotation mark in a label", () => {
     // Doubling is how CSV escapes a quote; anything else corrupts the file.
     expect(csvOf('He said "hi"')).toBe('"He said ""hi"""');
+  });
+
+  it("leaves the collections block out when it was not asked for", () => {
+    expect(csv).not.toContain("Collections by division and kind");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collections in the export (Phase 10)
+// ---------------------------------------------------------------------------
+
+describe("the export's collections block", () => {
+  function collectionRow(over: Partial<CollectionRow>): CollectionRow {
+    return {
+      id: over.id ?? "r",
+      kind: over.kind ?? "counter_sale",
+      division: over.division ?? "printshoppe",
+      paymentKind: over.paymentKind === undefined ? "sale" : over.paymentKind,
+      reference: "S-260918-001",
+      customerName: null,
+      amountCentavos: over.amountCentavos ?? 0,
+      source: over.source ?? "cash_drawer",
+      referenceNumber: null,
+      takenAt: "2026-09-18T02:00:00Z",
+      recordedForISO: "2026-09-18",
+      takenBy: null,
+      voidedAt: over.voidedAt ?? null,
+      href: "/sales",
+    };
+  }
+
+  const report = buildReport(
+    [
+      entry({ amountCentavos: parsePesos("5000"), category: "document_printing" }),
+      entry({
+        id: "fee",
+        amountCentavos: parsePesos("250"),
+        tag: "dabztech",
+        category: "checking_fee",
+      }),
+    ],
+    RANGE,
+  );
+
+  const collections = collectionsReport([
+    collectionRow({ id: "a", amountCentavos: parsePesos("5000") }),
+    collectionRow({
+      id: "b",
+      kind: "apparel_payment",
+      division: "apparel",
+      paymentKind: "down_payment",
+      amountCentavos: parsePesos("1200"),
+      source: "gcash",
+    }),
+    collectionRow({
+      id: "c",
+      kind: "repair_payment",
+      division: "dabztech",
+      paymentKind: null,
+      amountCentavos: parsePesos("250"),
+      source: "maya",
+    }),
+  ]);
+
+  const csv = toCsv(report, collections);
+
+  it("names each door and kind as a row", () => {
+    expect(csv).toContain('"Counter · Sale"');
+    expect(csv).toContain('"Apparel · Down payment"');
+    expect(csv).toContain('"DabzTech · Payment"');
+  });
+
+  it("writes one column per method, as plain numbers", () => {
+    // Counter: 5,000 cash and nothing else.
+    expect(csv).toContain('"Counter · Sale","5000.00","0.00","0.00","0.00","0.00","5000.00","1"');
+    // Apparel: 1,200 by GCash.
+    expect(csv).toContain('"Apparel · Down payment","0.00","1200.00","0.00","0.00","0.00","1200.00","1"');
+  });
+
+  it("adds the doors back up to the period's collections", () => {
+    expect(csv).toContain('"All collections","5000.00","1200.00","250.00","0.00","0.00","6450.00",""');
+  });
+
+  it("reports the checking fee beside the doors, not as one of them", () => {
+    expect(csv).toContain('"DabzTech checking fees","250.00"');
+    // And it is inside the DabzTech total rather than added on top of it.
+    expect(categoryAmount(report, "checking_fee")).toBe(parsePesos("250"));
+  });
+
+  it("gives nothing for a category the period never used", () => {
+    expect(categoryAmount(report, "tarpaulin")).toBe(0);
+  });
+
+  it("still quotes every field once the block is added", () => {
+    for (const line of csv.split("\n").filter(Boolean)) {
+      expect(line.startsWith('"'), line).toBe(true);
+    }
   });
 });
 
