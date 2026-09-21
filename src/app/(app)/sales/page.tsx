@@ -8,6 +8,7 @@ import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
   doorVisibility,
+  feedRebuiltNotice,
   figuresAreKnown,
   filterCollections,
   liveCollections,
@@ -77,6 +78,12 @@ export default async function SalesPage({
 
   const rows = read.rows;
   const readWarning = partialReadWarning(read);
+  /*
+    The feed view was missing, so the day was rebuilt from the three tables
+    underneath it. The figures are complete - see `feedRebuiltNotice` - so this
+    is a note under them, not a warning over them.
+  */
+  const rebuiltNotice = feedRebuiltNotice(read);
   /*
     A failed read has no figures, only an absence. See `figuresAreKnown` - the
     short of it is that PHP 0.00 in 4xl type beats a 12px warning every time,
@@ -296,6 +303,24 @@ export default async function SalesPage({
           >
             <span aria-hidden="true">{"⚠"}</span>
             <span>{readWarning}</span>
+          </p>
+        ) : null}
+
+        {rebuiltNotice ? (
+          <p className="mt-5 flex items-start gap-1.5 text-xs text-attention">
+            <span aria-hidden="true">{"⚠"}</span>
+            <span>
+              {rebuiltNotice}
+              {canDecide ? (
+                <>
+                  {" "}
+                  <Link href="/system" className={`underline ${TAP_AREA}`}>
+                    Open System check
+                  </Link>
+                  .
+                </>
+              ) : null}
+            </span>
           </p>
         ) : null}
 

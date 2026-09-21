@@ -16,6 +16,7 @@ import { monthTotals } from "@/lib/bills";
 import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
+  feedRebuiltNotice,
   figuresAreKnown,
   doorVisibility,
   partialReadWarning,
@@ -836,6 +837,11 @@ async function CollectedToday({
 
   const rows = read.rows;
   const readWarning = partialReadWarning(read);
+  // The feed view was missing, so the day was rebuilt from the three tables
+  // underneath it: complete figures, behind database. No System check link
+  // here - an Owner or Admin already has SchemaBanner above this card with
+  // the fuller version, and a staff member cannot open that screen at all.
+  const rebuiltNotice = feedRebuiltNotice(read);
   // A failed read has no figures at all - see `figuresAreKnown`. This is the
   // owner's home screen, so it is the first place a phantom PHP 0.00 lands.
   const showFigures = figuresAreKnown(read);
@@ -915,6 +921,13 @@ async function CollectedToday({
                 .join(", and ")}
               , so this is not the whole day.
             </span>
+          </p>
+        ) : null}
+
+        {rebuiltNotice ? (
+          <p className="mt-4 flex items-start gap-1.5 text-xs text-attention">
+            <span aria-hidden="true">{"⚠"}</span>
+            <span>{rebuiltNotice}</span>
           </p>
         ) : null}
 

@@ -454,6 +454,18 @@ round trip is the one thing that must be tried against a real project.
   feed works" - that opens the table everywhere else too.
   `12_phase10_rls.test.sql` checks the flag directly, because without it every
   other test in that file would pass while the books were wide open.
+- **A screen must not fall over because the VIEW is missing.** `collections`
+  stores nothing - it exists so one screen can ask one question instead of
+  three. When it cannot be read, `rebuildCollections` in
+  `src/lib/data/collections.ts` reads `sales`, `apparel_payments` and
+  `repair_payments` directly and the day still shows. That is safe for exactly
+  one reason, and it is the reason above: `security_invoker` means the view
+  holds no privilege of its own, so its rows are already the rows those three
+  tables' policies hand the same person. `12_phase10_rls.test.sql` proves the
+  two agree, as five different people, rather than trusting the argument. Keep
+  the apparel and repair joins INNER, matching the view, and never ask the
+  fallback for a column a LATER migration adds - it runs precisely when a
+  migration may be missing, and `repair_payments.kind` is the one to remember.
 - **The feed's totals must equal the ledger's, per money source.** The feed is
   a view of the three payment tables; the ledger is what those tables wrote. If
   they ever differ the FEED is wrong. The invariant is asserted over everything

@@ -4,6 +4,7 @@ import {
   breakdownCollections,
   checkPaymentAmount,
   collectedTotal,
+  feedRebuiltNotice,
   figuresAreKnown,
   collectionsReport,
   defaultPaymentKind,
@@ -12,6 +13,7 @@ import {
   heldForUnfinishedWork,
   isPartialRead,
   liveCollections,
+  mergeCollectionRows,
   partialReadWarning,
   paymentKindLabel,
   receiptFigures,
@@ -603,7 +605,13 @@ describe("money held for work the shop still owes", () => {
 // ---------------------------------------------------------------------------
 
 function read(over: Partial<CollectionsRead> = {}): CollectionsRead {
-  return { rows: [], failed: false, truncated: false, ...over };
+  return {
+    rows: [],
+    failed: false,
+    truncated: false,
+    feedViewMissing: false,
+    ...over,
+  };
 }
 
 describe("isPartialRead", () => {
@@ -820,6 +828,7 @@ describe("figuresAreKnown", () => {
     rows: [],
     failed: false,
     truncated: false,
+    feedViewMissing: false,
     ...over,
   });
 
@@ -859,6 +868,191 @@ describe("figuresAreKnown", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// The feed, read without the feed (21 Sep 2026)
+// ---------------------------------------------------------------------------
+
+/*
+  When `public.collections` is not in the database, the day is read from the
+  three tables the view is a view OF. These cover the two halves of that: the
+  merge that puts the three groups back into one list, and the sentence the
+  screens say about it.
+
+  What must NOT change is `figuresAreKnown`. The view is `security_invoker`,
+  so it never had a privilege the three reads lack - the rows are the same
+  rows, the total is the shop's total, and printing "Could not be read" over a
+  correct figure would be its own kind of lie.
+*/
+
+function rebuilt(over: Partial<CollectionsRead> = {}): CollectionsRead {
+  return {
+    rows: [],
+    failed: false,
+    truncated: false,
+    feedViewMissing: true,
+    ...over,
+  };
+}
+
+describe("mergeCollectionRows", () => {
+  const at = (takenAt: string, id: string) => row({ id, takenAt });
+
+  it("puts the three doors into one list, newest first", () => {
+    const merged = mergeCollectionRows(
+      [
+        [at("2026-09-21T01:00:00.000Z", "sale")],
+        [at("2026-09-21T03:00:00.000Z", "apparel")],
+        [at("2026-09-21T02:00:00.000Z", "repair")],
+      ],
+      500,
+    );
+
+    expect(merged.rows.map((entry) => entry.id)).toEqual([
+      "apparel",
+      "repair",
+      "sale",
+    ]);
+    expect(merged.truncated).toBe(false);
+  });
+
+  it("applies the cap ONCE, across every door together", () => {
+    /*
+      The reason this function exists. Each table is read with its own cap, so
+      three doors of two rows each is six rows in hand. Capping each at two and
+      adding them up would hand back six and call it untruncated - a figure
+      three times the size of what was asked for, reported as complete.
+    */
+    const merged = mergeCollectionRows(
+      [
+        [at("2026-09-21T06:00:00.000Z", "a"), at("2026-09-21T05:00:00.000Z", "b")],
+        [at("2026-09-21T04:00:00.000Z", "c"), at("2026-09-21T03:00:00.000Z", "d")],
+        [at("2026-09-21T02:00:00.000Z", "e"), at("2026-09-21T01:00:00.000Z", "f")],
+      ],
+      2,
+    );
+
+    expect(merged.rows).toHaveLength(2);
+    expect(merged.truncated).toBe(true);
+  });
+
+  it("keeps the newest rows, whichever door they came through", () => {
+    // Not "the first group's rows". A day where apparel took the last three
+    // payments must show those three, not three counter sales from the morning.
+    const merged = mergeCollectionRows(
+      [
+        [at("2026-09-21T01:00:00.000Z", "morning-sale")],
+        [
+          at("2026-09-21T09:00:00.000Z", "evening-apparel"),
+          at("2026-09-21T08:00:00.000Z", "late-apparel"),
+        ],
+      ],
+      2,
+    );
+
+    expect(merged.rows.map((entry) => entry.id)).toEqual([
+      "evening-apparel",
+      "late-apparel",
+    ]);
+  });
+
+  it("is not truncated when the rows fit exactly", () => {
+    const merged = mergeCollectionRows([[at("2026-09-21T01:00:00.000Z", "a")]], 1);
+    expect(merged.truncated).toBe(false);
+    expect(merged.rows).toHaveLength(1);
+  });
+
+  it("orders two rows written in the same instant the same way every time", () => {
+    /*
+      Two payments can share a timestamp. Without a tie-break the list can come
+      back in a different order on the next refresh, and somebody reading the
+      day twice believes a row moved or went missing.
+    */
+    const same = "2026-09-21T04:00:00.000Z";
+    const first = mergeCollectionRows(
+      [[at(same, "aaa")], [at(same, "bbb")]],
+      500,
+    );
+    const second = mergeCollectionRows(
+      [[at(same, "bbb")], [at(same, "aaa")]],
+      500,
+    );
+
+    expect(first.rows.map((entry) => entry.id)).toEqual(
+      second.rows.map((entry) => entry.id),
+    );
+  });
+
+  it("handles a day where nothing came in at all", () => {
+    const merged = mergeCollectionRows([[], [], []], 500);
+    expect(merged.rows).toEqual([]);
+    expect(merged.truncated).toBe(false);
+  });
+});
+
+describe("feedRebuiltNotice", () => {
+  it("says nothing at all about an ordinary read", () => {
+    // The rule the whole system is built on: a notice that arrives when
+    // nothing is wrong is the bug.
+    expect(feedRebuiltNotice(read())).toBeNull();
+    expect(feedRebuiltNotice(read({ truncated: true }))).toBeNull();
+  });
+
+  it("says the figures are right, and that the database is behind", () => {
+    const notice = feedRebuiltNotice(rebuilt({ rows: [row()] })) ?? "";
+
+    expect(notice).toContain("behind");
+    expect(notice).toContain("nothing has been lost");
+  });
+
+  it("does not send anybody to a screen, because not everybody has one", () => {
+    // System check is Owner/Admin only. The screens add that link themselves,
+    // for the people who can open it.
+    expect(feedRebuiltNotice(rebuilt()) ?? "").not.toContain("System check");
+  });
+
+  it("stands aside on a failed read", () => {
+    /*
+      A failed read has the louder and more important thing to say - see
+      partialReadWarning - and two warnings under one figure dilute each other.
+    */
+    expect(feedRebuiltNotice(rebuilt({ failed: true }))).toBeNull();
+  });
+});
+
+describe("a rebuilt read is a whole read", () => {
+  it("still has figures, because the rows are the same rows", () => {
+    /*
+      The point of the fallback. `collections` is security_invoker - it holds
+      no privilege of its own - so reading the three tables under it, as the
+      same person, returns exactly what the view would have. Treating that as
+      "could not be read" would hide a correct total behind a warning.
+    */
+    expect(figuresAreKnown(rebuilt({ rows: [row()] }))).toBe(true);
+  });
+
+  it("is not a PARTIAL read", () => {
+    // End of day stores a breakdown only from a whole read. A rebuilt one is
+    // whole, so a day read this way can still be closed.
+    expect(isPartialRead(rebuilt({ rows: [row()] }))).toBe(false);
+  });
+
+  it("is partial once it is truncated, exactly like any other read", () => {
+    expect(isPartialRead(rebuilt({ truncated: true }))).toBe(true);
+  });
+
+  it("adds its rows up the way any other read does", () => {
+    const rows = [
+      row({ id: "a", amountCentavos: parsePesos("30") }),
+      row({ id: "b", amountCentavos: parsePesos("70"), division: "apparel" }),
+      row({ id: "c", amountCentavos: parsePesos("15"), voidedAt: "2026-09-21T05:00:00.000Z" }),
+    ];
+
+    // The voided row counts for nothing here for the same reason it counts for
+    // nothing anywhere else.
+    expect(collectedTotal(rebuilt({ rows }).rows)).toBe(parsePesos("100"));
+  });
+});
+
 describe("partialReadWarning, on a failed read", () => {
   it("says the takings are safe", () => {
     // The sentence the owner needed and did not get. A read failing touches
@@ -868,6 +1062,7 @@ describe("partialReadWarning, on a failed read", () => {
       rows: [],
       failed: true,
       truncated: false,
+      feedViewMissing: false,
     });
 
     expect(warning).toContain("your takings are safe");

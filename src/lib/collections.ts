@@ -134,6 +134,51 @@ export interface CollectionsRead {
   failed: boolean;
   /** The cap was reached, so these are only the newest of the window. */
   truncated: boolean;
+  /**
+   * `public.collections` could not be read, so these rows were put together
+   * from `sales`, `apparel_payments` and `repair_payments` instead.
+   *
+   * THE FIGURES ARE STILL COMPLETE. The view is `security_invoker`, which
+   * means it has no privileges of its own - reading the three tables it is a
+   * view OF, as the same person, returns exactly the rows it would have. So
+   * this is not a partial read and it is not a failed one.
+   *
+   * What it does mean is that the database is behind on its migrations, and
+   * that is worth saying on screen even though the money is right: the same
+   * gap stops a DabzTech payment being taken at the counter, and the owner
+   * should not have to discover each symptom separately.
+   */
+  feedViewMissing: boolean;
+}
+
+/**
+ * Several groups of rows, put into one read, newest first.
+ *
+ * Used when the feed has to be rebuilt from the three tables underneath it:
+ * each is read and capped on its own, and the whole point of this is that the
+ * cap is then applied ONCE, across all three together. Capping each at
+ * `limit` and adding them up would quietly return more rows than asked for
+ * and call it untruncated.
+ */
+export function mergeCollectionRows(
+  groups: readonly CollectionRow[][],
+  limit: number,
+): { rows: CollectionRow[]; truncated: boolean } {
+  const all = groups.flat();
+
+  all.sort((a, b) => {
+    if (a.takenAt !== b.takenAt) return a.takenAt < b.takenAt ? 1 : -1;
+    /*
+      Two payments written in the same instant still need ONE order, or the
+      list shuffles between one refresh and the next and somebody reading it
+      twice believes a row has moved. The id is arbitrary; it is stable, which
+      is the only property needed here.
+    */
+    return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+  });
+
+  const truncated = all.length > limit;
+  return { rows: truncated ? all.slice(0, limit) : all, truncated };
 }
 
 // ---------------------------------------------------------------------------
@@ -244,6 +289,33 @@ export function partialReadWarning(read: CollectionsRead): string | null {
  */
 export function figuresAreKnown(read: CollectionsRead): boolean {
   return !read.failed;
+}
+
+/**
+ * "The database is behind, and the money below is still right."
+ *
+ * WHY BOTH HALVES OF THAT SENTENCE ARE NEEDED
+ * When `public.collections` is missing, the rows are read from the three
+ * tables the view is a view OF. That is a complete answer - the view is
+ * `security_invoker`, so it never saw anything those three reads do not - and
+ * so the figures print normally rather than as "Could not be read". Saying
+ * nothing at all, though, would hide a database that is behind until it broke
+ * something else, which is how a missing 0015 cost a day the first time.
+ *
+ * So: no ⚠ over the takings, and a ⚠ underneath them.
+ *
+ * Returns null on a FAILED read, where `partialReadWarning` has the louder and
+ * more important thing to say and two warnings would dilute each other.
+ *
+ * It also stops short of telling anybody where to go. System check is Owner
+ * and Admin only, and a staff member sent to a screen that does not exist for
+ * them learns nothing except that the system is confused - so the screens add
+ * that link themselves, for the people who have it.
+ */
+export function feedRebuiltNotice(read: CollectionsRead): string | null {
+  if (!read.feedViewMissing || read.failed) return null;
+
+  return "This database is behind: the payments feed it should read is not there, so this day was put together from the sale, job order and repair records directly. The figures below are right and nothing has been lost, but other things will be missing too.";
 }
 
 // ---------------------------------------------------------------------------

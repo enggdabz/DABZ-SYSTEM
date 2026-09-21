@@ -733,6 +733,94 @@ begin
 end;
 $$;
 
+-- ---------------------------------------------------------------------------
+-- Reading the three tables directly shows exactly what the feed shows
+-- ---------------------------------------------------------------------------
+
+/*
+  The claim the app's fallback rests on, checked as SQL.
+
+  When `public.collections` is not in the database - which is what happened to
+  the owner's on 21 September 2026, because migration 0015 had never been
+  applied - the app reads `sales`, `apparel_payments` and `repair_payments`
+  directly instead, so the Sales screen can still show the day. That is only
+  safe because the view is `security_invoker`: it holds no privilege of its
+  own, so it can never have been showing LESS than the three tables show.
+
+  "Can never have been" is the part worth proving rather than asserting. If it
+  were ever false - a policy tightened on the view's owner, a future migration
+  that filtered rows inside the view - the fallback would be a leak, and it
+  would be a leak that no screen could see. So: ask as five different people,
+  and require the two answers to be the same set, row for row.
+
+  The apparel and repair joins are INNER on purpose, because the view's are:
+  a payment whose order or ticket this person may not read is not theirs, and
+  the app drops those rows for the same reason.
+*/
+
+set test.user_id = '11111111-1111-1111-1111-111111111111';
+do $$
+declare
+  v_user text;
+  v_differences int;
+  v_rows int;
+  v_checked int := 0;
+begin
+  raise notice '--- phase 10: the feed and the tables under it agree, per person ---';
+
+  foreach v_user in array array[
+    '11111111-1111-1111-1111-111111111111',  -- the owner
+    '22222222-2222-2222-2222-222222222222',  -- an admin
+    '33333333-3333-3333-3333-333333333333',  -- both division permissions
+    '66666666-6666-6666-6666-666666666666',  -- the counter, and the daily report
+    ''                                        -- nobody at all
+  ]
+  loop
+    perform set_config('test.user_id', v_user, false);
+
+    with feed as (
+      select id, amount_centavos from public.collections
+    ),
+    direct as (
+      select s.id, s.total_centavos as amount_centavos
+        from public.sales s
+      union all
+      select p.id, p.amount_centavos
+        from public.apparel_payments p
+        join public.apparel_orders o on o.id = p.order_id
+      union all
+      select p.id, p.amount_centavos
+        from public.repair_payments p
+        join public.repair_tickets t on t.id = p.ticket_id
+    )
+    select count(*) into v_differences from (
+      (select * from feed except all select * from direct)
+      union all
+      (select * from direct except all select * from feed)
+    ) as disagreement;
+
+    if v_differences <> 0 then
+      raise exception 'FAIL: % row(s) differ between the feed and the tables under it, as %',
+        v_differences, coalesce(nullif(v_user, ''), 'nobody');
+    end if;
+
+    select count(*) into v_rows from public.collections;
+    v_checked := v_checked + v_rows;
+  end loop;
+
+  /*
+    And the check has to have had something to chew on. Five people all seeing
+    nothing would satisfy every line above while proving nothing at all - the
+    same trap as a test that passes because its fixture never loaded.
+  */
+  if v_checked = 0 then
+    raise exception 'FAIL: nobody saw any payments, so this check proved nothing';
+  end if;
+
+  raise notice 'PASS: five people, % rows, and the two ways of asking agree every time', v_checked;
+end;
+$$;
+
 do $$
 begin
   raise notice 'ALL PHASE 10 TESTS PASSED';

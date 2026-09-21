@@ -760,3 +760,40 @@ to ask:
   To change what is checked, `REQUIRED_RELATIONS` in
   `src/lib/schema-health.ts`; a test reads the migrations and fails if a new
   table is forgotten there.
+- **The Sales screen no longer depends on the payments feed existing.** The
+  same missing `0015` came back the same day: with `#24` deployed the screen
+  stopped printing a phantom ₱0.00 and started saying "⚠ Could not be read" -
+  honest, and still no use to an owner who wanted to see the morning's
+  takings. Both of those changes improved what the screen SAID about a
+  failure. Neither asked the better question, which is why a screen the whole
+  shop looks at should fall over because a *convenience* is absent. The money
+  was never in danger and never far away: it was in `sales`, one table from
+  where the screen was looking. `public.collections` is a VIEW over `sales`,
+  `apparel_payments` and `repair_payments` - it stores nothing, and it exists
+  so one screen can ask one question instead of three. So when it cannot be
+  read, the app now asks those three tables directly and shows the day
+  (`rebuildCollections` in `src/lib/data/collections.ts`). **This opens
+  nothing**, and that is the whole reason it is allowed: the view is
+  `security_invoker`, so it holds no privilege of its own and every row it
+  ever returned is a row those three tables' own policies would return to the
+  same person anyway. It is the same question with the view taken out of the
+  middle - no new policy, no service-role key, no `SECURITY DEFINER`.
+  `12_phase10_rls.test.sql` now proves the equality rather than asserting it:
+  it asks as five different people and requires the feed and the three tables
+  to return the same rows, row for row, refusing to pass if nobody saw
+  anything. Two details are deliberate. The apparel and repair joins are
+  INNER, matching the view, so a payment whose order or ticket a person may
+  not read stays invisible. And `repair_payments.kind` is **not** asked for,
+  because `0015` adds that column too - naming it would fail the very read
+  that is there to rescue the screen - so those rows read as a plain
+  "Payment", the same answer the system already gives for a repair payment
+  taken before Phase 10, and an honest one: in a database like this the kind
+  genuinely is not recorded anywhere the query can reach. The figures print
+  normally, because they are complete; underneath them a ⚠ says the database
+  is behind and that other things will be missing too, with a link to System
+  check for the Owner and Admin who can open it (`feedRebuiltNotice` in
+  `src/lib/collections.ts`). **The fallback is a floor, not the fix.** The
+  database still needs `0015`, and until it has one the counter cannot take a
+  DabzTech payment and a closed day cannot remember its breakdown. To change
+  it: delete `rebuildCollections` and the screens go back to "Could not be
+  read" - which is truthful and shows nobody their money.

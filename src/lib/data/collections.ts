@@ -17,6 +17,7 @@ import { cache } from "react";
 import { isOpenOrder } from "@/lib/apparel";
 import {
   heldForUnfinishedWork,
+  mergeCollectionRows,
   type CollectionKind,
   type CollectionRow,
   type CollectionsRead,
@@ -144,7 +145,16 @@ export async function getCollections(options: {
     displayNames(supabase),
   ]);
 
-  if (error || !data) return { rows: [], failed: true, truncated: false };
+  /*
+    The feed did not answer, so ask the three tables it is a view of.
+
+    This is not a guess at the data and it is not a relaxed permission: see
+    `rebuildCollections`. It is the same question put to the same rows without
+    the view in the way.
+  */
+  if (error || !data) {
+    return rebuildCollections(supabase, options, limit, names);
+  }
 
   const truncated = data.length > limit;
   // Ordered newest first, so the kept rows are the most recent ones.
@@ -157,6 +167,309 @@ export async function getCollections(options: {
     }),
     failed: false,
     truncated,
+    feedViewMissing: false,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The feed, without the feed
+// ---------------------------------------------------------------------------
+
+/** A sale's payment method, in the ledger's words. The view's CASE, in TypeScript. */
+const SALE_SOURCES: Record<string, MoneySource> = {
+  cash: "cash_drawer",
+  gcash: "gcash",
+  maya: "maya",
+  bank: "bank",
+};
+
+/**
+ * How many ids may go into one `in (...)`.
+ *
+ * PostgREST puts the list in the QUERY STRING, so a thousand uuids is a
+ * thirty-seven kilobyte URL, and something between here and the database will
+ * refuse it - a proxy, a gateway, a server's header limit. A month's report
+ * asks for up to 5,000 rows, so this is reachable rather than theoretical, and
+ * the failure would land on the rescue path where there is nothing to fall
+ * back to. A hundred uuids is under four kilobytes, which nothing objects to.
+ */
+const ID_BATCH = 100;
+
+/**
+ * The parent rows a set of payments points at, or null if the read failed.
+ *
+ * An empty list of ids is an empty map and NOT a failure - there was nothing
+ * to ask about, which is a different thing from asking and getting no answer.
+ * One failed batch fails the whole lookup, for the reason every other read
+ * here does: a half-filled map would silently drop the payments whose order
+ * happened to be in the batch that did not arrive.
+ */
+async function rowsById(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  table: string,
+  columns: string,
+  ids: string[],
+): Promise<Map<string, Record<string, unknown>> | null> {
+  if (ids.length === 0) return new Map();
+
+  const batches: string[][] = [];
+  for (let at = 0; at < ids.length; at += ID_BATCH) {
+    batches.push(ids.slice(at, at + ID_BATCH));
+  }
+
+  const results = await Promise.all(
+    batches.map((batch) =>
+      supabase.from(table).select(columns).in("id", batch),
+    ),
+  );
+
+  const found = new Map<string, Record<string, unknown>>();
+  for (const { data, error } of results) {
+    if (error || !data) return null;
+    for (const row of data as unknown as Record<string, unknown>[]) {
+      found.set(String(row.id), row);
+    }
+  }
+
+  return found;
+}
+
+function idsOf(rows: Record<string, unknown>[], column: string): string[] {
+  return [
+    ...new Set(
+      rows
+        .map((row) => row[column])
+        .filter((value): value is string => typeof value === "string"),
+    ),
+  ];
+}
+
+/**
+ * The same day, read from `sales`, `apparel_payments` and `repair_payments`.
+ *
+ * WHY THIS IS ALLOWED TO EXIST
+ * `public.collections` is `security_invoker`, which means it holds no
+ * privileges of its own: every row it hands back is a row the policies on
+ * those three tables would have handed back anyway. Reading them directly, as
+ * the same person, therefore returns the same rows - this opens nothing, adds
+ * no policy, and touches neither the service-role key nor a SECURITY DEFINER
+ * function. It is the same question with the view taken out of the middle.
+ *
+ * WHY IT NEEDS TO EXIST
+ * On 21 September 2026 migration `0015` had never reached the owner's
+ * database, so the view was not there, every read of the feed failed, and the
+ * Sales screen - the screen the whole shop looks at - could say nothing about
+ * a morning in which money had been taken. The money was never in danger: it
+ * was in `sales` the whole time, one table away. A screen that cannot show the
+ * day's takings because a CONVENIENCE is missing is a screen with a single
+ * point of failure it did not need.
+ *
+ * THREE THINGS IT COPIES FROM THE VIEW ON PURPOSE
+ *   * The counter's division is always `printshoppe`. A sale's LINES may be
+ *     apparel or dabztech; the door the money came through is the counter.
+ *   * An apparel or repair payment is joined to its order or ticket INNER. A
+ *     payment whose parent this person may not read is not theirs to see, and
+ *     dropping it is what the view does.
+ *   * `taken_at` is when the row was written - `occurred_at` on a sale,
+ *     `created_at` on a payment - never the date somebody typed.
+ *
+ * AND ONE THING IT CANNOT COPY
+ * `repair_payments.kind` is added by `0015` as well, so it is not asked for:
+ * this path runs precisely when that migration may be missing, and naming a
+ * column that is not there would fail the read it is here to rescue. Those
+ * rows come back with no kind, which reads as a plain "Payment" - the same
+ * answer the system already gives for a repair payment taken before Phase 10,
+ * and the honest one, because in this database the kind genuinely is not
+ * recorded anywhere this query can reach.
+ *
+ * ANY of the reads failing fails the whole thing. A staff member who may not
+ * see apparel money gets an EMPTY result from that table, never an error, so
+ * an error here is a real fault - and leaving one door out of a total silently
+ * is exactly what this file exists to refuse.
+ */
+async function rebuildCollections(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  window: { from: string; to: string },
+  limit: number,
+  names: Map<string, string>,
+): Promise<CollectionsRead> {
+  const unreadable: CollectionsRead = {
+    rows: [],
+    failed: true,
+    truncated: false,
+    feedViewMissing: false,
+  };
+
+  // Each door is capped at limit + 1 as the view's own read is, and the cap is
+  // then applied once across all three by `mergeCollectionRows`.
+  const cap = limit + 1;
+
+  const [sales, apparel, repairs] = await Promise.all([
+    supabase
+      .from("sales")
+      .select(
+        "id, sale_number, customer_id, total_centavos, payment_method, reference_number, occurred_at, sale_date, created_by, voided_at",
+      )
+      .gte("occurred_at", window.from)
+      .lt("occurred_at", window.to)
+      .order("occurred_at", { ascending: false })
+      .limit(cap),
+    supabase
+      .from("apparel_payments")
+      .select(
+        "id, order_id, amount_centavos, kind, source, reference_number, created_at, paid_on, created_by, voided_at",
+      )
+      .gte("created_at", window.from)
+      .lt("created_at", window.to)
+      .order("created_at", { ascending: false })
+      .limit(cap),
+    supabase
+      .from("repair_payments")
+      .select(
+        "id, ticket_id, amount_centavos, source, reference_number, created_at, paid_on, created_by, voided_at",
+      )
+      .gte("created_at", window.from)
+      .lt("created_at", window.to)
+      .order("created_at", { ascending: false })
+      .limit(cap),
+  ]);
+
+  if (sales.error || !sales.data) return unreadable;
+  if (apparel.error || !apparel.data) return unreadable;
+  if (repairs.error || !repairs.data) return unreadable;
+
+  const saleRaw = sales.data as Record<string, unknown>[];
+  const apparelRaw = apparel.data as Record<string, unknown>[];
+  const repairRaw = repairs.data as Record<string, unknown>[];
+
+  const [orders, tickets] = await Promise.all([
+    rowsById(
+      supabase,
+      "apparel_orders",
+      "id, order_number, customer_id, team_name",
+      idsOf(apparelRaw, "order_id"),
+    ),
+    rowsById(
+      supabase,
+      "repair_tickets",
+      "id, ticket_number, customer_id, customer_name",
+      idsOf(repairRaw, "ticket_id"),
+    ),
+  ]);
+
+  if (!orders || !tickets) return unreadable;
+
+  /*
+    The customers the rows name. The view reaches them with a LEFT join, so a
+    customer this person cannot read leaves the name empty rather than dropping
+    the payment - a walk-in has no customer row at all and must still appear.
+  */
+  const customers = await rowsById(
+    supabase,
+    "customers",
+    "id, name",
+    idsOf([...saleRaw, ...orders.values()], "customer_id"),
+  );
+  if (!customers) return unreadable;
+
+  const customerName = (id: unknown): string | null =>
+    typeof id === "string"
+      ? ((customers.get(id)?.name as string | null) ?? null)
+      : null;
+
+  const takenBy = (id: unknown): string | null =>
+    typeof id === "string" ? (names.get(id) ?? null) : null;
+
+  const text = (value: unknown): string | null =>
+    typeof value === "string" ? value : null;
+
+  const saleRows: CollectionRow[] = saleRaw.map((raw) => {
+    const id = String(raw.id);
+    return {
+      id,
+      kind: "counter_sale",
+      division: "printshoppe",
+      paymentKind: "sale",
+      reference: String(raw.sale_number),
+      customerName: customerName(raw.customer_id),
+      amountCentavos: Number(raw.total_centavos),
+      // `?? "cash_drawer"` is the view's own `else` branch, not a guess: the
+      // column is constrained to those four methods by 0005.
+      source: SALE_SOURCES[String(raw.payment_method)] ?? "cash_drawer",
+      referenceNumber: text(raw.reference_number),
+      takenAt: String(raw.occurred_at),
+      recordedForISO: String(raw.sale_date),
+      takenBy: takenBy(raw.created_by),
+      voidedAt: text(raw.voided_at),
+      href: hrefFor("counter_sale", id, id),
+    };
+  });
+
+  const apparelRows: CollectionRow[] = apparelRaw.flatMap((raw) => {
+    const orderId = String(raw.order_id);
+    const order = orders.get(orderId);
+    if (!order) return [];
+
+    const id = String(raw.id);
+    return [
+      {
+        id,
+        kind: "apparel_payment",
+        division: "apparel",
+        paymentKind: (text(raw.kind) as PaymentKind) ?? null,
+        reference: String(order.order_number),
+        // coalesce(customer, team): a team name is what the counter calls an
+        // order that was never attached to a customer record.
+        customerName: customerName(order.customer_id) ?? text(order.team_name),
+        amountCentavos: Number(raw.amount_centavos),
+        source: String(raw.source) as MoneySource,
+        referenceNumber: text(raw.reference_number),
+        takenAt: String(raw.created_at),
+        recordedForISO: String(raw.paid_on),
+        takenBy: takenBy(raw.created_by),
+        voidedAt: text(raw.voided_at),
+        href: hrefFor("apparel_payment", id, orderId),
+      },
+    ];
+  });
+
+  const repairRows: CollectionRow[] = repairRaw.flatMap((raw) => {
+    const ticketId = String(raw.ticket_id);
+    const ticket = tickets.get(ticketId);
+    if (!ticket) return [];
+
+    const id = String(raw.id);
+    return [
+      {
+        id,
+        kind: "repair_payment",
+        division: "dabztech",
+        // Not read - see the note above about 0015 and `kind`.
+        paymentKind: null,
+        reference: String(ticket.ticket_number),
+        customerName: text(ticket.customer_name),
+        amountCentavos: Number(raw.amount_centavos),
+        source: String(raw.source) as MoneySource,
+        referenceNumber: text(raw.reference_number),
+        takenAt: String(raw.created_at),
+        recordedForISO: String(raw.paid_on),
+        takenBy: takenBy(raw.created_by),
+        voidedAt: text(raw.voided_at),
+        href: hrefFor("repair_payment", id, ticketId),
+      },
+    ];
+  });
+
+  const merged = mergeCollectionRows(
+    [saleRows, apparelRows, repairRows],
+    limit,
+  );
+
+  return {
+    rows: merged.rows,
+    failed: false,
+    truncated: merged.truncated,
+    feedViewMissing: true,
   };
 }
 
