@@ -39,7 +39,71 @@ export function QuickExpense({
   approvalHint: string | null;
   suppliers?: { id: string; name: string }[];
 }) {
+  // Starts closed, so the server render never reaches `document.body` below -
+  // the dialog can only be opened by a tap, which only happens in a browser.
   const [open, setOpen] = useState(false);
+
+  /*
+    Counted up by "Add another", and the dialog's key.
+
+    `useActionState` remembers the last answer for as long as the component
+    holding it is mounted, and nothing can clear it from the outside. That is
+    why the form and its state live in the child below: closing the dialog
+    unmounts it, so the next expense starts blank instead of opening on
+    "PHP 5.00 recorded." from the one before. "Add another" does not close
+    anything, so it gets the same fresh start the only other way there is - a
+    new key, which is a new mount.
+  */
+  const [round, setRound] = useState(0);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-medium text-topbar-ink ring-1 ring-white/15 hover:bg-white/15"
+      >
+        <span aria-hidden="true">+</span>
+        <span className="hidden sm:inline">Expense</span>
+        <span className="sr-only sm:hidden">Record an expense</span>
+      </button>
+
+      {/*
+        Into <body>, not here. This sits inside the top bar, and the bar has a
+        backdrop blur - which makes it a containing block, so a `fixed` child
+        would measure itself against the bar and hang off the top of the
+        screen. See the same note in BillsDueSoon.
+      */}
+      {open
+        ? createPortal(
+            <Dialog
+              key={round}
+              presets={presets}
+              approvalHint={approvalHint}
+              suppliers={suppliers}
+              onClose={() => setOpen(false)}
+              onAddAnother={() => setRound((n) => n + 1)}
+            />,
+            document.body,
+          )
+        : null}
+    </>
+  );
+}
+
+function Dialog({
+  presets,
+  approvalHint,
+  suppliers,
+  onClose,
+  onAddAnother,
+}: {
+  presets: ExpensePreset[];
+  approvalHint: string | null;
+  suppliers: { id: string; name: string }[];
+  onClose: () => void;
+  onAddAnother: () => void;
+}) {
   const [state, submit, pending] = useActionState<ExpenseState, FormData>(
     recordExpenseAction,
     {},
@@ -50,13 +114,6 @@ export function QuickExpense({
   const [picked, setPicked] = useState<ExpensePreset | null>(null);
   const amountRef = useRef<HTMLInputElement>(null);
 
-  // Closing clears the pick here rather than in an effect: the dialog is only
-  // ever closed by one of these buttons, so there is nothing to synchronise.
-  function close() {
-    setOpen(false);
-    setPicked(null);
-  }
-
   function choose(preset: ExpensePreset) {
     setPicked(preset);
     // Straight to the one thing that always has to be typed.
@@ -65,7 +122,7 @@ export function QuickExpense({
 
   const activePresets = presets.filter((preset) => preset.active);
 
-  const dialog = (
+  return (
     <div
       className="fixed inset-0 z-[70] flex items-end justify-center bg-black/50 p-4 sm:items-center"
       role="dialog"
@@ -80,7 +137,7 @@ export function QuickExpense({
               Money that left the shop. Tap a quick pick, type the amount, done.
             </p>
           </div>
-          <Button type="button" variant="quiet" onClick={close}>
+          <Button type="button" variant="quiet" onClick={onClose}>
             Close
           </Button>
         </div>
@@ -89,10 +146,10 @@ export function QuickExpense({
           <div className="mt-5 space-y-3">
             <Notice tone="success" title={state.success} />
             <div className="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => setPicked(null)}>
+              <Button type="button" onClick={onAddAnother}>
                 Add another
               </Button>
-              <Button type="button" variant="secondary" onClick={close}>
+              <Button type="button" variant="secondary" onClick={onClose}>
                 Done
               </Button>
             </div>
@@ -157,7 +214,7 @@ export function QuickExpense({
               <Button type="submit" disabled={pending}>
                 {pending ? "Saving..." : "Record expense"}
               </Button>
-              <Button type="button" variant="quiet" onClick={close}>
+              <Button type="button" variant="quiet" onClick={onClose}>
                 Cancel
               </Button>
             </div>
@@ -237,27 +294,5 @@ export function QuickExpense({
         )}
       </div>
     </div>
-  );
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-sm font-medium text-topbar-ink ring-1 ring-white/15 hover:bg-white/15"
-      >
-        <span aria-hidden="true">+</span>
-        <span className="hidden sm:inline">Expense</span>
-        <span className="sr-only sm:hidden">Record an expense</span>
-      </button>
-
-      {/*
-        Into <body>, not here. This sits inside the top bar, and the bar has a
-        backdrop blur - which makes it a containing block, so a `fixed` child
-        would measure itself against the bar and hang off the top of the
-        screen. See the same note in BillsDueSoon.
-      */}
-      {open ? createPortal(dialog, document.body) : null}
-    </>
   );
 }
