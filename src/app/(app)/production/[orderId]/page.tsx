@@ -81,11 +81,19 @@ export default async function ProductionProjectPage({
   const production = productionFor(detail, marks.steps);
   const cancelled = order.status === "cancelled";
 
-  const disagreement = statusDisagreement({
-    project: production,
-    orderStatus: order.status,
-    orderStatusLabel: ORDER_STATUS_LABELS[order.status],
-  });
+  /*
+    Only asked when the marks were actually read. Worked out from an empty
+    answer it would announce that the order says Ready while the benches are
+    not marked - which would be this screen inventing a disagreement out of a
+    failed question.
+  */
+  const disagreement = marks.failed
+    ? null
+    : statusDisagreement({
+        project: production,
+        orderStatus: order.status,
+        orderStatusLabel: ORDER_STATUS_LABELS[order.status],
+      });
 
   const tone = production.complete
     ? "success"
@@ -159,8 +167,10 @@ export default async function ProductionProjectPage({
         description="A project is only as far along as its least advanced item, because the customer collects all of it at once. It is worked out here every time, never stored."
       >
         <div className="flex flex-wrap items-center gap-3">
-          <Tag tone={tone}>{projectStatusLabel(production)}</Tag>
-          {production.noItems ? null : (
+          <Tag tone={marks.failed ? "neutral" : tone}>
+            {marks.failed ? "Not known" : projectStatusLabel(production)}
+          </Tag>
+          {production.noItems || marks.failed ? null : (
             <span className="text-sm text-muted">
               {production.itemsComplete} of {production.items.length} item
               {production.items.length === 1 ? "" : "s"} through every bench
@@ -168,9 +178,13 @@ export default async function ProductionProjectPage({
           )}
         </div>
 
-        <p className="mt-3 text-sm text-ink/80">{projectStatusNote(production)}</p>
+        <p className="mt-3 text-sm text-ink/80">
+          {marks.failed
+            ? "Where this project has got to cannot be worked out until the marks can be read. Nothing has been lost."
+            : projectStatusNote(production)}
+        </p>
 
-        {production.noItems ? null : (
+        {production.noItems || marks.failed ? null : (
           <div className="mt-4">
             <div
               className="h-2 w-full overflow-hidden rounded-full bg-ink/10"
@@ -251,18 +265,26 @@ export default async function ProductionProjectPage({
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
                   <div className="min-w-0">
                     <h3 className="font-semibold">{item.name}</h3>
-                    <ItemNote item={item} />
+                    {marks.failed ? (
+                      <p className="text-xs text-muted">
+                        {item.quantity} piece{item.quantity === 1 ? "" : "s"}
+                      </p>
+                    ) : (
+                      <ItemNote item={item} />
+                    )}
                   </div>
                   <Tag
                     tone={
-                      item.complete
-                        ? "success"
-                        : item.reached === null
-                          ? "neutral"
-                          : "accent"
+                      marks.failed
+                        ? "neutral"
+                        : item.complete
+                          ? "success"
+                          : item.reached === null
+                            ? "neutral"
+                            : "accent"
                     }
                   >
-                    {itemStatusLabel(item)}
+                    {marks.failed ? "Not known" : itemStatusLabel(item)}
                   </Tag>
                 </div>
 

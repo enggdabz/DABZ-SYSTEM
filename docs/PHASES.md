@@ -2065,11 +2065,12 @@ exist, and running SQL by hand does not always refresh it. A migration that
   correction to "the printing is done" when it is not is to stop saying it. The
   permanent record is the audit log, which is written on every change and which
   nobody can edit.
-- **A failed read is not an empty one.** If the marks cannot be read the screen
-  says so and says nothing about where the work is — because "Not started"
-  against every project in the shop is exactly the confident wrong answer that
-  cost a day in September when a missing migration showed up as PHP 0.00 on
-  Sales.
+- **A failed read is not an empty one.** If the marks cannot be read, every
+  screen says so and says nothing about where the work is: the statuses read
+  **Not known**, the counts read **—**, and the disagreement check is not even
+  asked. "Not started" against every project in the shop is exactly the
+  confident wrong answer that cost a day in September when a missing migration
+  showed up as PHP 0.00 on Sales.
 - **An order with no items is its own state** — "Nothing being made yet" — and
   not "Not started" and not "Ready". There is no work on it to have started.
 

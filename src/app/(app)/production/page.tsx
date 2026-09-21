@@ -58,13 +58,22 @@ function ProgressBar({ project }: { project: ProjectProduction }) {
   );
 }
 
-/** One project on the list: its status, why, and the way into it. */
+/**
+ * One project on the list: its status, why, and the way into it.
+ *
+ * `known` is false when the marks could not be read, and then this row says
+ * nothing about where the work is. Without it, every project in the shop
+ * would read "Not started" off an empty answer - the same confident wrong
+ * claim as the PHP 0.00 that started `src/lib/schema-health.ts`.
+ */
 function ProjectRow({
   schedule,
   production,
+  known,
 }: {
   schedule: ScheduledProject;
   production: ProjectProduction;
+  known: boolean;
 }) {
   const tone = production.noItems
     ? "neutral"
@@ -95,7 +104,7 @@ function ProjectRow({
             {scheduleNote(schedule)}
           </p>
         ) : null}
-        {production.withMissing.length > 0 ? (
+        {known && production.withMissing.length > 0 ? (
           <p className="mt-0.5 text-xs text-attention">
             <span aria-hidden="true">{"⚠"} </span>
             {production.withMissing.length} item
@@ -107,7 +116,9 @@ function ProjectRow({
 
       <div className="w-full sm:w-64">
         <div className="flex items-center justify-between gap-3">
-          <Tag tone={tone}>{projectStatusLabel(production)}</Tag>
+          <Tag tone={known ? tone : "neutral"}>
+            {known ? projectStatusLabel(production) : "Not known"}
+          </Tag>
           <span className="text-xs text-muted">
             {production.noItems
               ? "no items"
@@ -116,7 +127,9 @@ function ProjectRow({
                 }`}
           </span>
         </div>
-        {production.noItems ? (
+        {!known ? (
+          <p className="mt-2 text-xs text-muted">The benches could not be read.</p>
+        ) : production.noItems ? (
           <p className="mt-2 text-xs text-muted">{projectStatusNote(production)}</p>
         ) : (
           <ProgressBar project={production} />
@@ -231,16 +244,22 @@ export default async function ProductionPage() {
         </Card>
 
         <Card title="Through every bench">
-          <p className="text-2xl font-semibold">{finished.length}</p>
+          <p className="text-2xl font-semibold">
+            {marks.failed ? "—" : finished.length}
+          </p>
           <p className="mt-1 text-sm text-muted">
-            {finished.length === 0
-              ? "Nothing is finished yet."
-              : "Made, checked and packed."}
+            {marks.failed
+              ? "Not known while the benches cannot be read."
+              : finished.length === 0
+                ? "Nothing is finished yet."
+                : "Made, checked and packed."}
           </p>
         </Card>
 
         <Card title="Not started">
-          <p className="text-2xl font-semibold">{notStarted.length}</p>
+          <p className="text-2xl font-semibold">
+            {marks.failed ? "—" : notStarted.length}
+          </p>
           <p className="mt-1 text-sm text-muted">
             {marks.failed
               ? "Not known while the benches cannot be read."
@@ -249,11 +268,15 @@ export default async function ProductionPage() {
         </Card>
 
         <Card title="Bench skipped">
-          <p className="text-2xl font-semibold">{skipped.length}</p>
+          <p className="text-2xl font-semibold">
+            {marks.failed ? "—" : skipped.length}
+          </p>
           <p className="mt-1 text-sm text-muted">
-            {skipped.length === 0
-              ? "Every mark has its earlier benches marked too."
-              : "A later bench is ticked with an earlier one blank."}
+            {marks.failed
+              ? "Not known while the benches cannot be read."
+              : skipped.length === 0
+                ? "Every mark has its earlier benches marked too."
+                : "A later bench is ticked with an earlier one blank."}
           </p>
         </Card>
       </div>
@@ -274,6 +297,7 @@ export default async function ProductionPage() {
                 key={row.schedule.id}
                 schedule={row.schedule}
                 production={row.production}
+                known={!marks.failed}
               />
             ))}
           </ul>
@@ -289,6 +313,7 @@ export default async function ProductionPage() {
                   key={row.schedule.id}
                   schedule={row.schedule}
                   production={row.production}
+                  known={!marks.failed}
                 />
               ))}
             </ul>
