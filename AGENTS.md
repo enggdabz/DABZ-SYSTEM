@@ -53,8 +53,9 @@ receiving code.
   `supabase_migrations.schema_migrations` so none can run twice. The `0000`-
   style four-digit prefixes are accepted as versions and sort before any later
   `supabase migration new` timestamp, so both naming styles can coexist. Verified
-  by pushing all fifteen to a throwaway PostgreSQL and then running the whole
-  RLS suite against the result: 42 tables, 268 checks, identical to `run.sh`.
+  by pushing all sixteen to a throwaway PostgreSQL and then running the whole
+  RLS suite against the result: 42 tables and one view, 301 checks, identical
+  to `run.sh`.
 - **CI runs all of it on every push and pull request** (`.github/workflows/ci.yml`):
   lint, typecheck, unit tests, the security rules and the schema checker, then
   the build. The security rules and the schema checker need a real PostgreSQL,
@@ -425,3 +426,47 @@ round trip is the one thing that must be tried against a real project.
 - **A link a customer taps is padded, not bare** - `TAP_AREA`, as everywhere
   else in the system now. The public page is where it matters most: a customer
   on a phone has one thumb and no patience.
+
+## Collections rules (built in Phase 10)
+
+- **`public.collections` is a VIEW, and `security_invoker` is the whole point.**
+  It unions `sales`, `apparel_payments` and `repair_payments`, three tables
+  whose policies differ, so a view running as its OWNER would hand a counter
+  assistant the apparel and DabzTech books one row at a time. With
+  `security_invoker = true` the existing policies still decide. Never make it
+  `SECURITY DEFINER`, and never add a policy to an underlying table "so the
+  feed works" - that opens the table everywhere else too.
+  `12_phase10_rls.test.sql` checks the flag directly, because without it every
+  other test in that file would pass while the books were wide open.
+- **The feed's totals must equal the ledger's, per money source.** The feed is
+  a view of the three payment tables; the ledger is what those tables wrote. If
+  they ever differ the FEED is wrong. The invariant is asserted over everything
+  in the database, not just the rows the test wrote.
+- **`taken_at` is when the row was WRITTEN, not the date somebody typed.** It
+  has to be: the matching ledger entry is stamped with the same `now()` in the
+  same transaction, and that is what makes the invariant above hold for a day.
+  The typed date rides along as `recorded_for` so a backdated payment can still
+  say so on screen.
+- **Nothing in Phase 10 writes to the ledger.** The counter's payment action
+  calls `record_apparel_payment` or `record_repair_payment` - the same two
+  functions those screens have always used. There are exactly three ways money
+  reaches the ledger and adding a fourth is how two of them start disagreeing.
+- **A division's permission, not `add_sales`, governs its payments.** Taking an
+  apparel payment needs `apparel_job_orders`; a repair payment needs
+  `dabztech_tickets`. `add_sales` alone gives neither, the button is hidden
+  without it, and the Server Action re-checks - a hidden button is not a rule.
+- **`owners_pocket` is takings, but it is not drawer cash.** It counts in the
+  day's total and never in the cash figure. Folding it into cash makes an
+  honest drawer read as short by exactly that amount.
+- **A screen that can only show PART of the day says so.** A staff member
+  without the apparel permission gets no apparel rows, which is correct - but
+  rendering "Apparel ₱0.00" for them is a claim that no apparel money came in.
+  Show only the doors that person can see, and name the ones that are hidden.
+- **`repair_payments.kind` is nullable with no default, and stays that way.**
+  Null means "taken before Phase 10", which nobody can now resolve. The
+  function refuses an unknown kind rather than storing null, so a typo cannot
+  manufacture one more unanswerable row.
+- **A closed day's breakdown is a snapshot.** It is frozen when the drawer is
+  counted, because a void tomorrow changes what the feed says about today and
+  the closing records what was believed at the time. Days closed before Phase
+  10 keep NULL and the screen says so - zero would be a claim.
