@@ -735,3 +735,28 @@ to ask:
   lost"**, which is true (a read touches no row) and is the sentence that was
   missing. To change it, `figuresAreKnown` in `src/lib/collections.ts`; the
   Sales screen and the Overview card both read it.
+- **The system checks its own database, and says so before it shows a figure.**
+  The missing `0015` cost a day because nothing in the system could say "this
+  database is behind" - the only symptom was an empty till, and an empty till
+  beside money reads as lost money. `npm run check:schema` could never have
+  caught it: it builds a throwaway database from the migration files, so it
+  proves the code agrees with the migrations and can know nothing about whether
+  those migrations were ever applied. So there is now a runtime half:
+  `src/lib/data/schema-health.ts` asks the live database, with one HEAD request
+  per relation, which of them are actually there. Three choices inside it are
+  the ones worth keeping. **A probe answers present, missing or UNKNOWN** - a
+  timeout or a paused project is not evidence about the schema, and reporting
+  it as missing would be this module committing the exact sin it was written to
+  prevent. **The advice always names `0013`**, because the app cannot see which
+  migrations are recorded and must assume the dangerous case is possible: a
+  screen that says "run `npm run db:push`" to somebody who has never pushed is
+  handing them an instruction that deletes every bill, loan and product.
+  **Home probes one relation per migration, not all forty-four** - migrations
+  are applied whole and in order, so that answers the question actually being
+  asked at a quarter of the cost, and the full sweep is one tap away on
+  **System check**. The banner is silent when everything is present, and
+  silent when the check itself could not run: a warning that appears when
+  nothing is wrong is the same mistake as a notification on a quiet morning.
+  To change what is checked, `REQUIRED_RELATIONS` in
+  `src/lib/schema-health.ts`; a test reads the migrations and fails if a new
+  table is forgotten there.
