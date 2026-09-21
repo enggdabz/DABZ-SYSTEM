@@ -146,3 +146,34 @@ export function splitQuoteByPieces(
 
   return shares.map(({ key, centavos }) => ({ key, centavos }));
 }
+
+/**
+ * The same three sentences as `totalLabel`, for a row that already carries the
+ * figures rather than the items they were added up from.
+ *
+ * The orders list, the calendar and the board all read `online_order_totals`,
+ * which has done the adding already - so they need the WORDING without
+ * rebuilding an item list to get it. One function, so the list and the order
+ * page cannot describe the same order differently.
+ */
+export function summaryTotalLabel(order: {
+  hasQuoteItems: boolean;
+  quoteAmountCentavos: Centavos | null;
+  fixedTotalCentavos: Centavos;
+  totalCentavos: Centavos;
+}): string {
+  if (!(order.hasQuoteItems && order.quoteAmountCentavos === null)) {
+    return formatPesos(order.totalCentavos);
+  }
+  return order.fixedTotalCentavos === 0
+    ? "No quote yet"
+    : `${formatPesos(order.fixedTotalCentavos)} + quote`;
+}
+
+/** True while part of the order still has no price, so no balance is honest. */
+export function summaryAwaitingQuote(order: {
+  hasQuoteItems: boolean;
+  quoteAmountCentavos: Centavos | null;
+}): boolean {
+  return order.hasQuoteItems && order.quoteAmountCentavos === null;
+}

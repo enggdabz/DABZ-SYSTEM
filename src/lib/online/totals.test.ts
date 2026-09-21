@@ -5,6 +5,8 @@ import {
   lineTotalLabel,
   orderTotals,
   splitQuoteByPieces,
+  summaryAwaitingQuote,
+  summaryTotalLabel,
   totalLabel,
 } from "./totals";
 
@@ -136,5 +138,53 @@ describe("splitQuoteByPieces", () => {
       { key: "c", pieces: 1 },
     ];
     expect(splitQuoteByPieces(100001, lines)).toEqual(splitQuoteByPieces(100001, lines));
+  });
+});
+
+describe("summaryTotalLabel", () => {
+  const row = (over: Partial<Parameters<typeof summaryTotalLabel>[0]> = {}) => ({
+    hasQuoteItems: false,
+    quoteAmountCentavos: null,
+    fixedTotalCentavos: 270000,
+    totalCentavos: 270000,
+    ...over,
+  });
+
+  it("prints a priced order's total", () => {
+    expect(summaryTotalLabel(row())).toBe("₱2,700.00");
+  });
+
+  it("says there is no quote yet when there is nothing else to say", () => {
+    expect(
+      summaryTotalLabel(
+        row({ hasQuoteItems: true, fixedTotalCentavos: 0, totalCentavos: 0 }),
+      ),
+    ).toBe("No quote yet");
+  });
+
+  it("says both halves when part of the order is priced", () => {
+    expect(summaryTotalLabel(row({ hasQuoteItems: true }))).toBe("₱2,700.00 + quote");
+  });
+
+  it("prints the whole total once the quote is in", () => {
+    expect(
+      summaryTotalLabel(
+        row({ hasQuoteItems: true, quoteAmountCentavos: 800000, totalCentavos: 1070000 }),
+      ),
+    ).toBe("₱10,700.00");
+  });
+});
+
+describe("summaryAwaitingQuote", () => {
+  it("is true only while a quote item has no figure against it", () => {
+    expect(
+      summaryAwaitingQuote({ hasQuoteItems: true, quoteAmountCentavos: null }),
+    ).toBe(true);
+    expect(
+      summaryAwaitingQuote({ hasQuoteItems: true, quoteAmountCentavos: 0 }),
+    ).toBe(false);
+    expect(
+      summaryAwaitingQuote({ hasQuoteItems: false, quoteAmountCentavos: null }),
+    ).toBe(false);
   });
 });
