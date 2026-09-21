@@ -308,14 +308,19 @@ to ask:
 
   **What "until they sign out" covers, and what it does not.** This system no
   longer starts a timer for a staff account, so nothing in *our* code signs
-  them out. Supabase can still end the session itself, and that is set in the
-  **dashboard** — *Authentication → Sessions*, "time-box user sessions" and
-  "inactivity timeout" — which is somewhere nobody has looked yet. It is NOT
-  set by `supabase/config.toml`: that file configures the Supabase CLI running
-  locally, and `npm run db:push` sends migrations only, never auth settings.
-  So if a staff member is still signed out after a long gap, it is Supabase
-  doing it, not this system, and the fix is in the dashboard rather than in
-  the code.
+  them out. Supabase can still end the session itself, from the **dashboard**
+  — *Authentication → Sessions*, "time-box user sessions" and "inactivity
+  timeout". The owner checked those on **21 September 2026 and both are off**,
+  so as of that date nothing at any layer signs a staff member out.
+
+  That is a fact with a date on it, not a property of this code, and it can be
+  changed by anyone with the dashboard. Two things follow. It is NOT set by
+  `supabase/config.toml` — that file configures the Supabase CLI running
+  locally, and `npm run db:push` sends migrations only, never auth settings,
+  so neither the repository nor a deploy can tell you what those two settings
+  are today. And if a staff member IS ever signed out after a long gap, that
+  is Supabase doing it rather than this system: check those two settings again
+  before looking at `idleSignOutMinutes`.
 - New staff get **Add sales (POS)** permission by default, nothing else
   (spec 4.3).
 - Passwords need **at least 8 characters, with a letter and a number**. Supabase's
