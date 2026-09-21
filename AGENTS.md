@@ -53,8 +53,8 @@ receiving code.
   `supabase_migrations.schema_migrations` so none can run twice. The `0000`-
   style four-digit prefixes are accepted as versions and sort before any later
   `supabase migration new` timestamp, so both naming styles can coexist. Verified
-  by pushing all seventeen to a throwaway PostgreSQL and then running the whole
-  RLS suite against the result: 43 tables and one view, 319 checks, identical
+  by pushing all eighteen to a throwaway PostgreSQL and then running the whole
+  RLS suite against the result: 43 tables and one view, 333 checks, identical
   to `run.sh`.
 - **CI runs all of it on every push and pull request** (`.github/workflows/ci.yml`):
   lint, typecheck, unit tests, the security rules and the schema checker, then

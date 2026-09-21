@@ -395,8 +395,8 @@ unverified work.
 | When the summary arrives | **Your shop's opening time**, read from the `workDayStart` you already set. Nothing invented | The cron fires at `0 0 * * *` UTC = 8am Manila, in `vercel.json`. Change your opening hour and change that line to match (UTC = Manila − 8) |
 | Anything immediate | **A customer message, and nothing else.** It is the only one with a person waiting at the other end (spec 9) | `notifyOwnersOfEnquiry` in `src/app/(public)/actions.ts` |
 | What the customer alert says | **That somebody wrote, and nothing about who.** A lock screen is readable by whoever is near the phone, and a stranger's name and number are Owner/Admin material (spec 4.3) | `enquiryAlert`. Worth keeping as it is |
-| Who may receive them | **Owner and Admin only**, refused by the database and not only by the screen. Every figure a summary carries is beyond a staff checkbox | The insert policy in `0016`. Widening it means deciding what a staff digest could safely say, which is a real question, not a toggle |
-| Whether admins see each other's phones | **No.** An endpoint is a device; one admin reading another's device list is a privacy question with no upside | `push_subscriptions_read_own` in `0016` |
+| Who may receive them | **Owner and Admin only**, refused by the database and not only by the screen. Every figure a summary carries is beyond a staff checkbox | The insert policy in `0017`. Widening it means deciding what a staff digest could safely say, which is a real question, not a toggle |
+| Whether admins see each other's phones | **No.** An endpoint is a device; one admin reading another's device list is a privacy question with no upside | `push_subscriptions_read_own` in `0017` |
 | Per-kind on/off switches | **Not built.** One summary does not need filtering, and every switch is another thing to get wrong | If you want them they belong on the subscription row, not in Settings — a person may have two phones with different answers |
 | Turning a phone off | **Deletes the row.** The one place in this system where deleting is right: it is a standing permission, not a money record, and a withdrawn permission must leave nothing behind that anything could still send to | `unsubscribeAction` |
 | A phone that stops answering | **404 and 410 switch it off** (the browser is gone); anything else is forgiven ten times first | `MAX_FAILURES` and `subscriptionVerdict`. Switching off after one bad afternoon is how somebody silently stops getting warnings |
@@ -412,6 +412,43 @@ unverified work.
 - **On an iPhone you must add the system to your Home Screen first.** Apple
   only allows notifications for an app installed that way. Safari in an
   ordinary tab will say it is unsupported, and it is right.
+## Decided after Phase 10 — a deactivated account reads nothing of its own
+
+Deactivating an account is supposed to remove all access **immediately**
+(spec 4.2), and a token stays valid until it expires. So "immediately" has to
+be the policies' job, not the sign-in screen's. `current_role_name()` returns
+null for a deactivated person, so every policy written in terms of a role or a
+permission already refused them — but the **own-row** policies matched on
+`auth.uid()` alone. Somebody dismissed this morning could still read, this
+afternoon: their own daily rate, address and emergency contact; their own
+permission list; and their own payslips, attendance, cash advances and
+deductions.
+
+Migration `0015` fixed the same defect on `sales`, `sale_lines` and
+`void_requests`. `0017` is the rest of it, found by listing **every** policy
+whose predicate reaches `auth.uid()` and **every `SECURITY DEFINER` helper that
+resolves the caller**, in a real database, rather than by looking where a test
+happened to fail.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| Five tables that never mention `auth.uid()` | Fixed in **one place**: `my_staff_id()`. It is `SECURITY DEFINER`, so it bypasses RLS on `staff` and answered for anybody whose profile id matched, active or not. `payroll_weeks`, `payroll_days`, `attendance_entries`, `cash_advances` and `advance_deductions` all compare against it, so guarding the helper closes all five | `my_staff_id()` in `0017` |
+| `staff_read_own`, `user_permissions_read_self` | Guarded with `current_role_name() is not null`, the same shape `0015` used | The policies in `0017` |
+| `profiles_read_self` | **Deliberately left open.** It is the row the app reads to discover the account is inactive — `getSignedInUser()` reads `status` from it and sends the person to "your account is no longer active". Guarding it would make a dismissed person's own name unreadable to the very screen trying to explain the situation, and they would get a blank "signed out" instead. It carries their own username and name and nothing about anybody else | Add the same clause if that message is ever worth losing |
+| `stock_movements_insert` | **Nothing to do.** It looks unguarded and is not: its check goes through `has_permission()`, which is already false for a deactivated account | — |
+
+**A `SECURITY DEFINER` helper must check the caller itself.** This is the third
+time that rule has come up — after the `*_has_history` functions and
+`is_active_staff` — and it is the same lesson each time: being `SECURITY
+DEFINER` is exactly what makes the check mandatory rather than optional,
+because nothing above it will do the check on the way past.
+
+**The test runs every check twice**
+(`supabase/tests/13_deactivated_account.test.sql`): once while the account is
+active, to prove the policies still serve the people they are meant to, and
+once after it is deactivated with the same live token. A test that only
+checked the second half would pass just as well on a policy that refuses
+everybody.
 
 ---
 
