@@ -22,6 +22,13 @@
 import { DIVISION_IDS, type DivisionId } from "./divisions";
 import { MONEY_SOURCES, type MoneySource } from "./ledger";
 import { sumCentavos, type Centavos } from "./money";
+import {
+  addDays,
+  civilDateToISO,
+  daysBetween,
+  parseISODate,
+  type CivilDate,
+} from "./period";
 
 // ---------------------------------------------------------------------------
 // One money event
@@ -195,12 +202,73 @@ export function isPartialRead(read: CollectionsRead): boolean {
  */
 export function partialReadWarning(read: CollectionsRead): string | null {
   if (read.failed) {
-    return "Today's payments could not be read, so the figures below are not the day's takings. This is a fault, not an empty day - show it to whoever maintains the system.";
+    return "The payments for this day could not be read, so the figures below are not the day's takings. This is a fault, not an empty day - show it to whoever maintains the system.";
   }
   if (read.truncated) {
     return "There were more payments in this period than this screen reads at once, so the figures below are short. Ask for a shorter period.";
   }
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Which day the feed is being asked about
+// ---------------------------------------------------------------------------
+
+/**
+ * The day the Sales screen is showing, and where its arrows go.
+ *
+ * WHY THIS EXISTS
+ * The screen was hard-wired to today and had no way to ask for another day.
+ * That is unremarkable at four in the afternoon and alarming at nine in the
+ * morning: every figure reads PHP 0.00, and an owner who took PHP 4,000
+ * yesterday opens a screen called "Sales", finds nothing on it, and concludes
+ * the system has lost the lot. Nothing was lost - yesterday's money was on
+ * yesterday, and there was no way to go there.
+ *
+ * So the day is a parameter, and an empty one says WHICH day it was empty on.
+ * Same rule as `unknown` in `target.ts`: a zero is a claim, and a claim has to
+ * say what it is about.
+ */
+export interface SalesDay {
+  date: CivilDate;
+  /** "2026-09-21" - for the URL, and for the date box. */
+  iso: string;
+  isToday: boolean;
+  /**
+   * A day that has not arrived yet, reachable only by typing one into the URL
+   * or the date box. It is empty for a reason that has nothing to do with the
+   * shop, and the screen has to say so rather than "nothing was taken".
+   */
+  isFuture: boolean;
+  /** The day before. There is always one. */
+  previous: CivilDate;
+  /**
+   * The day after, or null once there is nothing later worth opening. Today is
+   * the end of the road: tomorrow cannot have taken anything.
+   */
+  next: CivilDate | null;
+}
+
+/**
+ * Reads the day out of a URL.
+ *
+ * An unreadable date falls back to today rather than raising anything. The
+ * person typed something into an address bar, the heading always says which
+ * day is being shown, and a screen that refuses to draw teaches nobody
+ * anything.
+ */
+export function salesDay(asked: string | undefined, today: CivilDate): SalesDay {
+  const date = parseISODate(asked ?? "") ?? today;
+  const fromToday = daysBetween(today, date);
+
+  return {
+    date,
+    iso: civilDateToISO(date),
+    isToday: fromToday === 0,
+    isFuture: fromToday > 0,
+    previous: addDays(date, -1),
+    next: fromToday < 0 ? addDays(date, 1) : null,
+  };
 }
 
 // ---------------------------------------------------------------------------

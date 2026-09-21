@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Button, Card, Field, Input, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireUser } from "@/lib/auth/dal";
 import { doorViewer, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import {
@@ -12,9 +12,11 @@ import {
   liveCollections,
   partialReadWarning,
   paymentKindLabel,
+  salesDay,
   seesWholeDay,
   totalsByDivision,
   type CollectionRow,
+  type SalesDay,
 } from "@/lib/collections";
 import { getCollectionsForDay } from "@/lib/data/collections";
 import { getVoidRequests } from "@/lib/data/pos";
@@ -49,7 +51,7 @@ export const metadata = { title: "Sales · Dabz System" };
 export default async function SalesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ division?: string; method?: string }>;
+  searchParams: Promise<{ division?: string; method?: string; on?: string }>;
 }) {
   await connection();
 
@@ -58,9 +60,17 @@ export default async function SalesPage({
   const division = readDivision(params.division);
   const method = readMethod(params.method);
 
+  /*
+    Which day is being shown. `on` is absent almost always, and then this is
+    today - but the screen is no longer PINNED to today, which is what made an
+    ordinary quiet morning look like the system had been wiped.
+  */
   const today = manilaToday();
+  const todayISO = civilDateToISO(today);
+  const day = salesDay(params.on, today);
+
   const [read, voidRequests] = await Promise.all([
-    getCollectionsForDay(today),
+    getCollectionsForDay(day.date),
     getVoidRequests(),
   ]);
 
@@ -72,6 +82,23 @@ export default async function SalesPage({
 
   const pending = voidRequests.filter((request) => request.status === "pending");
   const canDecide = isOwnerOrAdmin(user);
+
+  /*
+    Every link on this screen keeps the other two choices. Changing the method
+    must not throw away the day the person navigated to, and picking a day must
+    not silently clear a filter - either one reads as the screen forgetting.
+  */
+  const hrefFor = (over: {
+    dayISO?: string;
+    division?: string;
+    method?: string;
+  }): string =>
+    salesHref({
+      dayISO: over.dayISO ?? day.iso,
+      todayISO,
+      division: over.division ?? division,
+      method: over.method ?? method,
+    });
 
   /*
     Which doors this person can see at all. Without this the totals strip would
@@ -103,11 +130,75 @@ export default async function SalesPage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Sales</h1>
         <p className="mt-2 text-muted">
-          {formatCivilDate(today)} &middot; everything taken at the counter, on a
-          job order and on a repair ticket
+          {formatCivilDate(day.date)} &middot; everything taken at the counter, on
+          a job order and on a repair ticket
           {canDecide ? "" : " that you are allowed to see"}
         </p>
       </div>
+
+      {/*
+        Which day.
+
+        The screen had none of this. It read today and only today, so at nine in
+        the morning every figure on it was PHP 0.00 with no way to look at the
+        day that had just ended - which is indistinguishable, from the outside,
+        from the shop's takings having been wiped.
+      */}
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={hrefFor({ dayISO: civilDateToISO(day.previous) })}
+              className="rounded-control bg-ink/5 px-3 py-1.5 text-sm ring-1 ring-line hover:bg-ink/10"
+            >
+              {"←"} {formatCivilDate(day.previous)}
+            </Link>
+            {/*
+              No forward arrow on today: tomorrow cannot have taken anything,
+              and a button that leads nowhere is tapped once and trusted less
+              afterwards.
+            */}
+            {day.next ? (
+              <Link
+                href={hrefFor({ dayISO: civilDateToISO(day.next) })}
+                className="rounded-control bg-ink/5 px-3 py-1.5 text-sm ring-1 ring-line hover:bg-ink/10"
+              >
+                {formatCivilDate(day.next)} {"→"}
+              </Link>
+            ) : null}
+          </div>
+          {day.isToday ? null : (
+            <Link
+              href={hrefFor({ dayISO: todayISO })}
+              className={`text-sm text-muted underline ${TAP_AREA}`}
+            >
+              Back to today
+            </Link>
+          )}
+        </div>
+
+        {/*
+          A plain GET form, so a week ago is one tap rather than seven. The two
+          filters ride along as hidden fields - picking a day must not quietly
+          undo the door or the method the person had chosen.
+        */}
+        <form action="/sales" method="get" className="mt-4 flex flex-wrap items-end gap-2">
+          {division === "all" ? null : (
+            <input type="hidden" name="division" value={division} />
+          )}
+          {method === "all" ? null : (
+            <input type="hidden" name="method" value={method} />
+          )}
+          <div className="w-44">
+            <Field label="Go to a day">
+              <Input type="date" name="on" defaultValue={day.iso} max={todayISO} />
+            </Field>
+          </div>
+          <Button type="submit" variant="secondary">
+            Show
+          </Button>
+        </form>
+      </Card>
 
       {canDecide && pending.length > 0 ? (
         <Card
@@ -127,8 +218,9 @@ export default async function SalesPage({
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     <span className="font-medium">
-                      {sale ? sale.reference : "Sale"}{" "}
-                      {sale ? `· ${formatPesos(sale.amountCentavos)}` : ""}
+                      {sale
+                        ? `${sale.reference} · ${formatPesos(sale.amountCentavos)}`
+                        : "Sale not shown on this day"}
                     </span>
                     <span className="text-xs text-muted">
                       {formatManilaDateTime(request.createdAt)}
@@ -145,7 +237,13 @@ export default async function SalesPage({
         </Card>
       ) : null}
 
-      <Card title="Collected today">
+      <Card
+        title={
+          day.isToday
+            ? "Collected today"
+            : `Collected on ${formatCivilDate(day.date)}`
+        }
+      >
         <p className="text-4xl font-semibold tracking-tight">
           {formatPesos(collectedTotal(rows))}
         </p>
@@ -182,7 +280,7 @@ export default async function SalesPage({
           <p className="mt-5 flex items-start gap-1.5 text-xs text-attention">
             <span aria-hidden="true">{"⚠"}</span>
             <span>
-              Part of today is missing from this figure.{" "}
+              Part of this day is missing from this figure.{" "}
               {[
                 counterIsOwnSalesOnly
                   ? "Only the counter sales you rang up yourself are shown"
@@ -221,7 +319,7 @@ export default async function SalesPage({
                 label: DIVISION_DOOR_LABELS[id],
               })),
             ]}
-            hrefFor={(value) => filterHref({ division: value, method })}
+            hrefFor={(value) => hrefFor({ division: value })}
           />
           <Chips
             legend="Paid with"
@@ -234,7 +332,7 @@ export default async function SalesPage({
                   source === "cash_drawer" ? "Cash" : MONEY_SOURCE_LABELS[source],
               })),
             ]}
-            hrefFor={(value) => filterHref({ division, method: value })}
+            hrefFor={(value) => hrefFor({ method: value })}
           />
         </div>
       </Card>
@@ -248,25 +346,25 @@ export default async function SalesPage({
         }
       >
         {shown.length === 0 ? (
-          <p className="text-sm text-muted">
-            {rows.length === 0 ? (
-              <>
-                Nothing has been taken yet today.{" "}
-                <Link href="/pos" className={`underline ${TAP_AREA}`}>
-                  Open the counter
-                </Link>
-                .
-              </>
-            ) : (
-              <>
-                Nothing matches that filter.{" "}
-                <Link href="/sales" className={`underline ${TAP_AREA}`}>
-                  Show everything
-                </Link>
-                .
-              </>
-            )}
-          </p>
+          readWarning ? (
+            <p className="flex items-start gap-1.5 text-sm text-attention">
+              <span aria-hidden="true">{"⚠"}</span>
+              <span>{readWarning}</span>
+            </p>
+          ) : rows.length === 0 ? (
+            <EmptyDay day={day} canOpenReports={canDecide} />
+          ) : (
+            <p className="text-sm text-muted">
+              Nothing matches that filter.{" "}
+              <Link
+                href={hrefFor({ division: "all", method: "all" })}
+                className={`underline ${TAP_AREA}`}
+              >
+                Show everything
+              </Link>
+              .
+            </p>
+          )
         ) : (
           <ul className="divide-y divide-line/60">
             {shown.map((row) => (
@@ -377,6 +475,62 @@ function CollectionLine({
   );
 }
 
+/**
+ * A day with nothing on it.
+ *
+ * Three different states, and wording them as one is what caused the alarm
+ * this screen was fixed for. Today may simply be early. A past day may
+ * genuinely have taken nothing. A day in the future cannot have taken
+ * anything at all, and saying "nothing was taken" about it would be a claim
+ * about the shop rather than about the calendar.
+ *
+ * The second paragraph is the one that matters. PHP 0.00 across a screen
+ * called "Sales" reads as lost money unless something says out loud that this
+ * is ONE DAY of a book that still has all its other days in it.
+ */
+function EmptyDay({
+  day,
+  canOpenReports,
+}: {
+  day: SalesDay;
+  canOpenReports: boolean;
+}) {
+  return (
+    <div className="text-sm text-muted">
+      {day.isFuture ? (
+        <p>{formatCivilDate(day.date)} has not happened yet.</p>
+      ) : day.isToday ? (
+        <p>
+          Nothing has been taken yet today.{" "}
+          <Link href="/pos" className={`underline ${TAP_AREA}`}>
+            Open the counter
+          </Link>
+          .
+        </p>
+      ) : (
+        <p>Nothing was taken on {formatCivilDate(day.date)}.</p>
+      )}
+
+      {day.isFuture ? null : (
+        <p className="mt-2">
+          This screen shows one day at a time. Takings from an earlier day are
+          still there, on that day &mdash; use the arrows above to open one
+          {canOpenReports ? (
+            <>
+              , or{" "}
+              <Link href="/reports" className={`underline ${TAP_AREA}`}>
+                Reports
+              </Link>{" "}
+              for a whole month at once
+            </>
+          ) : null}
+          .
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** A row of filter pills. Links, so a filter survives a refresh and can be shared. */
 function Chips({
   legend,
@@ -420,10 +574,23 @@ function Chips({
   );
 }
 
-function filterHref(filter: { division: string; method: string }): string {
+/**
+ * The URL for a given day, door and method.
+ *
+ * Today carries no `on` at all, so the bare /sales URL always means today: a
+ * link saved this morning still opens on the right day tomorrow, and the
+ * sidebar needs no special case.
+ */
+function salesHref(state: {
+  dayISO: string;
+  todayISO: string;
+  division: string;
+  method: string;
+}): string {
   const query = new URLSearchParams();
-  if (filter.division !== "all") query.set("division", filter.division);
-  if (filter.method !== "all") query.set("method", filter.method);
+  if (state.dayISO !== state.todayISO) query.set("on", state.dayISO);
+  if (state.division !== "all") query.set("division", state.division);
+  if (state.method !== "all") query.set("method", state.method);
   const search = query.toString();
   return search === "" ? "/sales" : `/sales?${search}`;
 }
