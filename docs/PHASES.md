@@ -16,7 +16,9 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 6 | Dabz Apparel job orders | ✅ **Done — waiting on owner to confirm** |
 | 7 | DabzTech Solutions job tickets | ✅ **Done — waiting on owner to confirm** |
 | 8 | Reports | ✅ **Done — waiting on owner to confirm** |
-| 9 | Later: public website, Messenger, Meta Ads, chatbot, notifications | Not in first build |
+| 9 | The public page and customer messages | ✅ **Done — waiting on owner to confirm** |
+| 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — waiting on owner to confirm** |
+| — | Later: Messenger API, Meta Ads tracking, chatbot, push notifications | Not in first build |
 
 ---
 
