@@ -304,9 +304,18 @@ to ask:
   sign out* (untick to put staff back on the timer); the minutes box beside it
   still sets the timer, up to 480. Stored in `app_settings.staff_stay_signed_in`
   (migration `0014`); the rule itself is `idleSignOutMinutes` in
-  `src/lib/settings.ts`. Nothing server-side ends a session early — Supabase's
-  `[auth.sessions]` timebox and inactivity timeout are both left off — so
-  "until they sign out" really does mean that, on that browser.
+  `src/lib/settings.ts`.
+
+  **What "until they sign out" covers, and what it does not.** This system no
+  longer starts a timer for a staff account, so nothing in *our* code signs
+  them out. Supabase can still end the session itself, and that is set in the
+  **dashboard** — *Authentication → Sessions*, "time-box user sessions" and
+  "inactivity timeout" — which is somewhere nobody has looked yet. It is NOT
+  set by `supabase/config.toml`: that file configures the Supabase CLI running
+  locally, and `npm run db:push` sends migrations only, never auth settings.
+  So if a staff member is still signed out after a long gap, it is Supabase
+  doing it, not this system, and the fix is in the dashboard rather than in
+  the code.
 - New staff get **Add sales (POS)** permission by default, nothing else
   (spec 4.3).
 - Passwords need **at least 8 characters, with a letter and a number**. Supabase's
