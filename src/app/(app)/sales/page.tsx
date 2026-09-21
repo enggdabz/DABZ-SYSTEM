@@ -8,6 +8,7 @@ import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
   doorVisibility,
+  figuresAreKnown,
   filterCollections,
   liveCollections,
   partialReadWarning,
@@ -76,6 +77,13 @@ export default async function SalesPage({
 
   const rows = read.rows;
   const readWarning = partialReadWarning(read);
+  /*
+    A failed read has no figures, only an absence. See `figuresAreKnown` - the
+    short of it is that PHP 0.00 in 4xl type beats a 12px warning every time,
+    so when the answer is unknown there is no number for the warning to lose
+    to.
+  */
+  const showFigures = figuresAreKnown(read);
 
   const shown = filterCollections(rows, { division, source: method });
   const byDivision = totalsByDivision(rows);
@@ -244,9 +252,16 @@ export default async function SalesPage({
             : `Collected on ${formatCivilDate(day.date)}`
         }
       >
-        <p className="text-4xl font-semibold tracking-tight">
-          {formatPesos(collectedTotal(rows))}
-        </p>
+        {showFigures ? (
+          <p className="text-4xl font-semibold tracking-tight">
+            {formatPesos(collectedTotal(rows))}
+          </p>
+        ) : (
+          <p className="flex items-baseline gap-2 text-4xl font-semibold tracking-tight text-attention">
+            <span aria-hidden="true">{"\u26A0"}</span>
+            <span>Could not be read</span>
+          </p>
+        )}
 
         {/*
           One figure per door. Stacked on a phone, three across from `sm` up -
@@ -263,14 +278,22 @@ export default async function SalesPage({
                   : ""}
               </dt>
               <dd className="mt-1 text-2xl font-semibold tracking-tight">
-                {formatPesos(byDivision[id])}
+                {showFigures ? (
+                  formatPesos(byDivision[id])
+                ) : (
+                  <span className="text-attention">Not known</span>
+                )}
               </dd>
             </div>
           ))}
         </dl>
 
         {readWarning ? (
-          <p className="mt-5 flex items-start gap-1.5 text-xs text-attention">
+          <p
+            className={`mt-5 flex items-start gap-1.5 text-attention ${
+              showFigures ? "text-xs" : "text-sm"
+            }`}
+          >
             <span aria-hidden="true">{"⚠"}</span>
             <span>{readWarning}</span>
           </p>

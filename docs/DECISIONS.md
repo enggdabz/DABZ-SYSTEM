@@ -717,3 +717,21 @@ to ask:
   warning. Either way `src/lib/data/checklist.test.ts` now holds the public
   page and the checklist together, so the next field added to one cannot be
   forgotten in the other.
+- **A failed read prints no peso figure at all.** The owner's production
+  database was missing `0015`, so `public.collections` did not exist and every
+  read of the feed failed. The screen printed **₱0.00** for the day and for
+  each of the three doors in 4xl type, with the explanation in 12px grey
+  underneath - and the owner spent a day believing the shop's takings had been
+  wiped (21 Sep 2026). Two things were wrong and only one of them was the
+  database. `#19` had already made a failed read carry `failed: true` and a ⚠,
+  which was necessary and not sufficient: a big number beats a small warning,
+  every time, so the warning lost. `figuresAreKnown()` now decides whether
+  there is a NUMBER at all, separately from whether there is something to say.
+  On a failed read the day reads "⚠ Could not be read" where the total goes and
+  "Not known" per door, and the warning moves up to `text-sm`. A TRUNCATED read
+  still shows its figures, because those are a floor - real money, just not all
+  of it - and collapsing the two cases would hide money that was genuinely
+  taken. The message also now says **"your takings are safe - nothing has been
+  lost"**, which is true (a read touches no row) and is the sentence that was
+  missing. To change it, `figuresAreKnown` in `src/lib/collections.ts`; the
+  Sales screen and the Overview card both read it.

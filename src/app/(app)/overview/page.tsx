@@ -16,6 +16,7 @@ import { monthTotals } from "@/lib/bills";
 import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
+  figuresAreKnown,
   doorVisibility,
   partialReadWarning,
   totalsByDivision as collectionTotalsByDivision,
@@ -786,6 +787,9 @@ async function CollectedToday({
 
   const rows = read.rows;
   const readWarning = partialReadWarning(read);
+  // A failed read has no figures at all - see `figuresAreKnown`. This is the
+  // owner's home screen, so it is the first place a phantom PHP 0.00 lands.
+  const showFigures = figuresAreKnown(read);
   const byDivision = collectionTotalsByDivision(rows);
 
   // The same rule the Sales screen and End of day use - see doorVisibility.
@@ -798,9 +802,16 @@ async function CollectedToday({
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Card title="Collected today">
-        <p className="text-3xl font-semibold tracking-tight">
-          {formatPesos(collectedTotal(rows))}
-        </p>
+        {showFigures ? (
+          <p className="text-3xl font-semibold tracking-tight">
+            {formatPesos(collectedTotal(rows))}
+          </p>
+        ) : (
+          <p className="flex items-baseline gap-2 text-3xl font-semibold tracking-tight text-attention">
+            <span aria-hidden="true">{"\u26A0"}</span>
+            <span>Could not be read</span>
+          </p>
+        )}
 
         <dl className="mt-4 space-y-2 text-sm">
           {DIVISION_IDS.filter(canSee).map((id) => (
@@ -812,7 +823,11 @@ async function CollectedToday({
                   : ""}
               </dt>
               <dd className="font-medium">
-                {formatPesos(byDivision[id])}{" "}
+                {showFigures ? (
+                  formatPesos(byDivision[id])
+                ) : (
+                  <span className="text-attention">Not known</span>
+                )}{" "}
                 <Link
                   href={`/sales?division=${id}`}
                   className={`ml-1 text-xs underline ${TAP_AREA}`}
@@ -825,7 +840,11 @@ async function CollectedToday({
         </dl>
 
         {readWarning ? (
-          <p className="mt-4 flex items-start gap-1.5 text-xs text-attention">
+          <p
+            className={`mt-4 flex items-start gap-1.5 text-attention ${
+              showFigures ? "text-xs" : "text-sm"
+            }`}
+          >
             <span aria-hidden="true">{"⚠"}</span>
             <span>{readWarning}</span>
           </p>

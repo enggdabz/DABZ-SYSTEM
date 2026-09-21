@@ -202,12 +202,48 @@ export function isPartialRead(read: CollectionsRead): boolean {
  */
 export function partialReadWarning(read: CollectionsRead): string | null {
   if (read.failed) {
-    return "The payments for this day could not be read, so the figures below are not the day's takings. This is a fault, not an empty day - show it to whoever maintains the system.";
+    /*
+      "Your takings are safe" earns its place here. A read failing touches no
+      row - it is a question that did not arrive, not an answer that came back
+      empty - and the one time this fired for real, that was the sentence the
+      owner needed and did not get. Reassurance is not padding when the
+      alternative is somebody believing their money is gone.
+    */
+    return "The payments for this day could not be read, so no figure here is the shop's takings. This is a fault, not an empty day, and your takings are safe - nothing has been lost. Show it to whoever maintains the system.";
   }
   if (read.truncated) {
     return "There were more payments in this period than this screen reads at once, so the figures below are short. Ask for a shorter period.";
   }
   return null;
+}
+
+/**
+ * May a peso figure be printed from this read at all?
+ *
+ * WHY THIS IS NOT THE SAME QUESTION AS `partialReadWarning`
+ * That function answers "is there something to say about this read". This one
+ * answers "is there a NUMBER here", and the two differ in the case that
+ * matters:
+ *
+ *   * `truncated` - the figures are a FLOOR. Real money, just not all of it.
+ *     Print them, with the warning beside them.
+ *   * `failed` - the figures are UNKNOWN. `collectedTotal([])` is 0, and that
+ *     zero is not a small number, it is the absence of an answer wearing the
+ *     costume of one.
+ *
+ * WHAT WENT WRONG WITHOUT IT
+ * The owner's database was missing the `collections` view, so every read
+ * failed. The screen printed PHP 0.00 across the day and all three doors in
+ * 4xl type, with the explanation in 12px grey underneath - and the owner spent
+ * a day believing the shop's takings had been wiped. The warning was right
+ * there and lost the argument to the big number, because a big number always
+ * wins. So on a failed read there is now no number to lose to.
+ *
+ * Same family as `unknown` in `target.ts` and a NULL day-closing breakdown: a
+ * zero is a claim, and this system does not make claims it cannot support.
+ */
+export function figuresAreKnown(read: CollectionsRead): boolean {
+  return !read.failed;
 }
 
 // ---------------------------------------------------------------------------

@@ -4,6 +4,7 @@ import {
   breakdownCollections,
   checkPaymentAmount,
   collectedTotal,
+  figuresAreKnown,
   collectionsReport,
   defaultPaymentKind,
   doorVisibility,
@@ -807,5 +808,69 @@ describe("salesDay", () => {
     expect(day.isFuture).toBe(true);
     expect(day.isToday).toBe(false);
     expect(day.next).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A failed read has no figures, only an absence
+// ---------------------------------------------------------------------------
+
+describe("figuresAreKnown", () => {
+  const read = (over: Partial<CollectionsRead> = {}): CollectionsRead => ({
+    rows: [],
+    failed: false,
+    truncated: false,
+    ...over,
+  });
+
+  it("is true for an ordinary read, empty or not", () => {
+    // A genuinely quiet day HAS an answer, and the answer is zero.
+    expect(figuresAreKnown(read())).toBe(true);
+  });
+
+  it("is FALSE when the read failed", () => {
+    /*
+      The one that matters, and the one this system got wrong in the field.
+      The owner's database was missing the collections view, every read
+      failed, and the screen printed PHP 0.00 across the day and all three
+      doors - so the owner spent a day believing the shop's takings had been
+      wiped. collectedTotal([]) is 0, but that zero is the absence of an
+      answer wearing the costume of one.
+    */
+    expect(figuresAreKnown(read({ failed: true }))).toBe(false);
+  });
+
+  it("is TRUE when the read was merely truncated", () => {
+    /*
+      Deliberately not the same as failed. A truncated read's figures are a
+      FLOOR - real money that is not all of it - so they are still worth
+      printing, with the warning beside them. Collapsing the two cases would
+      hide money that was genuinely taken.
+    */
+    expect(figuresAreKnown(read({ truncated: true }))).toBe(true);
+  });
+
+  it("stays false on a failed read even when some rows came back", () => {
+    // Belt and braces: `failed` is the claim about the READ, not about how
+    // many rows happen to be in hand.
+    expect(
+      figuresAreKnown(read({ failed: true, rows: [] as CollectionRow[] })),
+    ).toBe(false);
+  });
+});
+
+describe("partialReadWarning, on a failed read", () => {
+  it("says the takings are safe", () => {
+    // The sentence the owner needed and did not get. A read failing touches
+    // no row, and saying so is the difference between a bug report and a
+    // person thinking their money is gone.
+    const warning = partialReadWarning({
+      rows: [],
+      failed: true,
+      truncated: false,
+    });
+
+    expect(warning).toContain("your takings are safe");
+    expect(warning).toContain("not an empty day");
   });
 });
