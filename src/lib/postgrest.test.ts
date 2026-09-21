@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { isColumnMissingFromApi, isFunctionMissingFromApi } from "./postgrest";
+import {
+  isColumnMissingFromApi,
+  isFunctionMissingFromApi,
+  missingColumnFromApi,
+} from "./postgrest";
 
 describe("isFunctionMissingFromApi", () => {
   it("recognises the code PostgREST uses for a function it cannot find", () => {
@@ -135,5 +139,75 @@ describe("isColumnMissingFromApi", () => {
   it("survives an error with no code and no message", () => {
     expect(isColumnMissingFromApi({})).toBe(false);
     expect(isColumnMissingFromApi({ code: null, message: null })).toBe(false);
+  });
+});
+
+describe("missingColumnFromApi", () => {
+  it("reads the name out of what PostgREST answers", () => {
+    // Word for word what the owner's Settings screen showed on 21 Sep 2026.
+    expect(
+      missingColumnFromApi({
+        code: "PGRST204",
+        message:
+          "Could not find the 'staff_stay_signed_in' column of 'app_settings' in the schema cache",
+      }),
+    ).toBe("staff_stay_signed_in");
+  });
+
+  it("reads the name out of both of PostgreSQL's wordings", () => {
+    expect(
+      missingColumnFromApi({
+        code: "42703",
+        message:
+          'column "staff_stay_signed_in" of relation "app_settings" does not exist',
+      }),
+    ).toBe("staff_stay_signed_in");
+
+    expect(
+      missingColumnFromApi({
+        code: "42703",
+        message: "column app_settings.staff_stay_signed_in does not exist",
+      }),
+    ).toBe("staff_stay_signed_in");
+  });
+
+  it("takes the COLUMN, not the table it is on", () => {
+    // The trap in the dotted wording: both names are there, and dropping the
+    // table name from the write would do nothing at all.
+    expect(
+      missingColumnFromApi({
+        code: "42703",
+        message: "column app_settings.shop_phone does not exist",
+      }),
+    ).toBe("shop_phone");
+  });
+
+  it("answers null for anything that is not a missing column", () => {
+    /*
+      Null means "do not retry", and it has to. A guess here would drop a
+      column the database actually HAS, and the owner would watch a setting
+      they typed fail to stick with nothing on screen to explain it.
+    */
+    expect(
+      missingColumnFromApi({
+        code: "42501",
+        message: "permission denied for table app_settings",
+      }),
+    ).toBeNull();
+    expect(
+      missingColumnFromApi({
+        code: "23514",
+        message:
+          'new row for relation "app_settings" violates check constraint "app_settings_auto_logout_minutes_check"',
+      }),
+    ).toBeNull();
+    expect(missingColumnFromApi({})).toBeNull();
+  });
+
+  it("answers null when it is a missing column but nobody said which", () => {
+    expect(
+      missingColumnFromApi({ code: "PGRST204", message: "could not find the column" }),
+    ).toBeNull();
+    expect(missingColumnFromApi({ code: "PGRST204" })).toBeNull();
   });
 });

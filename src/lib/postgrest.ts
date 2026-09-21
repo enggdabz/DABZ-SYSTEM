@@ -63,3 +63,41 @@ export function isColumnMissingFromApi(error: PostgrestLikeError): boolean {
   // has a different fix and must not be reported as a missing migration.
   return /could not find the .*column/i.test(error.message ?? "");
 }
+
+/**
+ * WHICH column PostgREST could not find, or null when it did not say.
+ *
+ * `isColumnMissingFromApi` answers "the database is behind"; this answers "by
+ * exactly this much". The difference matters because the settings form writes
+ * every column in one statement: knowing the name lets the write be sent again
+ * without it, so the twenty-one settings the database DOES understand are
+ * saved instead of all twenty-two being refused together.
+ *
+ * Three wordings, because three different things can answer:
+ *
+ *   PostgREST   Could not find the 'staff_stay_signed_in' column of 'app_settings' in the schema cache
+ *   PostgreSQL  column "staff_stay_signed_in" of relation "app_settings" does not exist
+ *   PostgreSQL  column app_settings.staff_stay_signed_in does not exist
+ *
+ * Null is a real answer and the caller must treat it as "do not retry". A
+ * guess at the name would drop a column the database actually has, and the
+ * owner would watch a setting they typed fail to stick with no explanation.
+ */
+export function missingColumnFromApi(error: PostgrestLikeError): string | null {
+  if (!isColumnMissingFromApi(error)) return null;
+
+  const message = error.message ?? "";
+
+  const patterns = [
+    /could not find the ['"`]?([a-z0-9_]+)['"`]?\s+column/i,
+    /column ['"`]?([a-z0-9_]+)['"`]?\s+of relation/i,
+    /column ['"`]?(?:[a-z0-9_]+\.)?([a-z0-9_]+)['"`]?\s+does not exist/i,
+  ];
+
+  for (const pattern of patterns) {
+    const found = message.match(pattern);
+    if (found) return found[1];
+  }
+
+  return null;
+}

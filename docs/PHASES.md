@@ -1901,6 +1901,107 @@ underlined link it replaced.
 
 ---
 
+## 21 September 2026 — Settings would not save, and nothing could see why
+
+**What was wrong.** The owner opened **Settings**, typed a warranty period and
+pressed Save. The screen answered:
+
+> ⚠ Could not save the settings: your database is missing a column this version
+> stores. … [Could not find the 'staff\_stay\_signed\_in' column of
+> 'app\_settings' in the schema cache]
+
+`staff_stay_signed_in` is added by migration `0014`, which had never reached the
+production database. Two things made that worse than it had to be:
+
+1. **One absent column stopped the whole screen saving.** The form writes every
+   setting in one statement, so a checkbox the owner had not touched threw away
+   the warranty period they had just typed.
+2. **The System check screen said the database was fine.** It probes tables and
+   views, and `0014` creates neither — it adds one column to a table that
+   already existed. So the one screen whose job is to say "this database is
+   behind" reported *"The database has everything the system needs"* while
+   Settings refused to save.
+
+The second point is the same failure that put PHP 0.00 on the Sales screen and
+cost the owner a day: a confident "all fine" beside a screen that is visibly
+not fine. That is what this change is really about.
+
+**What was built.**
+
+- **A column the database has not got is dropped, and the rest is saved**
+  (`saveSettingsRow` in `src/lib/settings.ts`). PostgREST names the first
+  column it cannot find, so the write is sent again without it, until it goes
+  through. What was left out is then reported — by the name on the form, not
+  the column name — with what to run to finish it. Never silently: a setting
+  that quietly did not save is worse than one that visibly refused, because a
+  wrong value that reads back is trusted.
+- **Only columns added to `app_settings` after `0001` may be dropped**, and
+  every one of them has a database default, so leaving it out changes nothing.
+  A column outside that list going missing is a database that is *broken*, not
+  one that is *behind*, and the save fails loudly as before. A test holds the
+  list against the migration files, so a column added next month cannot be
+  forgotten.
+- **The audit log records what actually reached the database**, not what was
+  asked for. A dropped column never landed, and that log is what a
+  disagreement about settings gets settled by.
+- **The System check screen now asks after columns too** (`REQUIRED_COLUMNS` in
+  `src/lib/schema-health.ts`). One column per table per migration — the same
+  bet the home-screen sentinels already rest on, that a migration is applied
+  whole — so six extra questions cover every migration that adds a column to a
+  table that already existed. `0014` now has a sentinel, so **Home** says the
+  database is behind rather than leaving Settings to discover it.
+- **A column is only asked about once its table is known to be there.** When
+  the table is missing the column question is moot, and asking it anyway would
+  name two migrations for one absence — the wrong one loudest, since the
+  column's is the later.
+- **The screen no longer overclaims.** It now says what it does check, and says
+  plainly that a migration which only changes security rules, or only clears
+  rows, is invisible to it even when it has never been applied.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Dropping a column, refusing to drop a core one, not retrying an RLS refusal, not looping | `npm test` | 765 tests (35 new) |
+| That the skip list and the column probes cannot drift from the migrations | `npm test` | guards read `supabase/migrations` and fail on a forgotten column |
+| That nothing in the database changed | `npm run test:rls`, `npm run check:schema` | 334 checks, 44 tables — unchanged |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The drift guards were checked by breaking them: removing `0014` from
+`REQUIRED_COLUMNS` fails two tests by name, rather than passing quietly.
+
+**How to fix the database itself**
+
+The code change stops one missing column taking the whole screen with it. It
+does **not** apply the migration — the shop still needs `0014` for the "staff
+stay signed in" switch to work at all. Open **System check** (under Manage →
+Settings, or `/system`) and it will now name exactly which migrations are
+missing. Then, in order:
+
+```sql
+-- 1. In the Supabase SQL editor, see what has actually been applied:
+select version from supabase_migrations.schema_migrations order by version;
+```
+
+If `0011`, `0012` and `0013` are listed, `npm run db:push` is safe and applies
+the rest. **If they are not listed, do not push** — `0013` deletes every bill,
+loan, product, apparel item and repair service and cannot be undone. Paste the
+missing files into the SQL editor one at a time instead. For this one that is
+all of `supabase/migrations/0014_staff_stay_signed_in.sql`:
+
+```sql
+alter table public.app_settings
+  add column if not exists staff_stay_signed_in boolean not null default true;
+
+notify pgrst, 'reload schema';
+```
+
+The `notify` matters on its own: PostgREST keeps its own cache of what columns
+exist, and running SQL by hand does not always refresh it. A migration that
+*has* been applied can still produce this exact error until it does.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

@@ -7,6 +7,11 @@
  * developer.
  */
 import { parsePesos, type Centavos } from "./money";
+import {
+  isColumnMissingFromApi,
+  missingColumnFromApi,
+  type PostgrestLikeError,
+} from "./postgrest";
 
 export interface AppSettings {
   workingDaysPerMonth: number;
@@ -376,6 +381,110 @@ export function settingsToRow(settings: AppSettings): SettingsRow {
     public_opening_hours: settings.publicOpeningHours,
     public_page_enabled: settings.publicPageEnabled,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Saving against a database that is behind (21 September 2026)
+// ---------------------------------------------------------------------------
+
+/*
+  The owner opened Settings, typed a warranty period, pressed Save and was told
+  the whole form could not be saved because of `staff_stay_signed_in` - a
+  checkbox they had not touched, for a migration (`0014`) that had never
+  reached the production database. The app deploys the moment a branch merges;
+  `npm run db:push` is run by hand afterwards, and in between EVERY setting is
+  unsaveable because the form writes all of them in one statement.
+
+  So a column the database has not got yet is dropped from the write and the
+  rest is saved. The owner is told, by name and in their own words, which
+  setting did not stick and why - a silent drop would be far worse than the
+  refusal it replaces, because a setting that reads back wrong is trusted.
+
+  Only these columns may be dropped. Every one of them was added to
+  `app_settings` AFTER `0001` created it, and every one has a database default,
+  so leaving it out of an update changes nothing. A column outside this list
+  going missing is not a database that is behind - it is one that is broken,
+  and papering over that would hide it.
+*/
+export const SETTINGS_COLUMNS_ADDED_LATER: Readonly<Record<string, string>> = {
+  // 0005_phase4_pos
+  receipt_paper: "Receipt paper size",
+  // 0007_phase6_apparel
+  apparel_down_payment_percent: "Apparel down payment percentage",
+  // 0009_phase9_public
+  shop_address: "Shop address",
+  shop_phone: "Shop phone number",
+  shop_email: "Shop email address",
+  facebook_page_url: "Facebook page link",
+  messenger_username: "Messenger name",
+  map_url: "Map link",
+  public_opening_hours: "Opening hours",
+  public_page_enabled: "Show the public page",
+  // 0014_staff_stay_signed_in
+  staff_stay_signed_in: "Staff stay signed in",
+};
+
+/** May this column be left out of a settings write, or is it a real fault? */
+export function settingsColumnCanBeSkipped(column: string): boolean {
+  return Object.hasOwn(SETTINGS_COLUMNS_ADDED_LATER, column);
+}
+
+/** The setting's name as it is written on the form, not its column name. */
+export function settingsColumnLabel(column: string): string {
+  return SETTINGS_COLUMNS_ADDED_LATER[column] ?? column;
+}
+
+/** What came of trying to save: the failure that stuck, and what was dropped. */
+export interface SettingsWriteResult {
+  /** Null when the row went in. */
+  error: PostgrestLikeError | null;
+  /** Columns left out because the database does not have them, in order. */
+  skipped: string[];
+}
+
+/**
+ * Save the settings row, dropping any column this database has not got yet.
+ *
+ * The write itself is passed in rather than done here, so the rule can be
+ * tested without a database - and so this file stays free of anything that
+ * only runs on the server.
+ *
+ * It stops on the first refusal that is NOT a missing column, on a refusal
+ * that does not say which column, and on a column outside the list above.
+ * Each pass removes one key, so it cannot loop longer than the row is wide.
+ */
+export async function saveSettingsRow(
+  row: Readonly<Record<string, unknown>>,
+  write: (row: Record<string, unknown>) => Promise<PostgrestLikeError | null>,
+): Promise<SettingsWriteResult> {
+  const writing: Record<string, unknown> = { ...row };
+  const skipped: string[] = [];
+
+  let error = await write(writing);
+
+  while (error !== null && isColumnMissingFromApi(error)) {
+    const column = missingColumnFromApi(error);
+
+    /*
+      Not named, not ours to drop, or already dropped. Any of the three means
+      trying again would either change nothing or hide a real fault: a column
+      outside the list is a database that is BROKEN, not one that is behind,
+      and quietly writing round that is how a fault becomes permanent.
+    */
+    if (
+      column === null ||
+      !settingsColumnCanBeSkipped(column) ||
+      !Object.hasOwn(writing, column)
+    ) {
+      break;
+    }
+
+    delete writing[column];
+    skipped.push(column);
+    error = await write(writing);
+  }
+
+  return { error, skipped };
 }
 
 // ---------------------------------------------------------------------------
