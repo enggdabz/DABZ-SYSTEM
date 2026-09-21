@@ -4,7 +4,7 @@ import { connection } from "next/server";
 import { Card, Notice, TAP_AREA } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { readSchemaHealth } from "@/lib/data/schema-health";
-import { schemaAdvice, type RequiredRelation } from "@/lib/schema-health";
+import { probeKey, schemaAdvice, type RequiredRelation } from "@/lib/schema-health";
 
 export const metadata = { title: "System check · Dabz System" };
 
@@ -45,18 +45,19 @@ export default async function SystemPage() {
       {report.ok ? (
         <Notice tone="success" title={report.headline}>
           <p>
-            All {report.present.length} tables and views the screens read are
-            present. A screen showing nothing is showing you a real nothing.
+            All {report.present.length} tables, views and columns the screens
+            read are present. A screen showing nothing is showing you a real
+            nothing.
           </p>
         </Notice>
       ) : report.missing.length > 0 ? (
         <Notice tone="attention" title={report.headline}>
           <p>
             Some screens cannot read what they need, and will show you empty
-            figures that are <strong>not</strong> your shop&rsquo;s. Your
-            records are not affected &mdash; nothing has been lost. A missing
-            migration means the database was never told about a table, not that
-            anything was removed from it.
+            figures that are <strong>not</strong> your shop&rsquo;s, or
+            refuse to save. Your records are not affected &mdash; nothing has
+            been lost. A missing migration means the database was never told
+            about a table or a column, not that anything was removed from it.
           </p>
         </Notice>
       ) : (
@@ -91,7 +92,7 @@ export default async function SystemPage() {
           description="Asked, but no answer came back. This says nothing about whether they exist."
         >
           <p className="text-sm text-muted">
-            {report.unknown.map((relation) => relation.name).join(", ")}
+            {report.unknown.map(probeKey).join(", ")}
           </p>
         </Card>
       ) : null}
@@ -115,14 +116,21 @@ export default async function SystemPage() {
       >
         <ul className="space-y-2 text-sm text-muted">
           <li>
-            &bull; It checks that each table and view <em>exists</em>, not that
-            every column in it is right. That is what{" "}
+            &bull; It checks that each table and view <em>exists</em>, and asks
+            after one column per migration that adds columns to a table that
+            already existed &mdash; enough to catch a database that is behind,
+            because a migration is applied whole. It does not check that every
+            column in every table is right. That is what{" "}
             <code className="text-ink">npm run check:schema</code> does, before
             the code ever ships.
           </li>
           <li>
-            &bull; It does not check the security rules. Those have their own
-            suite &mdash; <code className="text-ink">npm run test:rls</code>.
+            &bull; It does not check the security rules, so a migration that
+            only changes those &mdash; or only clears out rows &mdash; is
+            invisible here even when it has never been applied. Those have
+            their own suite, <code className="text-ink">npm run test:rls</code>,
+            which runs against a database built from the migration files rather
+            than against this one.
           </li>
           <li>
             &bull; A table being present does not mean it has anything in it. An
@@ -157,8 +165,7 @@ function MigrationBlock({
         Without it: {relations[0].breaks}.
       </p>
       <p className="mt-1 text-xs text-muted">
-        Missing {relations.length === 1 ? "table" : "tables"}:{" "}
-        {relations.map((relation) => relation.name).join(", ")}
+        Missing: {relations.map(probeKey).join(", ")}
       </p>
     </li>
   );

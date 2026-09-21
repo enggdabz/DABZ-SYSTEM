@@ -4,9 +4,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+  REQUIRED_COLUMNS,
   REQUIRED_RELATIONS,
+  REQUIRED_SCHEMA,
   SENTINEL_RELATIONS,
   outcomeFromError,
+  probeKey,
   schemaAdvice,
   schemaReport,
   type ProbeOutcome,
@@ -39,6 +42,33 @@ describe("outcomeFromError", () => {
     expect(
       outcomeFromError({
         message: "Could not find the table 'public.collections' in the schema cache",
+      }),
+    ).toBe("missing");
+  });
+
+  it("recognises a COLUMN that is not there", () => {
+    /*
+      The 21 Sep gap, one layer down. `0014` adds one column and no table, so
+      nothing in this module could see it was missing - and Settings refused
+      to save while this screen reported the database had everything.
+    */
+    expect(
+      outcomeFromError({
+        code: "42703",
+        message: "column app_settings.staff_stay_signed_in does not exist",
+      }),
+    ).toBe("missing");
+    expect(
+      outcomeFromError({
+        code: "PGRST204",
+        message:
+          "Could not find the 'staff_stay_signed_in' column of 'app_settings' in the schema cache",
+      }),
+    ).toBe("missing");
+    expect(
+      outcomeFromError({
+        message:
+          "Could not find the 'staff_stay_signed_in' column of 'app_settings' in the schema cache",
       }),
     ).toBe("missing");
   });
@@ -247,16 +277,168 @@ describe("REQUIRED_RELATIONS", () => {
 describe("SENTINEL_RELATIONS", () => {
   it("covers every migration exactly once", () => {
     // The home-screen check is only allowed to be cheap because migrations
-    // are applied whole and in order: one relation per migration answers
-    // "is this database behind?" without forty-four round trips.
-    const all = new Set(REQUIRED_RELATIONS.map((r) => r.migration));
+    // are applied whole and in order: one probe per migration answers
+    // "is this database behind?" without the full sweep.
+    const all = new Set(REQUIRED_SCHEMA.map((r) => r.migration));
     const sentinels = SENTINEL_RELATIONS.map((r) => r.migration);
 
     expect(new Set(sentinels).size).toBe(sentinels.length);
     expect(new Set(sentinels)).toEqual(all);
   });
 
+  it("covers a migration that adds only a column", () => {
+    /*
+      Not a detail. `0014` creates no table, so before columns were probed it
+      had no sentinel at all - and Home reported a database that was behind as
+      fine while Settings could not save a single field.
+    */
+    const sentinel = SENTINEL_RELATIONS.find(
+      (r) => r.migration === "0014_staff_stay_signed_in",
+    );
+
+    expect(sentinel?.column).toBe("staff_stay_signed_in");
+  });
+
+  it("prefers a table over a column where a migration has both", () => {
+    // A missing table is the bigger absence and the cheaper question.
+    const sentinel = SENTINEL_RELATIONS.find(
+      (r) => r.migration === "0015_phase10_collections",
+    );
+
+    expect(sentinel?.column).toBeUndefined();
+  });
+
   it("is much smaller than the full sweep", () => {
-    expect(SENTINEL_RELATIONS.length).toBeLessThan(REQUIRED_RELATIONS.length / 3);
+    expect(SENTINEL_RELATIONS.length).toBeLessThan(REQUIRED_SCHEMA.length / 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Columns: the half of "is this database behind?" that nothing could see
+// ---------------------------------------------------------------------------
+
+describe("probeKey", () => {
+  it("asks for a table by name and a column by table.column", () => {
+    expect(probeKey({ name: "sales", migration: "0005", breaks: "x" })).toBe("sales");
+    expect(
+      probeKey({
+        name: "app_settings",
+        column: "staff_stay_signed_in",
+        migration: "0014",
+        breaks: "x",
+      }),
+    ).toBe("app_settings.staff_stay_signed_in");
+  });
+
+  it("keeps a table and a column on it apart in a report", () => {
+    // Same `name`, two different questions. Keying on `name` alone would let
+    // one answer overwrite the other.
+    const both = [
+      { name: "app_settings", migration: "0001_phase1_foundation", breaks: "settings" },
+      {
+        name: "app_settings",
+        column: "staff_stay_signed_in",
+        migration: "0014_staff_stay_signed_in",
+        breaks: "staying signed in",
+      },
+    ];
+
+    const report = schemaReport(
+      outcomes({
+        app_settings: "present",
+        "app_settings.staff_stay_signed_in": "missing",
+      }),
+      both,
+    );
+
+    expect(report.missingMigrations).toEqual(["0014_staff_stay_signed_in"]);
+    expect(report.present.map(probeKey)).toEqual(["app_settings"]);
+  });
+});
+
+describe("REQUIRED_COLUMNS", () => {
+  /*
+    The same anti-drift guard the relations have, for the gap that actually
+    bit: a migration that adds a column to a table created EARLIER is invisible
+    to a relation probe, so unless it is listed here the System check screen
+    reports "everything the system needs is here" while a screen refuses to
+    save.
+
+    One column per table per migration is enough, and the rule is the one the
+    sentinels rest on: a migration is applied whole.
+  */
+  const dir = join(process.cwd(), "supabase", "migrations");
+  const files = readdirSync(dir)
+    .filter((f) => f.endsWith(".sql"))
+    .sort();
+
+  /** Which migration file created each table or view. */
+  const createdIn = new Map<string, string>();
+  /** Pairs of [table, migration] where a LATER migration adds a column. */
+  const addedLater: [string, string][] = [];
+
+  for (const file of files) {
+    const sql = readFileSync(join(dir, file), "utf8");
+    const version = file.replace(/\.sql$/, "");
+
+    for (const match of sql.matchAll(
+      /create\s+(?:table\s+if\s+not\s+exists|view|or\s+replace\s+view)\s+public\.([a-z_]+)/gi,
+    )) {
+      if (!createdIn.has(match[1])) createdIn.set(match[1], version);
+    }
+
+    // Each `alter table ... ;` statement, so an `add column` is attributed to
+    // the table its own statement names.
+    for (const statement of sql.matchAll(
+      /alter\s+table\s+(?:public\.)?([a-z_]+)([\s\S]*?);/gi,
+    )) {
+      const table = statement[1];
+      if (!/add\s+column/i.test(statement[2])) continue;
+      if (createdIn.get(table) === version) continue; // same file: not a gap
+      addedLater.push([table, version]);
+    }
+  }
+
+  it("found something to check, so a broken parser cannot pass silently", () => {
+    expect(addedLater.length).toBeGreaterThan(0);
+    expect(addedLater).toContainEqual(["app_settings", "0014_staff_stay_signed_in"]);
+  });
+
+  it("asks about every table that a later migration adds a column to", () => {
+    const listed = new Set(
+      REQUIRED_COLUMNS.map((r) => `${r.name}@${r.migration}`),
+    );
+    const forgotten = [...new Set(addedLater.map(([t, m]) => `${t}@${m}`))]
+      .filter((pair) => !listed.has(pair))
+      .sort();
+
+    expect(forgotten).toEqual([]);
+  });
+
+  it("does not ask for a column the migrations never add", () => {
+    // A typo here would report a healthy database as behind for ever.
+    const invented = REQUIRED_COLUMNS.filter((relation) => {
+      const sql = readFileSync(
+        join(dir, `${relation.migration}.sql`),
+        "utf8",
+      );
+      return !new RegExp(`add\\s+column[^;]*?\\b${relation.column}\\b`, "is").test(sql);
+    }).map(probeKey);
+
+    expect(invented).toEqual([]);
+  });
+
+  it("only names tables the migrations actually create", () => {
+    const unknown = REQUIRED_COLUMNS.map((r) => r.name).filter(
+      (name) => !createdIn.has(name),
+    );
+
+    expect(unknown).toEqual([]);
+  });
+
+  it("asks each question once", () => {
+    const keys = REQUIRED_SCHEMA.map(probeKey);
+
+    expect(new Set(keys).size).toBe(keys.length);
   });
 });

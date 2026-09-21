@@ -18,9 +18,10 @@ import "server-only";
 import { cache } from "react";
 
 import {
-  REQUIRED_RELATIONS,
+  REQUIRED_SCHEMA,
   SENTINEL_RELATIONS,
   outcomeFromError,
+  probeKey,
   schemaReport,
   type ProbeOutcome,
   type RequiredRelation,
@@ -30,20 +31,29 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 async function probe(
   supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  name: string,
+  relation: RequiredRelation,
 ): Promise<[string, ProbeOutcome]> {
+  const key = probeKey(relation);
   try {
-    // `head: true` sends a HEAD - no body comes back, so nothing about the
-    // shop's money crosses the wire to answer a question about its schema.
-    const { error } = await supabase.from(name).select("*", { head: true });
-    return [name, outcomeFromError(error)];
+    /*
+      `head: true` sends a HEAD - no body comes back, so nothing about the
+      shop's money crosses the wire to answer a question about its schema.
+
+      Naming a column rather than `*` is what turns this into a column probe:
+      PostgreSQL builds the SELECT either way and refuses a column it has not
+      got, which is precisely the question.
+    */
+    const { error } = await supabase
+      .from(relation.name)
+      .select(relation.column ?? "*", { head: true });
+    return [key, outcomeFromError(error)];
   } catch {
     /*
       A thrown error is the network, not the schema. It must read as "could
       not check" rather than "missing", or this module starts making the same
       kind of confident wrong claim it exists to stop.
     */
-    return [name, "unknown"];
+    return [key, "unknown"];
   }
 }
 
@@ -51,21 +61,51 @@ async function reportOn(
   relations: readonly RequiredRelation[],
 ): Promise<SchemaReport> {
   const supabase = await createSupabaseServerClient();
-  const outcomes = await Promise.all(
-    relations.map((relation) => probe(supabase, relation.name)),
+
+  const tables = relations.filter((relation) => relation.column === undefined);
+  const columns = relations.filter((relation) => relation.column !== undefined);
+
+  const tableOutcomes = await Promise.all(
+    tables.map((relation) => probe(supabase, relation)),
   );
-  return schemaReport(new Map(outcomes), relations);
+  const byName = new Map(tableOutcomes);
+
+  /*
+    A column is only worth asking about once its table is known to be there.
+    When the table itself is missing, the probe would answer "missing" and the
+    report would name TWO migrations for one absence - and the wrong one
+    loudest, since the column's migration is the later of the two. When the
+    table could not be checked at all, the column cannot be either.
+
+    A column whose table is not in this set (the home-screen sentinels) is
+    asked about directly - nothing is known against it.
+  */
+  const askable = columns.filter(
+    (relation) => (byName.get(relation.name) ?? "present") === "present",
+  );
+
+  const columnOutcomes = await Promise.all(
+    askable.map((relation) => probe(supabase, relation)),
+  );
+
+  return schemaReport(new Map([...tableOutcomes, ...columnOutcomes]), [
+    ...tables,
+    ...askable,
+  ]);
 }
 
-/** Every relation the app reads. For the System check screen. */
+/**
+ * Every relation the app reads, and the columns that later migrations added to
+ * them. For the System check screen.
+ */
 export const readSchemaHealth = cache(
-  async (): Promise<SchemaReport> => reportOn(REQUIRED_RELATIONS),
+  async (): Promise<SchemaReport> => reportOn(REQUIRED_SCHEMA),
 );
 
 /**
- * One relation per migration. For the owner's home screen, where the full
- * forty-four round trips would be paid on every visit for an answer that is
- * almost always "yes, fine".
+ * One probe per migration. For the owner's home screen, where the full sweep
+ * would be paid on every visit for an answer that is almost always "yes,
+ * fine".
  */
 export const readSchemaSentinel = cache(
   async (): Promise<SchemaReport> => reportOn(SENTINEL_RELATIONS),

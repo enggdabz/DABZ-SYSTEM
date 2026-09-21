@@ -349,6 +349,16 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
         </Notice>
       ) : null}
       {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {/*
+        Saved, but not all of it. Shown BESIDE the success notice rather than
+        instead of it, because both halves are true and only one of them is
+        something to act on.
+      */}
+      {state.warning ? (
+        <Notice tone="attention" title={state.warning}>
+          {state.warningDetail}
+        </Notice>
+      ) : null}
 
       <Button type="submit" disabled={pending}>
         {pending ? "Saving…" : "Save settings"}

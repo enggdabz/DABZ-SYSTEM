@@ -31,10 +31,20 @@
 /** A table or view the app reads, and what stops working without it. */
 export interface RequiredRelation {
   name: string;
+  /**
+   * Set when the entry is a COLUMN on `name` rather than the relation itself.
+   * See REQUIRED_COLUMNS below for why a column is worth probing at all.
+   */
+  column?: string;
   /** The migration file that creates it, so the fix names itself. */
   migration: string;
   /** What the owner loses, in the owner's words - not in table names. */
   breaks: string;
+}
+
+/** What to ask the database about - a table name, or `table.column`. */
+export function probeKey(relation: RequiredRelation): string {
+  return relation.column ? `${relation.name}.${relation.column}` : relation.name;
 }
 
 /*
@@ -139,6 +149,69 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
   })),
 ];
 
+/*
+  Some migrations create no table at all - they add a COLUMN to one that
+  already existed. Those are invisible to every probe above, and on
+  21 September 2026 that gap cost the owner the Settings screen: `0014` adds
+  `app_settings.staff_stay_signed_in` and nothing else, so it had never reached
+  the production database, Settings could not save ANY setting, and this
+  screen cheerfully reported that the database had everything the system needs.
+
+  That is the same sin as the PHP 0.00 on Sales that this whole file was
+  written for, one layer down: a confident "all fine" beside a screen that is
+  visibly not fine.
+
+  ONE COLUMN PER TABLE PER MIGRATION, for the reason the sentinels exist: a
+  migration is applied whole, so asking about one of the eight columns `0009`
+  adds answers for all eight at an eighth of the cost. The guard test reads the
+  migrations and fails if a table gains a column from a LATER migration and
+  nothing here asks about it.
+*/
+export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
+  {
+    name: "app_settings",
+    column: "receipt_paper",
+    migration: "0005_phase4_pos",
+    breaks: "choosing the receipt paper size, and saving any other setting",
+  },
+  {
+    name: "app_settings",
+    column: "apparel_down_payment_percent",
+    migration: "0007_phase6_apparel",
+    breaks: "the apparel down payment percentage, and saving any other setting",
+  },
+  {
+    name: "app_settings",
+    column: "shop_address",
+    migration: "0009_phase9_public",
+    breaks: "the shop details on the public page, and saving any other setting",
+  },
+  {
+    name: "app_settings",
+    column: "staff_stay_signed_in",
+    migration: "0014_staff_stay_signed_in",
+    breaks: "keeping staff signed in, and saving any other setting",
+  },
+  {
+    name: "repair_payments",
+    column: "kind",
+    migration: "0015_phase10_collections",
+    breaks: "telling a repair down payment from a balance on the Sales screen",
+  },
+  {
+    name: "day_closings",
+    column: "counter_cash_centavos",
+    migration: "0015_phase10_collections",
+    breaks: "the breakdown kept with a closed day",
+  },
+];
+
+/** Everything the System check screen asks about - relations and columns. */
+export const REQUIRED_SCHEMA: readonly RequiredRelation[] = [
+  ...REQUIRED_RELATIONS,
+  ...REQUIRED_COLUMNS,
+];
+
 /**
  * One relation per migration, for the check that runs on the owner's home
  * screen.
@@ -150,7 +223,7 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
  * quarter of the cost. The full list is one tap away when it says yes.
  */
 export const SENTINEL_RELATIONS: readonly RequiredRelation[] = Object.values(
-  REQUIRED_RELATIONS.reduce<Record<string, RequiredRelation>>((first, relation) => {
+  REQUIRED_SCHEMA.reduce<Record<string, RequiredRelation>>((first, relation) => {
     first[relation.migration] ??= relation;
     return first;
   }, {}),
@@ -159,12 +232,14 @@ export const SENTINEL_RELATIONS: readonly RequiredRelation[] = Object.values(
 export type ProbeOutcome = "present" | "missing" | "unknown";
 
 /**
- * Was this the database saying "no such table", or something else entirely?
+ * Was this the database saying "no such table or column", or something else
+ * entirely?
  *
  * PostgreSQL answers 42P01 and PostgREST answers PGRST205 when a relation is
- * not there. ANYTHING else - a timeout, a paused project, a bad key, a row
- * limit - is `unknown`, because none of those is evidence about the schema and
- * guessing would put a wrong answer beside the owner's money.
+ * not there; 42703 and PGRST204 are the same answer about a column. ANYTHING
+ * else - a timeout, a paused project, a bad key, a row limit - is `unknown`,
+ * because none of those is evidence about the schema and guessing would put a
+ * wrong answer beside the owner's money.
  */
 export function outcomeFromError(
   error: { code?: string | null; message?: string | null } | null,
@@ -174,9 +249,18 @@ export function outcomeFromError(
   const code = (error.code ?? "").toUpperCase();
   if (code === "42P01" || code === "PGRST205") return "missing";
 
+  // 42703 is PostgreSQL's undefined_column, which is how a COLUMN probe comes
+  // back when the migration that adds it never ran. Unambiguous - it means
+  // this and nothing else.
+  if (code === "42703" || code === "PGRST204") return "missing";
+
   // Some proxies drop the code and keep only the sentence.
   const message = (error.message ?? "").toLowerCase();
-  if (message.includes("does not exist") || message.includes("could not find the table")) {
+  if (
+    message.includes("does not exist") ||
+    message.includes("could not find the table") ||
+    /could not find the .*column/.test(message)
+  ) {
     return "missing";
   }
 
@@ -205,14 +289,14 @@ export interface SchemaReport {
  */
 export function schemaReport(
   outcomes: ReadonlyMap<string, ProbeOutcome>,
-  relations: readonly RequiredRelation[] = REQUIRED_RELATIONS,
+  relations: readonly RequiredRelation[] = REQUIRED_SCHEMA,
 ): SchemaReport {
   const missing: RequiredRelation[] = [];
   const unknown: RequiredRelation[] = [];
   const present: RequiredRelation[] = [];
 
   for (const relation of relations) {
-    switch (outcomes.get(relation.name) ?? "unknown") {
+    switch (outcomes.get(probeKey(relation)) ?? "unknown") {
       case "present":
         present.push(relation);
         break;

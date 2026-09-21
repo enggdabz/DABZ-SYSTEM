@@ -912,3 +912,35 @@ to ask:
   another one, so the sidebar now marks the longest matching link as the
   current page rather than every link that matches — without it, opening the
   calendar lit up **Apparel** and **Apparel calendar** at once.
+- **A settings column the database has not got is dropped, and the rest of the
+  form is saved.** Decided on 21 September 2026, when the owner could not save
+  Settings at all because `0014` had never reached the production database and
+  the form writes every column in one statement. The alternative — the previous
+  behaviour — was to refuse the whole screen, which is honest but throws away
+  work the database would happily have taken. Three things keep the new
+  behaviour from being the silent kind of wrong. It is **said out loud**: a ⚠
+  beside the success notice names the setting in the words on the form and says
+  what to run. Only columns **added to `app_settings` after `0001`** may be
+  dropped, each of which has a database default, so leaving one out changes
+  nothing; anything else still fails loudly, because that is a broken database
+  rather than a behind one. And the **audit log records what reached the
+  database**, not what was asked for. To change it: delete `saveSettingsRow` in
+  `src/lib/settings.ts` and the action goes back to refusing the whole form.
+- **The System check screen asks after one column per table per migration, not
+  every column.** Migrations `0005`, `0007`, `0009`, `0014` and `0015` add
+  columns to tables that already existed, and `0014` adds nothing else at all —
+  so before this the screen reported "the database has everything the system
+  needs" while Settings could not save a field. Probing every column would be
+  twenty-three more round trips for no more information, because a migration is
+  applied whole: that is the same bet the home-screen sentinels already rest on.
+  To change it: add entries to `REQUIRED_COLUMNS` in `src/lib/schema-health.ts`;
+  the guard test requires one per (table, migration) pair and accepts more.
+- **A migration that only changes security rules, or only clears rows, is still
+  invisible to the System check screen** — `0004`, `0010`, `0011`, `0012`,
+  `0013` and `0017` among them. A policy has no cheap runtime probe the way a
+  table or a column does, and inventing one would mean the screen asserting
+  something it cannot actually check. So the screen says so instead, under
+  "What this does not check". To change it: the honest version is to read
+  `supabase_migrations.schema_migrations` directly and compare it with the
+  files, which would answer the whole question at once and need a route that
+  can see that schema.
