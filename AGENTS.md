@@ -401,7 +401,12 @@ round trip is the one thing that must be tried against a real project.
   opening hours, Facebook page and Messenger name are settings that start null,
   and the page leaves out whatever is missing. A made-up figure on an internal
   screen is bad; a made-up address on a page somebody drives to is worse. They
-  appear in `src/lib/data/checklist.ts` like every other owner-only figure.
+  appear in `src/lib/data/checklist.ts` like every other owner-only figure, and
+  so do the **email address and map link** - but as a SEPARATE, unimportant
+  item, because an absent map link is not the same order of gap as an absent
+  address, and folding them in would make that warning overstate itself.
+  `src/lib/data/checklist.test.ts` fails if a field is printed on the page and
+  forgotten in the checklist.
 - **Nothing on the public page is addressed to the owner.** A customer reading
   "fill this in under Settings" sees a shop that is not open yet. The gap
   belongs on the To fill in screen.

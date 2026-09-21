@@ -381,6 +381,36 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
+  /*
+    The two optional extras (21 Sep 2026). Both are printed on the public page
+    when the owner sets them - the email as a line a customer can tap, the map
+    link as a Get directions button - so a customer can feel their absence even
+    though the shop trades perfectly well without either.
+
+    They are deliberately a SEPARATE item from the five above, and not
+    important. An absent map link is not the same order of gap as an absent
+    address: folding them into that warning would make it overstate itself,
+    and a warning that overstates is one that gets ignored.
+  */
+  const missingOptionalPublicDetails = [
+    settings.shopEmail === null ? "Email address" : null,
+    settings.mapUrl === null ? "Map link" : null,
+  ].filter((label): label is string => label !== null);
+
+  if (missingOptionalPublicDetails.length > 0) {
+    items.push({
+      id: "public-page-optional-details",
+      title: `${missingOptionalPublicDetails.length} optional detail${
+        missingOptionalPublicDetails.length === 1 ? "" : "s"
+      } missing from your public page`,
+      why: "Neither is needed to open the shop, and the page reads properly without them. But a customer who wants to email rather than ring has no address to write to, and one who wants to drive over has nothing to tap - the Get directions button only appears once a map link is set.",
+      names: missingOptionalPublicDetails,
+      href: "/settings",
+      linkLabel: "Open Settings",
+      important: false,
+    });
+  }
+
   if (activeStaff.length === 0) {
     items.push({
       id: "no-staff",
