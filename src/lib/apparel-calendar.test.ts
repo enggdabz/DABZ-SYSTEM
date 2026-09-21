@@ -5,8 +5,10 @@ import {
   buildCalendar,
   compareProjects,
   isProductionDone,
+  scheduleAll,
   scheduleNote,
   scheduleProject,
+  summariseProjects,
   type CalendarOrder,
 } from "./apparel-calendar";
 import { parsePesos } from "./money";
@@ -317,5 +319,85 @@ describe("the order projects are read in", () => {
     ].sort(compareProjects);
 
     expect(projects.map((project) => project.id)).toEqual(["late", "soon", "a", "b"]);
+  });
+});
+
+describe("what the Apparel screen is told about the calendar", () => {
+  const today = date("2026-09-21");
+
+  function summarise(orders: CalendarOrder[]) {
+    return summariseProjects(scheduleAll({ orders, today }), today);
+  }
+
+  it("counts what is carried over and what is due off the bench today", () => {
+    const summary = summarise([
+      // Target 20 Sep, so carried over onto today.
+      order({ id: "late", promisedOn: "2026-09-21" }),
+      // Target 21 Sep - today, and not late yet.
+      order({ id: "now", promisedOn: "2026-09-22" }),
+      order({ id: "later", promisedOn: "2026-09-30" }),
+    ]);
+
+    expect(summary.priority).toBe(1);
+    expect(summary.dueToday).toBe(1);
+    expect(summary.nextOn).toBe("2026-09-29");
+  });
+
+  it("never counts a job twice: carried over is not also due today", () => {
+    const summary = summarise([order({ promisedOn: "2026-09-21" })]);
+
+    expect(summary.priority).toBe(1);
+    expect(summary.dueToday).toBe(0);
+  });
+
+  it("leaves finished and cancelled work out of every count", () => {
+    const summary = summarise([
+      order({ id: "done", promisedOn: "2026-09-22", status: "ready" }),
+      order({ id: "gone", promisedOn: "2026-09-10", status: "cancelled" }),
+    ]);
+
+    expect(summary).toEqual({
+      priority: 0,
+      dueToday: 0,
+      nextOn: null,
+      undated: 0,
+    });
+  });
+
+  it("says how many orders are waiting on a promised date", () => {
+    const summary = summarise([
+      order({ id: "a", promisedOn: null }),
+      order({ id: "b", promisedOn: null }),
+      // Released, so nothing is waiting on a date for it.
+      order({ id: "c", promisedOn: null, status: "released" }),
+    ]);
+
+    expect(summary.undated).toBe(2);
+    expect(summary.nextOn).toBeNull();
+  });
+
+  it("gives the earliest day still to come, not the first one it finds", () => {
+    const summary = summarise([
+      order({ id: "far", orderNumber: "A-1", promisedOn: "2026-10-20" }),
+      order({ id: "near", orderNumber: "A-2", promisedOn: "2026-09-25" }),
+    ]);
+
+    expect(summary.nextOn).toBe("2026-09-24");
+  });
+});
+
+describe("scheduleAll", () => {
+  it("is the one list both screens read, priority first", () => {
+    const today = date("2026-09-21");
+    const projects = scheduleAll({
+      orders: [
+        order({ id: "fine", orderNumber: "A-1", promisedOn: "2026-09-30" }),
+        order({ id: "late", orderNumber: "A-2", promisedOn: "2026-09-12" }),
+        order({ id: "gone", orderNumber: "A-3", promisedOn: "2026-09-12", status: "cancelled" }),
+      ],
+      today,
+    });
+
+    expect(projects.map((project) => project.id)).toEqual(["late", "fine"]);
   });
 });

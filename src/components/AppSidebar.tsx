@@ -28,7 +28,7 @@ function isCurrent(pathname: string, href: string): boolean {
 /**
  * The one link to mark as the current page.
  *
- * A section can sit inside another - the apparel calendar lives under the
+ * A section can sit inside another - the project calendar lives under the
  * Apparel screen - and `isCurrent` matches both, which would light two links
  * up at once and leave the person unsure which page they are on. The longest
  * matching href is the most specific one, so that is the one that wins.
