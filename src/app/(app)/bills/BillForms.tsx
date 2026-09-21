@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString } from "@/lib/money";
 
@@ -32,15 +33,15 @@ export function MarkPaidForm({
   );
   // Most bills are paid for exactly their usual amount, so the form starts
   // filled in and only needs changing when the amount differs.
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button type="button" onClick={openPanel}>
           Mark paid
         </Button>
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       </div>
     );
   }
@@ -51,7 +52,7 @@ export function MarkPaidForm({
       <input type="hidden" name="period" value={period} />
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Amount paid" error={state.fieldErrors?.amount}>
+        <Field label="Amount paid" error={answer.fieldErrors?.amount}>
           <Input
             name="amount"
             inputMode="decimal"
@@ -70,13 +71,13 @@ export function MarkPaidForm({
         </Field>
       </div>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving…" : `Confirm ${billName} paid`}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

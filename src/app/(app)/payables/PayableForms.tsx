@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import type { Payable, Supplier } from "@/lib/expenses";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { centavosToDecimalString } from "@/lib/money";
@@ -22,17 +23,17 @@ export function PayForm({
     payPayableAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
-  if (state.success) return <Notice tone="success" title={state.success} />;
+  if (answer.success) return <Notice tone="success" title={answer.success} />;
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" onClick={() => setOpen(true)}>
+        <Button type="button" onClick={openPanel}>
           Mark paid
         </Button>
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       </div>
     );
   }
@@ -45,7 +46,7 @@ export function PayForm({
         <Field label="Paid on">
           <Input name="paidOn" type="date" defaultValue={today} />
         </Field>
-        <Field label="Paid with" error={state.fieldErrors?.source}>
+        <Field label="Paid with" error={answer.fieldErrors?.source}>
           <Select name="source" defaultValue="cash_drawer">
             {MONEY_SOURCES.map((source) => (
               <option key={source} value={source}>
@@ -56,13 +57,13 @@ export function PayForm({
         </Field>
       </div>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : `Pay ${amountLabel}`}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -83,11 +84,11 @@ export function PayableForm({
     savePayableAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         {payable ? "Edit" : "Add something owed"}
       </Button>
     );
@@ -97,7 +98,7 @@ export function PayableForm({
     <form action={submit} className="space-y-3">
       {payable ? <input type="hidden" name="payableId" value={payable.id} /> : null}
 
-      <Field label="What was received" error={state.fieldErrors?.description}>
+      <Field label="What was received" error={answer.fieldErrors?.description}>
         <Input
           name="description"
           defaultValue={payable?.description ?? ""}
@@ -107,7 +108,7 @@ export function PayableForm({
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="Amount owed" error={state.fieldErrors?.amount}>
+        <Field label="Amount owed" error={answer.fieldErrors?.amount}>
           <Input
             name="amount"
             inputMode="decimal"
@@ -151,14 +152,14 @@ export function PayableForm({
         <Input name="note" defaultValue={payable?.note ?? ""} />
       </Field>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

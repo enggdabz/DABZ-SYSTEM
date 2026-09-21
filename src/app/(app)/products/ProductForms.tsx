@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { DIVISION_LIST } from "@/lib/divisions";
 import { centavosToDecimalString } from "@/lib/money";
 
@@ -149,7 +150,7 @@ export function PriceTiersForm({
     removePriceTierAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(addState);
 
   return (
     <div className="space-y-3">
@@ -192,31 +193,31 @@ export function PriceTiersForm({
           <div className="grid gap-3 sm:grid-cols-2">
             <Field
               label="From this quantity up"
-              error={addState.fieldErrors?.minQuantity}
+              error={answer.fieldErrors?.minQuantity}
             >
               <Input name="minQuantity" type="number" min={2} required placeholder="e.g. 50" />
             </Field>
-            <Field label="Each one costs" error={addState.fieldErrors?.unitPrice}>
+            <Field label="Each one costs" error={answer.fieldErrors?.unitPrice}>
               <Input name="unitPrice" inputMode="decimal" required placeholder="e.g. 2.50" />
             </Field>
           </div>
-          {addState.error ? <Notice tone="attention" title={addState.error} /> : null}
+          {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
           <div className="flex gap-2">
             <Button type="submit" variant="secondary" disabled={adding}>
               {adding ? "Saving…" : "Add the rule"}
             </Button>
-            <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+            <Button type="button" variant="quiet" onClick={closePanel}>
               Cancel
             </Button>
           </div>
         </form>
       ) : (
-        <Button type="button" variant="quiet" onClick={() => setOpen(true)}>
+        <Button type="button" variant="quiet" onClick={openPanel}>
           Add a bulk price
         </Button>
       )}
 
-      {addState.success ? <Notice tone="success" title={addState.success} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
     </div>
   );
 }

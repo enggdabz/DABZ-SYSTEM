@@ -495,6 +495,46 @@ everybody.
 
 ---
 
+## Fixed on 21 September 2026 — a form that opened on last time's answer
+
+You recorded a ₱5.00 expense, and the next time you opened the pop-up it still
+said "₱5.00 recorded." above no form at all. The same fault was in twenty-odd
+other panels across the system, and in two of them it was worse than
+confusing.
+
+**The cause is one React fact.** `useActionState` holds whatever the server
+last said until the NEXT submit, and nothing can clear it from outside — not a
+refresh, not closing the panel. Every one of these forms kept that state in a
+component that never goes away: the expense pop-up lives in the top bar, and
+the panels on Bills, Loans, Apparel, Repairs, Stocks and the rest ARE the
+button you tap, so they have to stay on screen when they are closed. Open one a
+second time and you were reading the first visit's answer.
+
+**Two fixes, because the panels are not the same shape.** Where the thing can
+simply be unmounted, it now is: the expense pop-up keeps its state inside the
+dialog, so closing the dialog forgets it — the pattern `TakeOrderPayment` on
+the counter already used. Where it cannot, `useFormPanel`
+(`src/components/use-form-panel.ts`) remembers which answer was already on
+screen when the panel was opened and hides that one. It is the same trick
+`PosScreen` uses with `finishedSaleId`, made shared.
+
+**The answer is hidden from the moment the panel OPENS, not when it closes.**
+That is deliberate. "₱500.00 recorded." beside the button after you close the
+form is the receipt for what just happened and belongs there; the same sentence
+above an empty form you have just opened is an answer to a question nobody has
+asked yet.
+
+**Two screens were not just confusing, they were stuck.** `New job order` and
+`Take a unit in` replaced themselves with a success notice and had no way back,
+so a second team at the counter — or a second laptop on it — needed the page
+reloading before the order could even be started. Both now offer "Write another
+order" / "Take another unit in" beside the link to the one just opened.
+
+To change any of it: `useFormPanel` is thirty lines and one idea, and a panel
+that wants last time's answer kept can simply read `state` instead of `answer`.
+
+---
+
 ## Assumptions I am working under
 
 Where the spec gives a default, I use it and note it here rather than stopping

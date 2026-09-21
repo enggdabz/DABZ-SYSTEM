@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import type { ApparelSize } from "@/lib/apparel";
 import { centavosToDecimalString } from "@/lib/money";
 
@@ -37,11 +38,11 @@ export function ProductForm({
     saveApparelProductAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         {product ? "Edit" : "Add an item"}
       </Button>
     );
@@ -51,7 +52,7 @@ export function ProductForm({
     <form action={submit} className="space-y-3">
       {product ? <input type="hidden" name="productId" value={product.id} /> : null}
 
-      <Field label="Name" error={state.fieldErrors?.name}>
+      <Field label="Name" error={answer.fieldErrors?.name}>
         <Input name="name" defaultValue={product?.name ?? ""} required />
       </Field>
 
@@ -59,7 +60,7 @@ export function ProductForm({
         <Field
           label="Price"
           hint="Leave empty until you decide. Orders still work — the price is asked for on the line."
-          error={state.fieldErrors?.basePrice}
+          error={answer.fieldErrors?.basePrice}
         >
           <Input
             name="basePrice"
@@ -101,14 +102,14 @@ export function ProductForm({
         <span>Offer this</span>
       </label>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

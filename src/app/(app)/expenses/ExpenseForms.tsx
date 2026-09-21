@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { DIVISION_IDS, divisionName } from "@/lib/divisions";
 import {
   QUICK_EXPENSE_CATEGORIES,
@@ -74,11 +75,11 @@ export function PresetForm({ preset }: { preset?: ExpensePreset }) {
     savePresetAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         {preset ? "Edit" : "Add a quick pick"}
       </Button>
     );
@@ -88,12 +89,12 @@ export function PresetForm({ preset }: { preset?: ExpensePreset }) {
     <form action={submit} className="space-y-3">
       {preset ? <input type="hidden" name="presetId" value={preset.id} /> : null}
 
-      <Field label="Button name" error={state.fieldErrors?.label}>
+      <Field label="Button name" error={answer.fieldErrors?.label}>
         <Input name="label" defaultValue={preset?.label ?? ""} required />
       </Field>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field label="What for" error={state.fieldErrors?.category}>
+        <Field label="What for" error={answer.fieldErrors?.category}>
           <Select
             name="category"
             defaultValue={preset?.category ?? "materials_supplies"}
@@ -106,7 +107,7 @@ export function PresetForm({ preset }: { preset?: ExpensePreset }) {
           </Select>
         </Field>
 
-        <Field label="Which part of the shop" error={state.fieldErrors?.tag}>
+        <Field label="Which part of the shop" error={answer.fieldErrors?.tag}>
           <Select name="tag" defaultValue={preset?.tag ?? "whole_shop"}>
             {TAGS.map((tag) => (
               <option key={tag} value={tag}>
@@ -120,7 +121,7 @@ export function PresetForm({ preset }: { preset?: ExpensePreset }) {
       <Field
         label="Usual amount"
         hint="Leave empty to be asked every time. Only fill this in if it really is always the same."
-        error={state.fieldErrors?.defaultAmount}
+        error={answer.fieldErrors?.defaultAmount}
       >
         <Input
           name="defaultAmount"
@@ -144,14 +145,14 @@ export function PresetForm({ preset }: { preset?: ExpensePreset }) {
         <span>Show this button</span>
       </label>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
@@ -164,11 +165,11 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
     saveSupplierAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
-      <Button type="button" variant="secondary" onClick={() => setOpen(true)}>
+      <Button type="button" variant="secondary" onClick={openPanel}>
         {supplier ? "Edit" : "Add a supplier"}
       </Button>
     );
@@ -180,7 +181,7 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
         <input type="hidden" name="supplierId" value={supplier.id} />
       ) : null}
 
-      <Field label="Name" error={state.fieldErrors?.name}>
+      <Field label="Name" error={answer.fieldErrors?.name}>
         <Input name="name" defaultValue={supplier?.name ?? ""} required />
       </Field>
 
@@ -211,14 +212,14 @@ export function SupplierForm({ supplier }: { supplier?: Supplier }) {
         <span>Still buying from them</span>
       </label>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-      {state.success ? <Notice tone="success" title={state.success} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Saving..." : "Save"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>

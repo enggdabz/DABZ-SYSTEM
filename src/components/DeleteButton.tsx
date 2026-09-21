@@ -23,9 +23,10 @@
  * A missing button teaches nothing; a sentence explaining that the bill has
  * been paid and offering Stop instead teaches the rule once.
  */
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 
 import { Button, Notice } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import {
   canDelete,
   deleteConfirmation,
@@ -68,7 +69,7 @@ export function DeleteButton({
     action,
     {},
   );
-  const [asking, setAsking] = useState(false);
+  const { open: asking, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!canDelete(hasHistory)) {
     return (
@@ -79,11 +80,11 @@ export function DeleteButton({
   if (!asking) {
     return (
       <div className="space-y-2">
-        <Button type="button" variant="danger" onClick={() => setAsking(true)}>
+        <Button type="button" variant="danger" onClick={openPanel}>
           Delete {name}
         </Button>
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -97,8 +98,8 @@ export function DeleteButton({
         sentences contradicting each other, with no way to tell which was the
         current one.
       */}
-      {state.error ? (
-        <Notice tone="attention" title={state.error} />
+      {answer.error ? (
+        <Notice tone="attention" title={answer.error} />
       ) : (
         /* Notice carries the ⚠ and a word of its own, never colour alone. */
         <Notice tone="attention" title={deleteConfirmation(kind, name)}>
@@ -111,7 +112,7 @@ export function DeleteButton({
         <Button type="submit" variant="danger" disabled={pending}>
           {pending ? "Deleting…" : `Yes, delete ${name}`}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setAsking(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </form>

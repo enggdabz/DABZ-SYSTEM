@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 
 import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { useFormPanel } from "@/components/use-form-panel";
 import { DIVISION_LIST } from "@/lib/divisions";
 import {
   CATEGORY_LABELS,
@@ -123,16 +124,16 @@ export function VoidEntryForm({ entryId }: { entryId: string }) {
     voidLedgerEntryAction,
     {},
   );
-  const [open, setOpen] = useState(false);
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        <Button type="button" variant="quiet" onClick={() => setOpen(true)}>
+        <Button type="button" variant="quiet" onClick={openPanel}>
           Void
         </Button>
-        {state.error ? <Notice tone="attention" title={state.error} /> : null}
-        {state.success ? <Notice tone="success" title={state.success} /> : null}
+        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
     );
   }
@@ -143,16 +144,16 @@ export function VoidEntryForm({ entryId }: { entryId: string }) {
       <Field
         label="Why is this being voided?"
         hint="Kept with the entry, so the trail makes sense a year from now."
-        error={state.fieldErrors?.reason}
+        error={answer.fieldErrors?.reason}
       >
         <Input name="reason" required autoFocus placeholder="e.g. entered twice by mistake" />
       </Field>
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
       <div className="flex gap-2">
         <Button type="submit" variant="danger" disabled={pending}>
           {pending ? "Voiding…" : "Void this entry"}
         </Button>
-        <Button type="button" variant="quiet" onClick={() => setOpen(false)}>
+        <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
         </Button>
       </div>
