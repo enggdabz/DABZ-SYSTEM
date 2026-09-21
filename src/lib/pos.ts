@@ -10,6 +10,7 @@ import {
   assertCentavos,
   computeChange,
   lineTotal,
+  parsePesos,
   sumCentavos,
   type Centavos,
 } from "./money";
@@ -22,6 +23,17 @@ import type { DivisionId } from "./divisions";
 /** The rates the owner quoted, in centavos per square foot. Highest first. */
 export const TARPAULIN_RATES: Centavos[] = [3000, 2500, 2000, 1500];
 export const DEFAULT_TARPAULIN_RATE: Centavos = 3000;
+
+/**
+ * What the rate picker holds when the rate is being typed in instead of chosen.
+ *
+ * The four rates above are the ones the owner quoted, and a job does turn up
+ * that none of them covers - a price agreed on the phone, a bulk order, a
+ * material the shop does not usually print on. Before this, the counter had to
+ * pick the nearest rate and then quietly fix the total afterwards, which loses
+ * the one thing the receipt is for: the rate that was actually agreed.
+ */
+export const CUSTOM_TARPAULIN_RATE = "custom";
 
 export interface TarpaulinQuote {
   widthFeet: number;
@@ -43,6 +55,28 @@ export class PosError extends Error {
 /** Trims a trailing ".0" so 3 x 5 does not read as 3.0 x 5.0. */
 function tidyNumber(value: number): string {
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+}
+
+/**
+ * A rate typed in by hand, in pesos, as whole centavos.
+ *
+ * "30", "27.50" and "1,250" all have to land on the same centavo the preset
+ * rates do, so this goes through `parsePesos` like every other amount in the
+ * system rather than doing its own arithmetic. There is deliberately NO upper
+ * limit: what a square foot of tarpaulin is worth is the owner's to say, and
+ * a ceiling here would be this file inventing a price rule. A total that looks
+ * wrong is visible on the screen before anything is added to the sale.
+ */
+export function parseTarpaulinRate(input: string): Centavos {
+  let rate: Centavos;
+  try {
+    rate = parsePesos(input);
+  } catch {
+    throw new PosError("Enter a rate per sq ft like 30 or 27.50.");
+  }
+
+  if (rate <= 0) throw new PosError("Enter a rate per sq ft greater than zero.");
+  return rate;
 }
 
 export function quoteTarpaulin(options: {
