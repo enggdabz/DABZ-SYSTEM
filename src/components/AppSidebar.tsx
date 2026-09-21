@@ -25,6 +25,22 @@ function isCurrent(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
+/**
+ * The one link to mark as the current page.
+ *
+ * A section can sit inside another - the apparel calendar lives under the
+ * Apparel screen - and `isCurrent` matches both, which would light two links
+ * up at once and leave the person unsure which page they are on. The longest
+ * matching href is the most specific one, so that is the one that wins.
+ */
+function currentHref(pathname: string, sections: NavSection[]): string | null {
+  return (
+    sections
+      .filter((section) => !section.comingSoon && isCurrent(pathname, section.href))
+      .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
+  );
+}
+
 function SectionLinks({
   sections,
   pathname,
@@ -34,6 +50,8 @@ function SectionLinks({
   pathname: string;
   onNavigate?: () => void;
 }) {
+  const here = currentHref(pathname, sections);
+
   return (
     <nav className="flex flex-col pb-6">
       {NAV_GROUPS.map((group) => {
@@ -46,7 +64,7 @@ function SectionLinks({
               {group}
             </h2>
             {inGroup.map((section) => {
-              const current = isCurrent(pathname, section.href);
+              const current = section.href === here;
               return (
                 <Link
                   key={section.href}

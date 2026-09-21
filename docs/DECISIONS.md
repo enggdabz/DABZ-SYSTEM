@@ -839,3 +839,36 @@ to ask:
   DabzTech payment and a closed day cannot remember its breakdown. To change
   it: delete `rebuildCollections` and the screens go back to "Could not be
   read" - which is truthful and shows nobody their money.
+- **The apparel calendar plans against a date one day before the promised one,
+  and carries unfinished work forward.** The owner asked for this on 21
+  September 2026, and four things inside it were decided here rather than
+  asked about. **The one-day lead is a constant, not a setting**
+  (`PRODUCTION_LEAD_DAYS` in `src/lib/apparel-calendar.ts`): the owner stated
+  the figure, so it is not one of the figures only they can know, and a setting
+  would have meant a migration and a Settings field for a number nobody is
+  waiting to change. To make it two days, change the constant — the tests read
+  it rather than hard-coding one, so nothing else needs touching. **"Finished"
+  means Ready for pickup or Released**, because whether the customer has
+  collected the jerseys is a different question from whether the shop still
+  owes anybody work; if the owner wants a job to keep appearing until it is
+  collected, that is `isProductionDone` and one line. **Carried-forward work
+  lands on today, not on the day after the one it missed.** Read literally the
+  rule says "put it in the next day", and that is exactly what happens — every
+  day, until it is done, which is why a job three days late is on today. A job
+  left sitting on the square it missed would be on a day nobody can act on any
+  more, and by the end of a busy week the calendar would be a record of the
+  past rather than a plan. **Nothing is stored**: no table, no column, no
+  nightly job that moves orders along, and no migration at all. The schedule is
+  worked out from each order's own promised date and status every time the
+  screen is opened, the same choice Phase 8 made for reports. A stored
+  "scheduled day" and a promised date can disagree, and then nothing says which
+  is lying — and a nightly job would mean a shop that was closed on Tuesday
+  came back on Wednesday to find Tuesday's work had never been carried forward.
+  The cost is one pass over the orders per visit; the benefit is that the
+  calendar cannot fall out of step with the orders it is drawn from. A job with
+  **no promised date gets no square** and is listed underneath instead: a date
+  invented on a production calendar is worked to, and the customer was never
+  told it. The calendar also became the first section that lives *inside*
+  another one, so the sidebar now marks the longest matching link as the
+  current page rather than every link that matches — without it, opening the
+  calendar lit up **Apparel** and **Apparel calendar** at once.

@@ -1779,6 +1779,80 @@ Then, on your phone:
 
 ---
 
+## 21 September 2026 — the apparel production calendar
+
+You asked for "a calendar of all projects in Dabz Apparel; make it minus one
+day from the original due date, and if it is not finished, put it in the next
+day but assign it as a priority project."
+
+**Built** — a new screen at **Apparel → Apparel calendar**
+(`/apparel/calendar`), also in the sidebar under Daily.
+
+- **Two dates, not one.** The *promised* date is what the customer was told and
+  it never moves. The *target* date is one day earlier, and that is where the
+  job sits on the calendar — so there is a day in hand when the layout comes
+  back wrong or the fabric runs short.
+- **Unfinished work is carried forward and marked priority.** A target day that
+  ends with the job still on the bench does not simply pass: the job moves to
+  the next day, and if that day passes too it moves again. Applied every day
+  since, it lands on **today** — the only square anybody can still act on — and
+  it says how many days it has been carried. A job three days late is at the
+  top of today, not gathering dust on the square it missed.
+- **"Finished" means Ready for pickup or Released.** Whether the customer has
+  come for the jerseys is a different question from whether the shop still owes
+  anybody work, so a ready order stops being carried. It stays on the target
+  day it was made for, marked ✓.
+- **A cancelled order is off the calendar altogether** — it is not work. It is
+  still on the Apparel screen with its reason, because the customer may be
+  holding the sheet.
+- **An order with no promised date is never given one.** A date invented here
+  would be worked to, and the customer was never told it. Those orders are
+  listed under the calendar as *Not on the calendar*, asking for a date.
+- **The Apparel screen says it too.** If anything has been carried over, the
+  first thing on the screen is a ⚠ with the count, the teams and how long each
+  has been waiting.
+- **Nothing is stored.** No table, no column, no nightly job that moves orders
+  along, and **no migration** — the schedule is worked out from each order's own
+  promised date and status every time the screen is opened, the same rule as
+  reports in Phase 8. A stored "scheduled day" and a promised date can disagree,
+  and a shop that never opened the screen on Tuesday would find Tuesday's work
+  had never been carried forward.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| The target date, the roll-forward, finished and undated orders, the month grid | `npm test` | 724 tests (21 new) |
+| That nothing in the database changed | `npm run test:rls`, `npm run check:schema` | 334 checks, 44 tables — unchanged |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+| The grid at 390 / 768 / 1024 / 1440 | headless browser | no sideways scroll at any width; the grid from 768 up, the day-by-day list below it; every chip 29px tall |
+
+The seven-column grid is the part no unit test can see, so it was measured in a
+browser. At 390px seven columns give each day about 50px, which cannot hold a
+team name — so a phone gets the same month as a **list, one day under the
+other**, with the full name, the status and what is owed on each.
+
+**How to check it**
+
+```bash
+npm test          # expect: 724 passed
+npm run dev
+```
+
+1. Open **Apparel**, start a job order and give it a promised date **three days
+   from now**. Open **Apparel calendar**: it is on the square *two* days from
+   now — one day before you promised it.
+2. Change the promised date to **yesterday**. The order now sits on **today**,
+   in amber, with ⚠ and "Carried over 2 days", and the Apparel screen says so
+   at the top.
+3. Move it to **Ready for pickup**. It stops being carried and goes back to its
+   own target day with a ✓.
+4. Clear the promised date. It leaves the grid and appears under **Not on the
+   calendar** — the system will not guess a date.
+5. Open the same screen on a phone: the same month, as a list.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

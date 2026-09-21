@@ -9,6 +9,7 @@ import "server-only";
  */
 import { cache } from "react";
 
+import { type CalendarOrder } from "@/lib/apparel-calendar";
 import {
   orderTotals,
   orderWarnings,
@@ -286,6 +287,29 @@ export const getApparelOrders = cache(
     });
   },
 );
+
+/**
+ * An order as the production calendar needs it (see
+ * `src/lib/apparel-calendar.ts`).
+ *
+ * Here rather than in either screen, because two screens ask the same
+ * question - the Apparel list wants the count of priority projects, the
+ * calendar wants the projects themselves - and two copies of this mapping
+ * would be two chances for them to disagree about what a project is.
+ */
+export function toCalendarOrder(detail: ApparelOrderDetail): CalendarOrder {
+  return {
+    id: detail.order.id,
+    orderNumber: detail.order.orderNumber,
+    teamName: detail.order.teamName,
+    customerName: detail.order.customerName,
+    status: detail.order.status,
+    promisedOn: detail.order.promisedOn,
+    itemCount: detail.totals.itemCount,
+    totalCentavos: detail.totals.totalCentavos,
+    balanceCentavos: detail.totals.balanceCentavos,
+  };
+}
 
 export async function getApparelOrder(
   orderId: string,
