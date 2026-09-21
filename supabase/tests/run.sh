@@ -48,8 +48,10 @@ quiet "$HERE/../migrations/0012_clear_apparel_and_repair_prices.sql"
 quiet "$HERE/../migrations/0014_staff_stay_signed_in.sql"
 # 0015 adds the collections feed, so it has to be here too - 12 tests it.
 quiet "$HERE/../migrations/0015_phase10_collections.sql"
-# 0016 closes the own-row reads a deactivated account still had - 13 tests it.
-quiet "$HERE/../migrations/0016_deactivated_account_reads_nothing.sql"
+# 0016 adds the push subscriptions table - 13 tests it.
+quiet "$HERE/../migrations/0016_phase11_notifications.sql"
+# 0017 closes the own-row reads a deactivated account still had - 14 tests it.
+quiet "$HERE/../migrations/0017_deactivated_account_reads_nothing.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -66,4 +68,5 @@ run "$HERE/09_phase7_rls.test.sql"
 run "$HERE/10_phase9_rls.test.sql"
 run "$HERE/11_delete_rules.test.sql"
 run "$HERE/12_phase10_rls.test.sql"
-run "$HERE/13_deactivated_account.test.sql"
+run "$HERE/13_phase11_rls.test.sql"
+run "$HERE/14_deactivated_account.test.sql"

@@ -380,6 +380,38 @@ the same family, and now says so out loud.
 
 ---
 
+## Decided for Phase 11 — Notifications
+
+You asked for these knowing the build plan lists them under *Later, not in the
+first build*, and knowing phases 4 to 10 are still waiting to be confirmed.
+Recorded here so the reason is on paper: **you asked, twice, after I raised
+both points.** They are independent of Phase 10, so nothing is stacked on
+unverified work.
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| A daily summary, or an alert per event | **One summary each morning.** A shop generates dozens of these a week; twelve a day gets the channel muted, and a muted channel is worse than none because everyone still believes it works | Add a kind to `digestLines` in `src/lib/notifications.ts` |
+| What happens on a quiet day | **Nothing is sent.** Not "all clear" — enough cheerful notifications and you swipe them away unread, and the one that mattered goes too | `buildDigest` returns null. It is the behaviour most likely to be "fixed" by mistake; there is a test named for it |
+| When the summary arrives | **Your shop's opening time**, read from the `workDayStart` you already set. Nothing invented | The cron fires at `0 0 * * *` UTC = 8am Manila, in `vercel.json`. Change your opening hour and change that line to match (UTC = Manila − 8) |
+| Anything immediate | **A customer message, and nothing else.** It is the only one with a person waiting at the other end (spec 9) | `notifyOwnersOfEnquiry` in `src/app/(public)/actions.ts` |
+| What the customer alert says | **That somebody wrote, and nothing about who.** A lock screen is readable by whoever is near the phone, and a stranger's name and number are Owner/Admin material (spec 4.3) | `enquiryAlert`. Worth keeping as it is |
+| Who may receive them | **Owner and Admin only**, refused by the database and not only by the screen. Every figure a summary carries is beyond a staff checkbox | The insert policy in `0017`. Widening it means deciding what a staff digest could safely say, which is a real question, not a toggle |
+| Whether admins see each other's phones | **No.** An endpoint is a device; one admin reading another's device list is a privacy question with no upside | `push_subscriptions_read_own` in `0017` |
+| Per-kind on/off switches | **Not built.** One summary does not need filtering, and every switch is another thing to get wrong | If you want them they belong on the subscription row, not in Settings — a person may have two phones with different answers |
+| Turning a phone off | **Deletes the row.** The one place in this system where deleting is right: it is a standing permission, not a money record, and a withdrawn permission must leave nothing behind that anything could still send to | `unsubscribeAction` |
+| A phone that stops answering | **404 and 410 switch it off** (the browser is gone); anything else is forgiven ten times first | `MAX_FAILURES` and `subscriptionVerdict`. Switching off after one bad afternoon is how somebody silently stops getting warnings |
+| A third use of the service-role key | **Allowed, for the digest cron**, which runs as nobody and must read every Owner/Admin's phones and the shop's warnings. Now listed in AGENTS.md beside sign-in and the public page | It is the only way a cron can read anything. What keeps it safe is `CRON_SECRET` and the fact that the route only ever sends |
+| Hand-rolling the Web Push crypto | **No — added the `web-push` package.** It is a VAPID JWT plus RFC 8291 aes128gcm encryption, and getting either subtly wrong does not raise an error, it just makes the push service answer 400 and nobody learns why | It is the standard implementation. The alternative is ~120 lines of crypto this project has no business owning |
+
+**Two things worth knowing before you rely on it**
+
+- **The last hop is untested.** Everything up to the moment a message leaves
+  the server is covered by the 645 tests. Whether it lands on your phone needs
+  a real deployment, a real project and a real handset — the steps are in
+  [PHASES.md](PHASES.md).
+- **On an iPhone you must add the system to your Home Screen first.** Apple
+  only allows notifications for an app installed that way. Safari in an
+  ordinary tab will say it is unsupported, and it is right.
 ## Decided after Phase 10 — a deactivated account reads nothing of its own
 
 Deactivating an account is supposed to remove all access **immediately**
@@ -393,15 +425,15 @@ permission list; and their own payslips, attendance, cash advances and
 deductions.
 
 Migration `0015` fixed the same defect on `sales`, `sale_lines` and
-`void_requests`. `0016` is the rest of it, found by listing **every** policy
+`void_requests`. `0017` is the rest of it, found by listing **every** policy
 whose predicate reaches `auth.uid()` and **every `SECURITY DEFINER` helper that
 resolves the caller**, in a real database, rather than by looking where a test
 happened to fail.
 
 | Question | What I decided | How to change it |
 |---|---|---|
-| Five tables that never mention `auth.uid()` | Fixed in **one place**: `my_staff_id()`. It is `SECURITY DEFINER`, so it bypasses RLS on `staff` and answered for anybody whose profile id matched, active or not. `payroll_weeks`, `payroll_days`, `attendance_entries`, `cash_advances` and `advance_deductions` all compare against it, so guarding the helper closes all five | `my_staff_id()` in `0016` |
-| `staff_read_own`, `user_permissions_read_self` | Guarded with `current_role_name() is not null`, the same shape `0015` used | The policies in `0016` |
+| Five tables that never mention `auth.uid()` | Fixed in **one place**: `my_staff_id()`. It is `SECURITY DEFINER`, so it bypasses RLS on `staff` and answered for anybody whose profile id matched, active or not. `payroll_weeks`, `payroll_days`, `attendance_entries`, `cash_advances` and `advance_deductions` all compare against it, so guarding the helper closes all five | `my_staff_id()` in `0017` |
+| `staff_read_own`, `user_permissions_read_self` | Guarded with `current_role_name() is not null`, the same shape `0015` used | The policies in `0017` |
 | `profiles_read_self` | **Deliberately left open.** It is the row the app reads to discover the account is inactive — `getSignedInUser()` reads `status` from it and sends the person to "your account is no longer active". Guarding it would make a dismissed person's own name unreadable to the very screen trying to explain the situation, and they would get a blank "signed out" instead. It carries their own username and name and nothing about anybody else | Add the same clause if that message is ever worth losing |
 | `stock_movements_insert` | **Nothing to do.** It looks unguarded and is not: its check goes through `has_permission()`, which is already false for a deactivated account | — |
 

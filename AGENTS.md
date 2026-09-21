@@ -53,8 +53,8 @@ receiving code.
   `supabase_migrations.schema_migrations` so none can run twice. The `0000`-
   style four-digit prefixes are accepted as versions and sort before any later
   `supabase migration new` timestamp, so both naming styles can coexist. Verified
-  by pushing all seventeen to a throwaway PostgreSQL and then running the whole
-  RLS suite against the result: 42 tables and one view, 315 checks, identical
+  by pushing all eighteen to a throwaway PostgreSQL and then running the whole
+  RLS suite against the result: 43 tables and one view, 333 checks, identical
   to `run.sh`.
 - **CI runs all of it on every push and pull request** (`.github/workflows/ci.yml`):
   lint, typecheck, unit tests, the security rules and the schema checker, then
@@ -132,9 +132,11 @@ Rules that are easy to break:
   admin could edit a staff row and set its role to `owner`.
 - `SUPABASE_SERVICE_ROLE_KEY` bypasses RLS entirely. Only
   `src/lib/supabase/admin.ts` may use it, only for work that happens before
-  anyone is signed in (username lookup, lockout counting, login history) or
-  that needs Supabase's admin API (creating accounts, resetting passwords).
-  That module is marked `server-only`. Everywhere else, use
+  anyone is signed in (username lookup, lockout counting, login history), that
+  needs Supabase's admin API (creating accounts, resetting passwords), or that
+  runs as NOBODY - the public page's price lists, and the Phase 11 digest cron.
+  Those are the only three sanctioned uses and there is not a fourth without a
+  very good reason. That module is marked `server-only`. Everywhere else, use
   `createSupabaseServerClient()` so RLS stays in force.
 - `audit_log` and `login_events` have **no** insert/update/delete policy on
   purpose. Only the server writes them. Do not add one.
@@ -470,3 +472,52 @@ round trip is the one thing that must be tried against a real project.
   counted, because a void tomorrow changes what the feed says about today and
   the closing records what was believed at the time. Days closed before Phase
   10 keep NULL and the screen says so - zero would be a claim.
+
+## Notification rules (built in Phase 11)
+
+- **A notification that arrives when nothing is wrong is the bug.** `buildDigest`
+  returns NULL for a quiet shop and the sender sends nothing - it never says
+  "all clear". Enough cheerful notifications and the owner swipes them away
+  without reading, and the one that mattered goes with it. Same instinct as a
+  daily target of zero meaning "not known" rather than "reached".
+- **One summary a morning, not an alert per event.** The single exception is a
+  customer message, and it earns it because a person is waiting at the other
+  end (spec 9). Anything else added here should go in the digest.
+- **Notifications carry no names, numbers or message text.** A push payload is
+  encrypted end to end, but it lands on a lock screen anyone standing near the
+  phone can read. `enquiryAlert` says somebody wrote and nothing about who.
+- **Owner and Admin only.** Every figure a digest can carry is Owner/Admin
+  material under spec 4.3, so the insert policy on `push_subscriptions` refuses
+  everybody else. A notification is a screen that arrives by itself and obeys
+  the same rule as the screen.
+- **A person sees only their own phones**, Owner and Admin included. An
+  endpoint is a device; one admin reading another's device list is a privacy
+  question with no upside.
+- **`readDigestInput` must NOT use the `getX` helpers.** They read through the
+  ordinary server client, and a cron has nobody signed in - so RLS would hand
+  back nothing and the digest would be empty every morning without ever
+  looking broken. It fetches rows with the service-role client and hands them
+  to the same PURE functions the screens use (`billsNeedingAttention`,
+  `buildStockLines`, `itemsNeedingAttention`, `unclaimedStatus`), so the
+  judgement is shared even though the fetching cannot be.
+- **The digest route fails shut.** With no `CRON_SECRET` set it refuses
+  everybody, including Vercel. It is a public URL that reads the whole shop,
+  and a missing secret means nobody configured it - not that it should run
+  wide open. It answers 404 identically to a wrong secret and a missing one.
+- **`last_digest_on` is what stops a second send, not the cron's schedule.** A
+  job can run twice, be re-run by hand or be moved; the owner must still get
+  one summary. A quiet day is marked as sent too, so a later run does not
+  reconsider and interrupt them in the afternoon.
+- **404 and 410 from a push service mean the phone is gone**, not that the
+  send should be retried. Anything else only counts towards a tally, because a
+  shop's notifications must survive a push service having a bad minute.
+- **A subscription is DELETED when switched off**, which is the one place in
+  this system where deleting is right: it is a standing permission rather than
+  a money record, and a withdrawn permission must leave nothing behind that
+  anything could still send to.
+- **Never ask for notification permission on load.** A prompt nobody invited
+  gets denied, and a denied browser cannot be asked again from code - the
+  person has to go into their own settings to undo it.
+- **The VAPID keys are generated once** (`npm run push:keys`). Regenerating
+  invalidates every phone already turned on. Until both exist, Settings says
+  so and offers no button, the same as every figure only the owner can supply.

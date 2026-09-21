@@ -18,7 +18,8 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 8 | Reports | ✅ **Done — confirmed 21 Sep 2026** |
 | 9 | The public page and customer messages | ✅ **Done — confirmed 21 Sep 2026** |
 | 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — confirmed 21 Sep 2026** |
-| — | Later: Messenger API, Meta Ads tracking, chatbot, push notifications | Not in first build |
+| 11 | Notifications: the shop's warnings on your phone | ✅ **Done — waiting on owner to confirm** |
+| — | Later: Messenger API, Meta Ads tracking, chatbot | Not in first build |
 
 **"Confirmed" means the owner has used the phase and says it works.** It is not
 a claim that every hand-check under that phase has been done — where a phase
@@ -1648,6 +1649,133 @@ Then, at the counter:
    an order* button is **not there**, and Sales shows counter rows only — with
    a ⚠ line saying part of the day is not shown to them, so an incomplete
    total is never mistaken for the whole day.
+
+---
+
+## Phase 11 — Notifications on your phone ✅
+
+**Built**
+
+Every warning this sends already existed. A bill due in five days, stock below
+its reorder level, a unit nobody has collected, a customer message with no
+reply — the system has known all four for phases. The only thing wrong with
+them was that **you had to open a screen to find out**.
+
+*What arrives, and when*
+- **One summary each morning**, when the shop opens. "3 things need you today
+  — 2 bills overdue (₱4,500.00) · 1 customer message waiting".
+- **If nothing needs you, nothing is sent.** No cheerful "all clear". Enough of
+  those and you swipe them away without reading, and the one that mattered goes
+  with it — the same reasoning as a daily target of zero meaning *not known*
+  rather than *reached*.
+- **One exception arrives straight away: a customer message.** That is the only
+  one with a person waiting at the other end (spec 9). Everything else is the
+  shop's own business and keeps until morning.
+- Most urgent first: what is already late, then what is about to be, then a
+  person waiting, then a thing on a shelf.
+
+*What it will not put on your lock screen*
+- **No names, no numbers, no message text.** The payload is encrypted end to
+  end — Google and Apple carry it without being able to read a peso — but it
+  still lands on a screen anyone standing near your phone can see. So the
+  customer alert says *somebody wrote* and nothing about who. The Messages
+  screen is one tap away, behind your sign-in.
+
+*Who can turn it on*
+- **Owner and Admin only.** Every figure a summary can carry is Owner/Admin
+  material under spec 4.3, and a notification is just a screen that arrives by
+  itself. A staff account is refused by the database, not only by the screen.
+- **You see only your own phones**, and so does every admin. An endpoint is a
+  device, and one person reading another's device list has no upside.
+- Turning a phone off **deletes** the row. That is the one place in this system
+  where deleting is right: it is a standing permission, not a money record, and
+  a withdrawn permission should leave nothing behind that could still be sent
+  to.
+
+*The awkward bits, handled*
+- A phone that has been wiped or had permission revoked answers 404. That is
+  not retried — it is switched off, with the reason kept so **Settings can tell
+  you why it stopped**. A push service merely having a bad minute is forgiven,
+  ten times over, before anything is switched off.
+- The job can run twice, be re-run by hand, or be moved. You still get **one**
+  summary: the date of the last one is what stops a second, not the schedule. A
+  quiet day is marked as done too, so a later run does not reconsider and
+  interrupt you at four in the afternoon with news that there is no news.
+- It never asks for permission on load. A prompt nobody invited gets denied,
+  and a denied browser **cannot be asked again from code** — you would have to
+  go into your own browser settings to undo it.
+
+**What I decided and how to change it**
+
+| Decision | How to change it |
+|---|---|
+| A **daily summary**, not an alert per event | A shop generates dozens a week; twelve notifications a day gets the channel muted, and a muted channel is worse than none because everyone thinks it still works. Add a kind to `digestLines` in `src/lib/notifications.ts` |
+| Sent at **your shop's opening time**, from Settings | Nothing was invented — it reads `workDayStart`. The cron itself runs at `0 0 * * *` UTC, which is 8am Manila; if you change your opening hour, change that line in `vercel.json` to match (UTC = Manila − 8) |
+| A customer message is the **only** immediate one | `notifyOwnersOfEnquiry` in `src/app/(public)/actions.ts`. Anything else you want immediately goes there too — but think hard first |
+| The alert carries **no customer details** | Deliberate, and worth keeping. `enquiryAlert` in `src/lib/notifications.ts` |
+| **No per-kind on/off switches** | One summary does not need filtering, and every switch is another thing to get wrong. If you want them, they belong on the subscription row, not in Settings — a person may have two phones |
+| Ten failures before a phone is switched off | `MAX_FAILURES`. Switching off after one bad afternoon is how somebody silently stops getting warnings and finds out weeks later |
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| The digest logic: silence when quiet, order, plurals, truncation, the send verdicts | `npm test` | 645 tests (36 new in `notifications.test.ts`) |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 319 checks (was 301) |
+| That every table and column the app asks for exists | `npm run check:schema` | 43 tables and one view |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+**What could NOT be tested here, and needs you**
+
+This is a bigger gap than usual, so it is worth being plain about:
+
+- **Whether a notification actually lands on your phone.** That needs a real
+  deployment, a real Supabase project and a real phone. Everything up to the
+  moment the message leaves the server is tested; the last hop is not.
+- The **permission prompt**, the **service worker**, and the **iPhone
+  home-screen requirement** are all browser behaviour that no unit test can
+  see.
+
+**How to check it**
+
+```bash
+npm install
+npm run db:push     # applies 0016
+npm run push:keys   # ONCE - then paste both keys into .env.local and Vercel
+npm test            # expect: 645 passed
+npm run dev
+```
+
+You also need a `CRON_SECRET` — any long random string, in `.env.local` and in
+Vercel. Without it the digest route refuses everybody, **including Vercel**.
+That is on purpose: it is a public URL that reads the whole shop, and a missing
+secret means nobody set it up rather than that it should run wide open.
+
+Then, on your phone:
+
+1. Open the system on your phone and sign in as the owner. **On an iPhone, add
+   it to your Home Screen first** and open it from there — Apple only allows
+   notifications for an app installed that way.
+2. Open **Settings**, scroll to **Notifications**, press *Turn on for this
+   phone*, and allow it when your phone asks. It should now be listed, with
+   the phone named.
+3. On a computer, open **Settings** as the same person: that phone is in the
+   list there too, because it is yours.
+4. Sign in as an **admin** on the computer. Your phone is **not** in their
+   list, and theirs would not be in yours.
+5. Sign in as a **staff member**. There is no notifications section at all.
+6. From a private window, send yourself a message through the **public page**.
+   Your phone should buzz within seconds, saying a customer has messaged —
+   and saying **nothing about who or what**. Tap it: it opens Messages.
+7. The morning summary is harder to try on demand, because it waits for
+   opening time. To force one, call the route yourself with your secret:
+   `curl -H "Authorization: Bearer YOUR_CRON_SECRET" https://your-site/api/notifications/digest`
+   It answers with what it did. With nothing wrong in the shop it will say
+   *"Nothing needed attention, so nothing was sent"* — **that is the correct
+   answer**, not a failure. Make a bill overdue and try again.
+8. Try that same URL **without** the header. It should answer *Not found*.
+9. Press **Turn off** beside the phone in Settings. It disappears, and the next
+   morning nothing arrives.
 
 ---
 

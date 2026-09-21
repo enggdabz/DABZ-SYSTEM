@@ -1,4 +1,4 @@
--- A DEACTIVATED ACCOUNT READS NOTHING OF ITS OWN (spec 4.2, migration 0016).
+-- A DEACTIVATED ACCOUNT READS NOTHING OF ITS OWN (spec 4.2, migration 0017).
 --
 -- Deactivating an account removes all access immediately. A token stays valid
 -- until it expires, though, so "immediately" has to be enforced by the
@@ -98,7 +98,7 @@ begin
     The wider half. These five tables never mention auth.uid(): they compare
     against my_staff_id(), which is SECURITY DEFINER and so bypasses RLS on
     `staff`. Guarding the two policies above would have left every one of them
-    open, which is why 0016 guards the helper.
+    open, which is why 0017 guards the helper.
   */
   if public.my_staff_id() is not null then
     raise exception 'FAIL: my_staff_id() still answers for a deactivated account';
