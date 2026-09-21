@@ -210,3 +210,56 @@ export function orderedLabel(product: Pick<Product, "orderedPieces" | "orderedCo
     product.orderedCount === 1 ? "" : "s"
   }`;
 }
+
+/**
+ * A web address for a product or a design, made from its name.
+ *
+ * The URL a customer shares has to survive being pasted into Messenger, so it
+ * is lower case, ASCII, and hyphen-separated. A name that reduces to nothing -
+ * all punctuation, or a script this does not handle - falls back to "item"
+ * rather than to an empty slug, and the caller makes it unique.
+ */
+export function slugify(name: string): string {
+  const slug = name
+    .normalize("NFKD")
+    // Strip the accents NFKD just separated out.
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60)
+    .replace(/-+$/g, "");
+
+  return slug === "" ? "item" : slug;
+}
+
+/** The same slug, made unique against the ones already in use. */
+export function uniqueSlug(name: string, taken: ReadonlySet<string>): string {
+  const base = slugify(name);
+  if (!taken.has(base)) return base;
+
+  for (let suffix = 2; suffix < 1000; suffix += 1) {
+    const candidate = `${base}-${suffix}`;
+    if (!taken.has(candidate)) return candidate;
+  }
+
+  // A thousand products called the same thing is not a case worth a nicer
+  // answer than this one, which is still unique.
+  return `${base}-${Date.now().toString(36)}`;
+}
+
+/** The next free design code: DJ-101, DJ-102, ... */
+export function nextDesignCode(existing: readonly string[]): string {
+  const numbers = existing
+    .map((code) => /^DJ-(\d+)$/i.exec(code.trim())?.[1])
+    .filter((digits): digits is string => digits !== undefined)
+    .map(Number);
+
+  const next = numbers.length === 0 ? 101 : Math.max(...numbers) + 1;
+  return `DJ-${next}`;
+}
+
+/** What a person typed into the code box, as it will be stored. */
+export function normaliseDesignCode(input: string): string {
+  return input.trim().toUpperCase().replace(/\s+/g, "-");
+}

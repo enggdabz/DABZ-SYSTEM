@@ -9,8 +9,12 @@ import {
   parseShopSort,
   priceLabel,
   sortForAdmin,
+  slugify,
   sortForShop,
   termsLabel,
+  uniqueSlug,
+  nextDesignCode,
+  normaliseDesignCode,
 } from "./catalogue";
 import type { Product } from "./types";
 
@@ -222,5 +226,63 @@ describe("orderedLabel", () => {
   it("counts pieces and orders", () => {
     expect(orderedLabel({ orderedPieces: 27, orderedCount: 2 })).toBe("27 pcs · 2 orders");
     expect(orderedLabel({ orderedPieces: 6, orderedCount: 1 })).toBe("6 pcs · 1 order");
+  });
+});
+
+describe("slugify", () => {
+  it("makes a name into something that survives being pasted into a chat", () => {
+    expect(slugify("Full Sublimation Jersey")).toBe("full-sublimation-jersey");
+  });
+
+  it("drops punctuation rather than encoding it", () => {
+    expect(slugify("Team jersey (long sleeve) — 2026!")).toBe(
+      "team-jersey-long-sleeve-2026",
+    );
+  });
+
+  it("folds accents down to ASCII", () => {
+    expect(slugify("Camisón Niño")).toBe("camison-nino");
+  });
+
+  it("has something to say about a name that reduces to nothing", () => {
+    expect(slugify("!!!")).toBe("item");
+    expect(slugify("   ")).toBe("item");
+  });
+
+  it("never ends in a hyphen, even after being cut short", () => {
+    expect(slugify("a".repeat(58) + " bb")).not.toMatch(/-$/);
+  });
+});
+
+describe("uniqueSlug", () => {
+  it("leaves a free name alone", () => {
+    expect(uniqueSlug("Jersey", new Set())).toBe("jersey");
+  });
+
+  it("numbers a name that is taken", () => {
+    expect(uniqueSlug("Jersey", new Set(["jersey"]))).toBe("jersey-2");
+    expect(uniqueSlug("Jersey", new Set(["jersey", "jersey-2"]))).toBe("jersey-3");
+  });
+});
+
+describe("nextDesignCode", () => {
+  it("starts at DJ-101 on an empty gallery", () => {
+    expect(nextDesignCode([])).toBe("DJ-101");
+  });
+
+  it("carries on from the highest, not from the count", () => {
+    // Deleting DJ-102 must not hand its number to something else: a past
+    // order still says DJ-102 on it.
+    expect(nextDesignCode(["DJ-101", "DJ-104"])).toBe("DJ-105");
+  });
+
+  it("ignores a code that is not of that shape", () => {
+    expect(nextDesignCode(["SPECIAL", "DJ-101"])).toBe("DJ-102");
+  });
+});
+
+describe("normaliseDesignCode", () => {
+  it("stores what a person typed the way the database wants it", () => {
+    expect(normaliseDesignCode("  dj 205 ")).toBe("DJ-205");
   });
 });

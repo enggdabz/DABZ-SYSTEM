@@ -59,6 +59,31 @@ export const NAV_SECTIONS: NavSection[] = [
     group: "Daily",
     phase: 6,
   },
+  /*
+    The online shop's orders (Phase 12). They are Dabz Apparel's work, so the
+    permission is the same one that opens the job orders - a person trusted
+    with those is the person who runs these.
+
+    Two entries, not six. The module has its own tab bar (Orders, Production,
+    Calendar, Reports, Products, Designs) because that is how docs/spec.md 9
+    lays it out, and six more links in a rail that already holds twenty-three
+    would bury the ones the counter uses every hour. These two are the ones
+    somebody opens without being sent there.
+  */
+  {
+    href: "/online-orders",
+    label: "Online orders",
+    permission: "apparel_job_orders",
+    group: "Daily",
+    phase: 12,
+  },
+  {
+    href: "/online-orders/production",
+    label: "Production board",
+    permission: "apparel_job_orders",
+    group: "Daily",
+    phase: 12,
+  },
   { href: "/repairs", label: "Repairs", permission: "dabztech_tickets", group: "Daily", phase: 7 },
   { href: "/customers", label: "Customers", group: "Daily", phase: 4 },
 
@@ -72,6 +97,13 @@ export const NAV_SECTIONS: NavSection[] = [
 
   { href: "/reports", label: "Reports", ownerOrAdminOnly: true, group: "Manage", phase: 8 },
   { href: "/products", label: "Products", ownerOrAdminOnly: true, group: "Manage", phase: 4 },
+  {
+    href: "/online-orders/products",
+    label: "Online shop",
+    ownerOrAdminOnly: true,
+    group: "Manage",
+    phase: 12,
+  },
   { href: "/accounts", label: "Accounts", ownerOrAdminOnly: true, group: "Manage", phase: 1 },
   { href: "/activity", label: "Activity", ownerOrAdminOnly: true, group: "Manage", phase: 1 },
   { href: "/settings", label: "Settings", ownerOrAdminOnly: true, group: "Manage", phase: 1 },

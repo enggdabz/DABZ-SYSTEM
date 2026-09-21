@@ -439,6 +439,13 @@ create table if not exists public.online_order_production (
   stage_key text not null references public.online_production_stages (key),
   done_at timestamptz not null default now(),
   done_by uuid,
+  /*
+    The name as well as the id, for the reason `status_log.actor_label` keeps
+    one: a staff member may only read their OWN profile row, so a join would
+    show every other tick as done by nobody - and after an account is removed
+    it would show that way for the owner too.
+  */
+  done_by_name text,
   -- "Not needed for this order" is a finished step, not a missing one. The
   -- difference is kept because the shop will want to know which orders skip
   -- which steps, and a missing row would just read as "not started".
@@ -1361,8 +1368,9 @@ begin
     raise exception 'Steps are done in order. The next one is %.', v_stage_label;
   end if;
 
-  insert into public.online_order_production (order_id, stage_key, done_by, skipped)
-  values (p_order_id, v_current, auth.uid(), coalesce(p_skipped, false));
+  insert into public.online_order_production
+    (order_id, stage_key, done_by, done_by_name, skipped)
+  values (p_order_id, v_current, auth.uid(), v_label, coalesce(p_skipped, false));
 
   select count(*) into v_remaining
   from public.online_production_stages s

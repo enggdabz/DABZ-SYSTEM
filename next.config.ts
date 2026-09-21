@@ -25,6 +25,30 @@ const nextConfig: NextConfig = {
       dynamic: 30,
     },
   },
+
+  /*
+    Product photos and jersey mockups live in Supabase Storage, so next/image
+    has to be told that host is allowed to serve them.
+
+    Matched by the shape of a Supabase URL rather than by reading
+    NEXT_PUBLIC_SUPABASE_URL here: this file is read at BUILD time, the CI
+    build deliberately runs with no Supabase credentials at all, and a pattern
+    list built from a missing variable would be empty - which fails at
+    runtime, in production, on a page nobody looked at in CI.
+
+    Only the public read path, and only the two public buckets' prefix. A
+    self-hosted Supabase on another domain is the one case that needs a line
+    adding here.
+  */
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
+  },
 };
 
 export default nextConfig;
