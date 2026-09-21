@@ -1727,6 +1727,33 @@ grant execute on function public.online_void_payment(uuid, text) to authenticate
 -- as its owner, so nobody else needs it.
 revoke all on sequence public.online_order_no_seq from public;
 
+/*
+  Table privileges, said out loud.
+
+  Supabase's own default privileges already hand `anon` and `authenticated`
+  SELECT on a new table in `public`, and RLS is what decides the rows. This
+  repeats it for the catalogue anyway, because the shop window is the one part
+  of this module that a project-level setting could quietly close: a visitor
+  who cannot select the products sees an empty shop and no error at all.
+
+  Only the catalogue and the two views. The order tables are left exactly as
+  Supabase made them - their policies are what keep them shut, and adding a
+  grant here would say something this file does not mean.
+*/
+grant select on
+  public.online_categories,
+  public.online_products,
+  public.online_product_images,
+  public.online_product_prices,
+  public.online_product_options,
+  public.online_designs,
+  public.online_design_products,
+  public.online_production_stages,
+  public.online_product_stats
+to anon, authenticated;
+
+grant select on public.online_order_totals to authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Storage buckets
 -- ---------------------------------------------------------------------------
@@ -1762,8 +1789,18 @@ begin
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
-  -- Owner/Admin put pictures up and take them down; everybody may look at the
-  -- two public buckets, because that is what a shop window is.
+  /*
+    Owner/Admin put pictures up and take them down; everybody may look at the
+    two public buckets, because that is what a shop window is.
+
+    `storage.objects` belongs to `supabase_storage_admin`, and a project whose
+    `postgres` role has not been granted on it will refuse these. That is
+    worth FAILING for rather than skipping quietly - a bucket with no write
+    policy is a bucket nobody can upload to, and finding that out from a
+    screen that silently does nothing is far worse than finding it out here.
+    The handler below only makes the refusal say what to do about it.
+  */
+  begin
   execute $p$
     drop policy if exists online_public_images_read on storage.objects;
     create policy online_public_images_read on storage.objects
@@ -1782,6 +1819,9 @@ begin
         and (public.is_owner_or_admin() or public.has_permission('apparel_job_orders'))
       );
   $p$;
+  exception when insufficient_privilege then
+    raise exception 'This project''s postgres role may not write storage policies (%). Paste the three policies in this block into the Supabase SQL editor, or add them under Storage -> Policies, before anybody uploads a picture.', sqlerrm;
+  end;
 
   /*
     No write policy on `order-files` for anybody signed in or not. A customer's

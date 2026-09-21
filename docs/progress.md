@@ -142,6 +142,12 @@ reading the code.
 
 Then, in rough order of value:
 
+0. **Check the storage policies landed.** `0018` creates three buckets and the
+   policies on `storage.objects` that guard them. If your project's `postgres`
+   role may not write those, the migration says so by name and tells you to
+   paste that block into the SQL editor - it fails rather than skipping,
+   because a bucket with no write policy is one nobody can upload to and the
+   screen would just do nothing.
 1. **Wire up Playwright** against a Supabase project with a seeded staff
    account. The nine flows are listed in spec 14.
 2. **Ask the owner about the ledger.** It is the one structural question the
