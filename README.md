@@ -160,6 +160,11 @@ src/
     change-password/  Choosing a new password
     (public)/         The shop's page at "/" - no sign-in, and the one
                       form a stranger may send into the system
+    (shop)/           The online shop at "/shop" - the catalogue, the design
+                      gallery, a product page, the order, the checkout, the
+                      receipt and track-my-order. No sign-in, and the other
+                      three things a stranger may cause to happen
+    api/online/       The cron that throws away files nobody ordered
     (app)/            Every screen you must be signed in to see
       layout.tsx        Top bar, navigation, idle sign-out
       overview/         The owner's home
@@ -167,6 +172,9 @@ src/
       staff/            Accounts, roles, permission checkboxes
       settings/         Working days, hours, staff limits, public details
       activity/         The audit log and sign-in history
+      online-orders/    The online shop's own screens: the orders, one order,
+                        the production board, the calendar, the reports, and
+                        the catalogue and design gallery behind them
   components/
     ui.tsx            Buttons, cards, fields, notices - used everywhere
     AppTopBar.tsx     Black frosted top bar with the navigation
@@ -184,6 +192,10 @@ src/
       navigation.ts   Which sections a person sees
       credentials.ts  Usernames, temporary passwords, the lockout
       dal.ts          "Who is asking?" - checked by every screen
+    online/           The online shop's rules, as pure tested functions:
+                      quantities, totals, the status flow, the production
+                      paths, the calendar, the sorting and the reports
+    mail.ts           Sending the new-order email, when one is configured
     supabase/         Database connections (browser, server, admin)
 supabase/
   config.toml         Settings the Supabase CLI reads - notably that there is
@@ -243,5 +255,28 @@ red is the Dabz brand colour and a red label would look like a button
 ## Documentation
 
 - [docs/SETUP.md](docs/SETUP.md) — create the Supabase project, deploy to Vercel
-- [docs/PHASES.md](docs/PHASES.md) — the 10 build phases and current progress
+- [docs/PHASES.md](docs/PHASES.md) — the build phases and current progress
 - [docs/DECISIONS.md](docs/DECISIONS.md) — open questions for the owner
+
+The online shop (Phase 12) has its own three:
+
+- [docs/spec.md](docs/spec.md) — its specification, which is the source of truth
+- [docs/open-questions.md](docs/open-questions.md) — what is waiting on the
+  owner, and every place that spec was mapped onto this system's own rules
+- [docs/progress.md](docs/progress.md) — what is built, how to check it in a
+  browser, and what is not built
+
+### Turning the online shop on
+
+1. `npm run db:push` applies `0018`, which creates its sixteen tables, two
+   views and three storage buckets. Open **System check** afterwards; it asks
+   the live database about every one of them.
+2. Open **Settings → The online shop** and fill in what is yours to decide:
+   how many pieces you can finish for one date, your monthly target, and where
+   new orders should be emailed. Leaving any of them empty is a real answer —
+   the calendar then marks no day full, and Reports show no meter.
+3. Open **Online shop** under Manage and add your first product. The shop is
+   empty until you do, and a customer is told so honestly.
+4. Optional: set `RESEND_API_KEY` and `NOTIFY_FROM_EMAIL` for the new-order
+   email. Without them a new order still reaches your phone, through the
+   notifications from Phase 11.

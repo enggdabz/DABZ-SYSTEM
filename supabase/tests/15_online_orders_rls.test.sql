@@ -435,6 +435,58 @@ begin
     raise notice 'PASS: a delivery needs an address';
   end;
 
+  -- Anything the caller sends that the product did not ask about is dropped,
+  -- and a size the shop does not make is not a size.
+  declare
+    v_order jsonb;
+    v_item record;
+  begin
+    v_order := public.create_online_order(
+      'Extra Keys', '09171234567', null, 'pickup', null,
+      ((now() at time zone 'Asia/Manila')::date + 20), null,
+      jsonb_build_array(jsonb_build_object(
+        'product_id', 'aaaa0002-0000-0000-0000-000000000002',
+        'variant_label', 'A4 print',
+        'options', jsonb_build_object('Sneaky', 'yes'),
+        'sizes', jsonb_build_object('M', 2, '4XL', 5, 'L', 'x')
+      ))
+    );
+
+    select * into v_item from public.online_order_items
+    where order_id = (v_order ->> 'id')::uuid;
+
+    if v_item.options <> '{}'::jsonb then
+      raise exception 'FAIL: an option the product never asked about was stored';
+    end if;
+    raise notice 'PASS: an option the product never asked about is dropped, not stored';
+
+    if v_item.qty <> 2 or v_item.sizes <> jsonb_build_object('M', 2) then
+      raise exception 'FAIL: the size tally kept a size the shop does not make (qty %, sizes %)',
+        v_item.qty, v_item.sizes;
+    end if;
+    raise notice 'PASS: a size the shop does not make is not counted and not stored';
+  end;
+
+  begin
+    v_ignored := public.create_online_order(
+      'Bad Size', '09171234567', null, 'pickup', null,
+      ((now() at time zone 'Asia/Manila')::date + 20), null,
+      jsonb_build_array(jsonb_build_object(
+        'product_id', 'aaaa0001-0000-0000-0000-000000000001',
+        'variant_label', 'Standard',
+        'options', jsonb_build_object('Collar', 'Round'),
+        'roster', (
+          select jsonb_agg(jsonb_build_object('player_name', 'p' || g, 'size', '4XL'))
+          from generate_series(1, 6) g
+        )
+      ))
+    );
+    raise exception 'FAIL: a roster asked for a size the shop does not make';
+  exception when others then
+    if SQLERRM like 'FAIL:%' then raise; end if;
+    raise notice 'PASS: a roster size the shop does not make is refused';
+  end;
+
   begin
     v_ignored := public.create_online_order(
       'Bad Number', '12345', null, 'pickup', null,

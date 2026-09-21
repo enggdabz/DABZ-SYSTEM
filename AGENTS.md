@@ -564,3 +564,63 @@ round trip is the one thing that must be tried against a real project.
 - **The VAPID keys are generated once** (`npm run push:keys`). Regenerating
   invalidates every phone already turned on. Until both exist, Settings says
   so and offers no button, the same as every figure only the owner can supply.
+
+## Online orders rules (built in Phase 12)
+
+The module has its own specification: read `docs/spec.md`, then
+`docs/open-questions.md` for every place it was mapped onto the rules above.
+
+- **The service-role key has a FOURTH sanctioned use, and this is it.** The
+  online shop is by construction a set of writes by NOBODY - placing an order,
+  attaching a file, looking an order up - and `docs/spec.md` 6.4 asks for it in
+  as many words. It is the same shape as the enquiry form: checked, capped,
+  honeypotted, rate-limited by address, and only then written. The boundary is
+  those three things plus reading the catalogue, and there is not a fifth.
+  Everything else in the module uses `createSupabaseServerClient()`.
+- **No `online_*` order table has an insert, update or delete policy, for
+  anybody.** Every write goes through a `SECURITY DEFINER` function that checks
+  the caller itself and writes the order, its money and its history in one
+  transaction. `15_online_orders_rls.test.sql` fails if a write policy appears.
+- **`create_online_order` trusts nothing the caller sends.** It re-reads the
+  product, its category, its path, its price and its minimum out of the
+  database; derives the quantity from the roster or the size tally rather than
+  taking it; keeps only the options the product actually asks about; drops a
+  size the shop does not make; and refuses a hidden or deleted product. The
+  browser's totals are a preview, and this is the record - the same shape as
+  `complete_sale`.
+- **`online_order_totals` is `security_invoker`; `online_product_stats` is
+  deliberately NOT.** The first is per-order money and must obey the caller's
+  own policies (the Phase 10 lesson). The second is three counts per product
+  with no row behind them, and an anonymous visitor has to read it to sort the
+  catalogue by "most ordered". **Do not add a column to that view** - every
+  column on it is readable by a stranger, and a test counts them.
+- **An order's total is never stored.** It is added up from the order's own
+  items and payments every time, the same rule as a payslip, a receipt and an
+  apparel job order.
+- **A quote nobody has given is not zero.** An order that is part priced shows
+  "₱2,700 + quote" and NO BALANCE AT ALL, everywhere - the list, the order
+  page, the track page and the unpaid-balance tile. A balance built on a
+  missing figure is a bill for the wrong amount.
+- **A quantity is never typed twice.** A roster IS the pieces and a size tally
+  IS the pieces; only a product that asks for neither has a number to type.
+  Three layers derive it and none of them trusts the one above.
+- **Ready to ship has no button.** An order gets there by its last production
+  step being ticked, and only the CURRENT step can be ticked - the first one on
+  that order's path with no row against it.
+- **An order goes the short DTF way only if EVERY item is a DTF print.** One
+  sublimated jersey among ten shirts still has to be cut and sewn.
+- **A figure only the owner can know is still never invented.** The daily
+  capacity and the monthly sales target both start NULL: the calendar marks no
+  day full and Reports show no meter until somebody says. Both are on the To
+  fill in screen. The specification's sample 60 and ₱100,000 are sample data,
+  which `docs/spec.md` 0.4 says so itself.
+- **Nothing in Phase 12 writes to the ledger.** A payment on an online order is
+  recorded against the order and nowhere else, so the three sanctioned ways
+  money reaches the ledger stay three. Joining them up is a decision about the
+  books, not a detail - see `docs/open-questions.md`.
+- **Deleting a product or a design is SOFT.** A past order keeps its own
+  snapshot of the name, the category, the price and the design code, so it
+  still reads correctly a year later.
+- **A customer's upload is private.** `order-files` has no public URL and no
+  write policy; staff reach it through a link that expires in minutes, and the
+  upload is checked by its CONTENT rather than by what it is called.

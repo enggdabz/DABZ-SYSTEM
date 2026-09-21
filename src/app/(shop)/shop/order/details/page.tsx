@@ -8,7 +8,14 @@ import { manilaToday } from "@/lib/period";
 
 import { CheckoutForm } from "./CheckoutForm";
 
-export const metadata = { title: "Your details · Dabz Apparel" };
+/*
+  Not indexed: it is one person's own order, and a search result pointing at
+  it would be a page that means nothing to anybody else.
+*/
+export const metadata = {
+  title: "Your details · Dabz Apparel",
+  robots: { index: false, follow: false },
+};
 
 export default async function CheckoutPage() {
   await connection();

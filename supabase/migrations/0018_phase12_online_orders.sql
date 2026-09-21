@@ -903,6 +903,10 @@ declare
   v_sizes jsonb;
   v_option record;
   v_chosen text;
+  -- Built up from the product's OWN options, never taken wholesale.
+  v_options jsonb;
+  v_sizes_clean jsonb;
+  v_size text;
   -- Three scalars rather than one record: a record cannot be set back to
   -- nothing between loop passes, and most items carry no design at all.
   v_design_id uuid;
@@ -1019,7 +1023,24 @@ begin
     end if;
 
     v_roster := coalesce(v_item -> 'roster', '[]'::jsonb);
-    v_sizes := coalesce(v_item -> 'sizes', '{}'::jsonb);
+    if jsonb_typeof(v_roster) <> 'array' then v_roster := '[]'::jsonb; end if;
+
+    /*
+      The size tally, rebuilt from the SEVEN SIZES THE SHOP SELLS rather than
+      taken as sent. A "4XL: 5" that came from a browser would otherwise be
+      counted into the quantity and printed on the job order, and there is no
+      4XL to cut.
+    */
+    v_sizes_clean := '{}'::jsonb;
+    for v_size, v_chosen in
+      select key, value from jsonb_each_text(coalesce(v_item -> 'sizes', '{}'::jsonb))
+    loop
+      if v_size = any (array['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'])
+         and v_chosen ~ '^[0-9]+$'
+         and v_chosen::integer > 0 then
+        v_sizes_clean := v_sizes_clean || jsonb_build_object(v_size, v_chosen::integer);
+      end if;
+    end loop;
 
     -- The quantity is DERIVED, never taken. A roster is the quantity; a size
     -- tally is the quantity; only a product with neither has a typed one.
@@ -1028,10 +1049,16 @@ begin
       v_sizes := '{}'::jsonb;
     elsif v_product.uses_sizes then
       select coalesce(sum(value::integer), 0) into v_qty
-      from jsonb_each_text(v_sizes)
-      where value ~ '^[0-9]+$';
+      from jsonb_each_text(v_sizes_clean);
+      v_sizes := v_sizes_clean;
     else
-      v_qty := coalesce((v_item ->> 'qty')::integer, 0);
+      -- A quantity that is not a number at all is nothing, not an error with
+      -- a cast in it that nobody at a counter could read.
+      v_qty := case
+        when coalesce(v_item ->> 'qty', '') ~ '^[0-9]+$'
+          then (v_item ->> 'qty')::integer
+        else 0
+      end;
       v_sizes := '{}'::jsonb;
     end if;
 
@@ -1047,6 +1074,7 @@ begin
     -- Every option the product asks must be answered, and answered with one
     -- of its own choices. A product whose options changed since the cart was
     -- filled is refused rather than stored with a made-up answer.
+    v_options := '{}'::jsonb;
     for v_option in
       select name, choices from public.online_product_options
       where product_id = v_product.id order by sort_order, name
@@ -1056,6 +1084,9 @@ begin
         raise exception 'The choices for % have changed. Please open it again and re-pick.',
           v_product.name;
       end if;
+      -- Only the product's own questions are kept. Anything else the caller
+      -- put in that object is dropped rather than stored and later printed.
+      v_options := v_options || jsonb_build_object(v_option.name, v_chosen);
     end loop;
 
     v_variant := nullif(btrim(coalesce(v_item ->> 'variant_label', '')), '');
@@ -1108,7 +1139,7 @@ begin
       coalesce(v_product.category_name, 'Uncategorised'),
       coalesce(v_product.production_path, 'full'),
       v_product.pricing_mode, v_variant, v_price,
-      coalesce(v_item -> 'options', '{}'::jsonb), v_qty, v_sizes,
+      v_options, v_qty, v_sizes,
       v_design_id, v_design_code, v_design_name,
       nullif(btrim(coalesce(v_item ->> 'team_colors', '')), ''),
       nullif(btrim(coalesce(v_item ->> 'notes', '')), ''),
@@ -1121,14 +1152,27 @@ begin
       for v_entry in select * from jsonb_array_elements(v_roster)
       loop
         v_index := v_index + 1;
+        v_size := upper(btrim(coalesce(v_entry ->> 'size', '')));
+        if not (v_size = any (array['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL'])) then
+          raise exception 'Every player needs a size we make. Row % of % has "%".',
+            v_index, v_product.name, coalesce(v_entry ->> 'size', '');
+        end if;
+
         insert into public.online_order_roster
           (order_item_id, position, player_name, player_number, size)
         values (
           v_item_id,
           v_index,
           nullif(left(upper(btrim(coalesce(v_entry ->> 'player_name', ''))), 20), ''),
-          nullif(btrim(coalesce(v_entry ->> 'player_number', '')), ''),
-          coalesce(v_entry ->> 'size', '')
+          -- A number that is not one to three digits is dropped rather than
+          -- refused: the team can still be cut, and nobody is turned away
+          -- over a typo in a jersey number.
+          case
+            when btrim(coalesce(v_entry ->> 'player_number', '')) ~ '^[0-9]{1,3}$'
+              then btrim(v_entry ->> 'player_number')
+            else null
+          end,
+          v_size
         );
       end loop;
     end if;

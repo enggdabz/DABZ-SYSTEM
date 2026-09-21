@@ -62,7 +62,68 @@ calls — but then the ledger and these orders can no longer be added together.
 Spec 0.10 asks for `₱12,300`, no decimals unless non-zero. The system's
 `formatPesos` always prints two decimals, and every screen in eleven phases uses
 it. One module printing `₱12,300` beside ten printing `₱12,300.00` reads as a
-bug, so this module uses the house format.
+bug, so this module uses the house format. Dates already match what the spec
+asks for (`Sep 21, 2026`), so `formatCivilDate` is used unchanged.
+
+### Table names are prefixed `online_`
+
+Spec 6.2 names the tables `products`, `orders`, `payments`, `customers`,
+`categories`. Three of those already exist here and mean other things: the
+Counter's catalogue, the shop's customers, and nothing at all - `payments` is
+`ledger_entries` plus three per-division payment tables. So every table this
+module adds is prefixed, and the later finance modules can still read them.
+
+### Statuses are `text` with a `check`, not `enum`
+
+Spec 6.1 asks for seven PostgreSQL enums. Every status column in eleven phases
+here is `text` with a `check` constraint, and one enum would be the odd one
+out - a new value would need a migration where the others need none, and the
+`check` says what is allowed in the same place a reader is already looking.
+
+### One extra table, and one extra setting, the spec does not name
+
+`online_rate_events`, which spec 0.3 says to write down here. It is the
+server's own notebook: an address and a storage path, so the hourly upload
+limit and the ten-minute track limit can be counted per address the way the
+enquiry form counts messages, and so the purge can find a file in `tmp/` that
+no order claimed. It has no policy of any kind, for anybody.
+
+And `online_shop_enabled`, matching the Phase 9 `public_page_enabled` switch:
+a way to take the shop down without removing anything. It ships as true, and
+it is not something anybody fills in.
+
+### Products and designs are Owner/Admin, not staff
+
+Spec 4 lets staff manage products and designs. Here they do not: the counter's
+products, the apparel price list and the repair services are all set by the
+owner and read by everybody, and `AGENTS.md` makes that a rule. A staff member
+who could reprice the shop is a different decision from one who can write an
+order, and it is the owner's to make. One line in the migration's policies
+changes it back.
+
+### The module's screens have a tab bar, AND two rail links
+
+Spec 9 gives the admin its own tab bar. This system's navigation is the
+sidebar, which already carries twenty-three links. So the module has both: two
+links in the rail - the orders and the production board, the two somebody
+opens without being sent there - and the spec's tab bar across the top of
+every one of its screens for the other four.
+
+### The palette, and two places it bends
+
+The customer-facing shop obeys spec 5.1: a browser check over every page at
+390px in both themes found only red, gold and neutrals. Two honest exceptions:
+
+- **The system's greys carry a 1-2% cool tint** (`#18181b`, `#9a9aa0`), set in
+  Phase 0 and shared with every screen in the app. The spec asks for greys with
+  no tint at all. The difference is 3 parts in 255, nobody can see it, and
+  restyling eleven built phases to close it would be this module changing
+  something that is not its own.
+- **The admin screens keep the system's warning amber and success green.**
+  Those are `--attention` and `--success`, used by every screen since Phase 1,
+  and the house rule is that a warning carries an icon and a word as well as a
+  colour. Six screens in a different palette from the other twenty-three would
+  read as a different application.
 
 ### Routes: the shop lives under `/shop`
 

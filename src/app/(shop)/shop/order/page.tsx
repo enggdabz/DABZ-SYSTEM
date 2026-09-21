@@ -5,7 +5,14 @@ import { designImageUrl, productImageUrl } from "@/lib/online/storage";
 
 import { OrderLines } from "./OrderLines";
 
-export const metadata = { title: "Your order · Dabz Apparel" };
+/*
+  Not indexed: it is one person's own order, and a search result pointing at
+  it would be a page that means nothing to anybody else.
+*/
+export const metadata = {
+  title: "Your order · Dabz Apparel",
+  robots: { index: false, follow: false },
+};
 
 export default async function OrderPage() {
   await connection();
