@@ -63,6 +63,15 @@ receiving code.
   at it. They were the checks most worth automating: they are what stops a
   policy change quietly opening the books, and by hand they only ran when
   somebody remembered.
+- **A new table or view must be added to `src/lib/schema-health.ts`.** That
+  list is what the System check screen asks the LIVE database for, and
+  `npm run check:schema` cannot cover it: that script builds a throwaway
+  database from the migration files, so it only ever proves the code agrees
+  with the migrations - never that those migrations reached the real database.
+  That gap is what made a missing `0015` show up as PHP 0.00 on the Sales
+  screen instead of as "the database is behind". `schema-health.test.ts` reads
+  `supabase/migrations` and fails if a relation is created there and forgotten
+  here, so this cannot be skipped quietly.
 - **`supabase test db` is NOT our test command.** It expects pgTAP tests in
   `supabase/tests/`, and ours are plain psql scripts with the same `.test.sql`
   suffix, so it fails confusingly. Use `npm run test:rls`.

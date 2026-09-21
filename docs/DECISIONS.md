@@ -717,3 +717,46 @@ to ask:
   warning. Either way `src/lib/data/checklist.test.ts` now holds the public
   page and the checklist together, so the next field added to one cannot be
   forgotten in the other.
+- **A failed read prints no peso figure at all.** The owner's production
+  database was missing `0015`, so `public.collections` did not exist and every
+  read of the feed failed. The screen printed **₱0.00** for the day and for
+  each of the three doors in 4xl type, with the explanation in 12px grey
+  underneath - and the owner spent a day believing the shop's takings had been
+  wiped (21 Sep 2026). Two things were wrong and only one of them was the
+  database. `#19` had already made a failed read carry `failed: true` and a ⚠,
+  which was necessary and not sufficient: a big number beats a small warning,
+  every time, so the warning lost. `figuresAreKnown()` now decides whether
+  there is a NUMBER at all, separately from whether there is something to say.
+  On a failed read the day reads "⚠ Could not be read" where the total goes and
+  "Not known" per door, and the warning moves up to `text-sm`. A TRUNCATED read
+  still shows its figures, because those are a floor - real money, just not all
+  of it - and collapsing the two cases would hide money that was genuinely
+  taken. The message also now says **"your takings are safe - nothing has been
+  lost"**, which is true (a read touches no row) and is the sentence that was
+  missing. To change it, `figuresAreKnown` in `src/lib/collections.ts`; the
+  Sales screen and the Overview card both read it.
+- **The system checks its own database, and says so before it shows a figure.**
+  The missing `0015` cost a day because nothing in the system could say "this
+  database is behind" - the only symptom was an empty till, and an empty till
+  beside money reads as lost money. `npm run check:schema` could never have
+  caught it: it builds a throwaway database from the migration files, so it
+  proves the code agrees with the migrations and can know nothing about whether
+  those migrations were ever applied. So there is now a runtime half:
+  `src/lib/data/schema-health.ts` asks the live database, with one HEAD request
+  per relation, which of them are actually there. Three choices inside it are
+  the ones worth keeping. **A probe answers present, missing or UNKNOWN** - a
+  timeout or a paused project is not evidence about the schema, and reporting
+  it as missing would be this module committing the exact sin it was written to
+  prevent. **The advice always names `0013`**, because the app cannot see which
+  migrations are recorded and must assume the dangerous case is possible: a
+  screen that says "run `npm run db:push`" to somebody who has never pushed is
+  handing them an instruction that deletes every bill, loan and product.
+  **Home probes one relation per migration, not all forty-four** - migrations
+  are applied whole and in order, so that answers the question actually being
+  asked at a quarter of the cost, and the full sweep is one tap away on
+  **System check**. The banner is silent when everything is present, and
+  silent when the check itself could not run: a warning that appears when
+  nothing is wrong is the same mistake as a notification on a quiet morning.
+  To change what is checked, `REQUIRED_RELATIONS` in
+  `src/lib/schema-health.ts`; a test reads the migrations and fails if a new
+  table is forgotten there.

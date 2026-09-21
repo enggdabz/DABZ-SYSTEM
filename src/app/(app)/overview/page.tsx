@@ -16,11 +16,13 @@ import { monthTotals } from "@/lib/bills";
 import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
+  figuresAreKnown,
   doorVisibility,
   partialReadWarning,
   totalsByDivision as collectionTotalsByDivision,
 } from "@/lib/collections";
 import { getCollectionsForDay, getHeldMoney } from "@/lib/data/collections";
+import { readSchemaSentinel } from "@/lib/data/schema-health";
 import { getStanding } from "@/lib/data/reports";
 import { DIVISION_IDS, type DivisionId } from "@/lib/divisions";
 import { getChecklist } from "@/lib/data/checklist";
@@ -93,6 +95,20 @@ export default async function HomePage({
         </Notice>
       ) : null}
 
+      {/*
+        Before anything with a peso sign on it.
+
+        A database missing a migration shows up on the screens below as empty
+        figures, and an empty figure beside money reads as lost money - that is
+        exactly what happened on 21 September 2026 and it cost a day. So this
+        goes ABOVE the takings, not beside them: it is the sentence that makes
+        every zero underneath it readable. Owner and Admin only, because it is
+        the only pair who can do anything about it, and one relation per
+        migration rather than all forty-four, because this is a screen people
+        open twenty times a day.
+      */}
+      {isOwnerOrAdmin(user) ? <SchemaBanner /> : null}
+
       {isOwnerOrAdmin(user) ? <OwnerOverview /> : <StaffHome user={user} />}
 
       {/*
@@ -139,6 +155,40 @@ export default async function HomePage({
         </p>
       )}
     </div>
+  );
+}
+
+/**
+ * "The database is behind", said before any figure is shown.
+ *
+ * Silent when everything is present, which is almost always - a banner that
+ * appears when nothing is wrong is the same mistake as a notification that
+ * arrives on a quiet morning, and gets swiped away just as fast. It also stays
+ * silent when the check itself could not run: that is not evidence of anything
+ * and saying so on the home screen would be noise with a warning triangle on
+ * it. The System check screen reports that case in full.
+ */
+async function SchemaBanner() {
+  const report = await readSchemaSentinel();
+  if (report.missing.length === 0) return null;
+
+  return (
+    <Notice tone="attention" title={report.headline}>
+      <p>
+        Some screens below cannot read what they need, so their figures are{" "}
+        <strong>not</strong> your shop&rsquo;s. Affected:{" "}
+        {report.missing.map((relation) => relation.breaks).join("; ")}.
+      </p>
+      <p className="mt-2">
+        <strong>Your records are safe</strong> &mdash; nothing has been lost. A
+        missing migration means the database was never told about a table, not
+        that anything was taken out of it.{" "}
+        <Link href="/system" className={`underline ${TAP_AREA}`}>
+          Open System check
+        </Link>{" "}
+        for what to do.
+      </p>
+    </Notice>
   );
 }
 
@@ -786,6 +836,9 @@ async function CollectedToday({
 
   const rows = read.rows;
   const readWarning = partialReadWarning(read);
+  // A failed read has no figures at all - see `figuresAreKnown`. This is the
+  // owner's home screen, so it is the first place a phantom PHP 0.00 lands.
+  const showFigures = figuresAreKnown(read);
   const byDivision = collectionTotalsByDivision(rows);
 
   // The same rule the Sales screen and End of day use - see doorVisibility.
@@ -798,9 +851,16 @@ async function CollectedToday({
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <Card title="Collected today">
-        <p className="text-3xl font-semibold tracking-tight">
-          {formatPesos(collectedTotal(rows))}
-        </p>
+        {showFigures ? (
+          <p className="text-3xl font-semibold tracking-tight">
+            {formatPesos(collectedTotal(rows))}
+          </p>
+        ) : (
+          <p className="flex items-baseline gap-2 text-3xl font-semibold tracking-tight text-attention">
+            <span aria-hidden="true">{"\u26A0"}</span>
+            <span>Could not be read</span>
+          </p>
+        )}
 
         <dl className="mt-4 space-y-2 text-sm">
           {DIVISION_IDS.filter(canSee).map((id) => (
@@ -812,7 +872,11 @@ async function CollectedToday({
                   : ""}
               </dt>
               <dd className="font-medium">
-                {formatPesos(byDivision[id])}{" "}
+                {showFigures ? (
+                  formatPesos(byDivision[id])
+                ) : (
+                  <span className="text-attention">Not known</span>
+                )}{" "}
                 <Link
                   href={`/sales?division=${id}`}
                   className={`ml-1 text-xs underline ${TAP_AREA}`}
@@ -825,7 +889,11 @@ async function CollectedToday({
         </dl>
 
         {readWarning ? (
-          <p className="mt-4 flex items-start gap-1.5 text-xs text-attention">
+          <p
+            className={`mt-4 flex items-start gap-1.5 text-attention ${
+              showFigures ? "text-xs" : "text-sm"
+            }`}
+          >
             <span aria-hidden="true">{"⚠"}</span>
             <span>{readWarning}</span>
           </p>

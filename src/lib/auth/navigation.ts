@@ -63,6 +63,7 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/activity", label: "Activity", ownerOrAdminOnly: true, group: "Manage", phase: 1 },
   { href: "/settings", label: "Settings", ownerOrAdminOnly: true, group: "Manage", phase: 1 },
   { href: "/checklist", label: "To fill in", ownerOrAdminOnly: true, group: "Manage", phase: 4 },
+  { href: "/system", label: "System check", ownerOrAdminOnly: true, group: "Manage", phase: 1 },
 ];
 
 export function visibleSections(actor: Actor | null): NavSection[] {

@@ -20,8 +20,8 @@ otherwise send you down a blind alley.
 ```bash
 git pull
 npm install
-npm run db:push     # applies all 17 migrations, in order
-npm test            # expect: 645 passed
+npm run db:push     # applies every migration, in order
+npm test            # expect: all passed (656 of them, on 21 Sep 2026)
 npm run dev
 ```
 
@@ -33,11 +33,14 @@ written before these were true:
   editor. That was right at the time; it is not now. `db:push` applies every
   migration in order and records each one, so none can run twice.
 - **Ignore the per-phase test counts in PHASES.md.** Each says what was true on
-  the day it was written — 234, 270, 339, and so on. There is one number now
-  and it is **645**. A phase that says "expect: 270 passed" is not broken.
+  the day it was written — 234, 270, 339, 645, and so on. The count goes up
+  every time a test is added, so a phase that says "expect: 270 passed" is not
+  broken, and neither is a total that has moved past the one written here.
 
-If `npm test` does not say 645, stop and tell me before going further. Nothing
-below is worth checking against a broken build.
+**What matters is that nothing FAILS**, not that the total matches. If `npm
+test` reports a failure, stop and tell me before going further — nothing below
+is worth checking against a broken build. A higher total than the one above
+just means work has landed since this page was written.
 
 ---
 
@@ -282,8 +285,8 @@ things need your eyes, because no test can see either:
 - The **breakdown table** on End of day. At 390px it should be a stack of cards,
   one per division; from tablet width up, a real table.
 
-Everything else in Phase 10 is covered by the 645 unit tests and the 319
-security checks.
+Everything else in Phase 10 is covered by the unit tests and the security
+checks — 656 and 333 of them as this is written.
 
 **Phase 11 has a bigger gap, and it is named in its own section of
 [PHASES.md](PHASES.md):** whether a notification actually lands on your phone
