@@ -11,14 +11,19 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 1 | Foundation: design system, top nav, login, roles, permissions, audit log, settings | ✅ Done |
 | 2 | Bills, loans, ledger, Overview (the money side) | ✅ Done |
 | 3 | Staff: profiles, time clock, weekly payroll, cash advances, payslips | ✅ Done |
-| 4 | Customers + Dabz Printshoppe POS | ✅ **Done — waiting on owner to confirm** |
-| 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — waiting on owner to confirm** |
-| 6 | Dabz Apparel job orders | ✅ **Done — waiting on owner to confirm** |
-| 7 | DabzTech Solutions job tickets | ✅ **Done — waiting on owner to confirm** |
-| 8 | Reports | ✅ **Done — waiting on owner to confirm** |
-| 9 | The public page and customer messages | ✅ **Done — waiting on owner to confirm** |
-| 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — waiting on owner to confirm** |
+| 4 | Customers + Dabz Printshoppe POS | ✅ **Done — confirmed 21 Sep 2026** |
+| 5 | Expenses pop-up, stocks and supplier payables | ✅ **Done — confirmed 21 Sep 2026** |
+| 6 | Dabz Apparel job orders | ✅ **Done — confirmed 21 Sep 2026** |
+| 7 | DabzTech Solutions job tickets | ✅ **Done — confirmed 21 Sep 2026** |
+| 8 | Reports | ✅ **Done — confirmed 21 Sep 2026** |
+| 9 | The public page and customer messages | ✅ **Done — confirmed 21 Sep 2026** |
+| 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — confirmed 21 Sep 2026** |
 | — | Later: Messenger API, Meta Ads tracking, chatbot, push notifications | Not in first build |
+
+**"Confirmed" means the owner has used the phase and says it works.** It is not
+a claim that every hand-check under that phase has been done — where a phase
+ends with something still to check by hand, that note stands, and Phase 10's
+four-width browser check is one.
 
 ---
 
