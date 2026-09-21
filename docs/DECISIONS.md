@@ -661,3 +661,16 @@ to ask:
   one boolean. Same shape as `unlock_payroll_week`: the table stays shut and
   there is one named way past it. If a person ever needs to change their own
   full name, add a second narrow function rather than opening the table.
+- **The optional public details are listed, but never as a warning.** The owner
+  asked for the email address and the map link to appear on the To fill in
+  screen (21 Sep 2026); until then only the five details the page treats as
+  expected were listed, and the screen could read "Nothing left to fill in"
+  beside a public page giving a customer no way to email the shop and no way to
+  find it. Both are now listed as their own item with `important: false`,
+  rather than joining the five that carry the warning: those five are what a
+  shop ought to have, these two are extras, and a warning that treats them
+  alike is one that gets ignored. To change it, move the two fields into
+  `missingPublicDetails` in `src/lib/data/checklist.ts` and they inherit the
+  warning. Either way `src/lib/data/checklist.test.ts` now holds the public
+  page and the checklist together, so the next field added to one cannot be
+  forgotten in the other.
