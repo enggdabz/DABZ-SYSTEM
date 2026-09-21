@@ -94,6 +94,15 @@ npm run typecheck && npm run lint && npm run build
 `test:rls` and `check:schema` need a local PostgreSQL. Point them at one with
 `PGHOST`/`PGPORT`/`PGUSER`.
 
+A sixth thing was checked in a browser and is worth knowing about, because it
+could not have been caught any other way: **the proxy has to let a customer
+in.** It only redirects once Supabase is configured, so a page missing from
+`src/lib/auth/public-paths.ts` works perfectly on a developer's machine and
+sends every customer to a staff login screen on the day it goes live. That
+file now has its own tests, and the behaviour was confirmed against a stand-in
+Supabase answering 401: every `/shop` page 200, `/overview` and
+`/online-orders` redirected to the login screen.
+
 **What was checked in a browser**, because no unit test can see a pixel:
 every customer-facing page at 390, 768, 1024 and 1440 px in both themes — no
 sideways scroll anywhere — and every computed colour on those pages against

@@ -150,8 +150,9 @@ so nothing should be deployed until it passes.
 ```
 src/
   proxy.ts            Runs before every request: refreshes the session,
-                      sends signed-out visitors to the login screen -
-                      except on "/", which is the shop's public page
+                      sends signed-out visitors to the login screen - except
+                      on the pages in lib/auth/public-paths.ts, which are the
+                      two shops and the crons
   app/
     layout.tsx        The frame every screen sits in (font, theme)
     globals.css       THE DESIGN SYSTEM - all Dabz colours and sizes
