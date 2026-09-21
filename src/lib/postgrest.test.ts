@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { isFunctionMissingFromApi } from "./postgrest";
+import { isColumnMissingFromApi, isFunctionMissingFromApi } from "./postgrest";
 
 describe("isFunctionMissingFromApi", () => {
   it("recognises the code PostgREST uses for a function it cannot find", () => {
@@ -53,5 +53,87 @@ describe("isFunctionMissingFromApi", () => {
   it("survives an error with no code and no message", () => {
     expect(isFunctionMissingFromApi({})).toBe(false);
     expect(isFunctionMissingFromApi({ code: null, message: null })).toBe(false);
+  });
+});
+
+describe("isColumnMissingFromApi", () => {
+  it("recognises the code PostgREST uses for a column it cannot find", () => {
+    expect(
+      isColumnMissingFromApi({
+        code: "PGRST204",
+        message:
+          "Could not find the 'staff_stay_signed_in' column of 'app_settings' in the schema cache",
+      }),
+    ).toBe(true);
+  });
+
+  it("recognises the phrase when the code is missing", () => {
+    expect(
+      isColumnMissingFromApi({
+        message: "Could not find the 'shop_phone' column of 'app_settings'",
+      }),
+    ).toBe(true);
+  });
+
+  /*
+    PostgREST normally catches this against its own cache and answers PGRST204.
+    When the statement reaches PostgreSQL instead, this is what comes back -
+    the wording is different enough that the phrase above would miss it.
+  */
+  it("recognises PostgreSQL's own undefined_column code", () => {
+    expect(
+      isColumnMissingFromApi({
+        code: "42703",
+        message:
+          'column "staff_stay_signed_in" of relation "app_settings" does not exist',
+      }),
+    ).toBe(true);
+  });
+
+  /*
+    The same trap `isFunctionMissingFromApi` fell into once. A column named in
+    some other kind of refusal has a different fix, and telling the owner to
+    push migrations that are already applied sends them the wrong way.
+  */
+  it("does not treat a constraint or permission failure as a missing column", () => {
+    expect(
+      isColumnMissingFromApi({
+        code: "23514",
+        message:
+          'new row for relation "app_settings" violates check constraint "app_settings_auto_logout_minutes_check"',
+      }),
+    ).toBe(false);
+
+    expect(
+      isColumnMissingFromApi({
+        code: "42501",
+        message: "permission denied for table app_settings",
+      }),
+    ).toBe(false);
+
+    // A write refused by Row Level Security is the other one that must not be
+    // reported as a missing migration: the fix is the person's role.
+    expect(
+      isColumnMissingFromApi({
+        code: "42501",
+        message:
+          'new row violates row-level security policy for table "app_settings"',
+      }),
+    ).toBe(false);
+  });
+
+  it("is not confused by the MISSING FUNCTION message, which is the other fix", () => {
+    expect(
+      isColumnMissingFromApi({
+        code: "PGRST202",
+        message:
+          "Could not find the function public.finish_password_change without parameters in the schema cache",
+      }),
+    ).toBe(false);
+  });
+
+  it("survives an error with no code and no message", () => {
+    expect(isColumnMissingFromApi({})).toBe(false);
+    expect(isColumnMissingFromApi({ code: null, message: null })).toBe(false);
   });
 });

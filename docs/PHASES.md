@@ -1452,6 +1452,14 @@ npm run db:push   # applies 0014_staff_stay_signed_in.sql
 `npm run db:push` matters here — the switch is a column, and until it exists
 every account keeps the old timer.
 
+It matters in one more way worth knowing, because the app deploys the moment a
+branch merges while `db:push` is run by hand afterwards. The Settings form
+writes every column at once, so in between the two, **Settings cannot save at
+all** — not just the new box, the whole screen, including a figure typed months
+ago. It now says so in those words and names the command, rather than showing
+the raw *could not find the column* message. Nothing is changed when it
+refuses.
+
 Then, in the app:
 
 1. Sign in as the **owner**. The footer still reads *Signed out automatically

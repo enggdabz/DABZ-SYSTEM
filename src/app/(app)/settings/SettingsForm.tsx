@@ -343,7 +343,11 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
         </div>
       </section>
 
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {state.error ? (
+        <Notice tone="attention" title={state.error}>
+          {state.errorDetail}
+        </Notice>
+      ) : null}
       {state.success ? <Notice tone="success" title={state.success} /> : null}
 
       <Button type="submit" disabled={pending}>
