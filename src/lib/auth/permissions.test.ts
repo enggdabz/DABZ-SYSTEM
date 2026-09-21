@@ -137,6 +137,14 @@ describe("visibleSections", () => {
     expect(visibleSections(admin).map((s) => s.href)).toContain("/enquiries");
   });
 
+  it("puts the production report behind the apparel permission", () => {
+    // It is the same job orders read a different way, so it follows the same
+    // checkbox - not add_sales, which Juan has.
+    expect(visibleSections(staff).map((s) => s.href)).not.toContain("/production");
+    expect(visibleSections(owner).map((s) => s.href)).toContain("/production");
+    expect(visibleSections(admin).map((s) => s.href)).toContain("/production");
+  });
+
   it("shows a deactivated account and a visitor nothing at all", () => {
     expect(visibleSections(deactivated)).toEqual([]);
     expect(visibleSections(null)).toEqual([]);

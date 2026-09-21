@@ -13,7 +13,9 @@ import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getApparelOrders, toCalendarOrder } from "@/lib/data/apparel";
 import { getCustomers } from "@/lib/data/pos";
+import { getProductionSteps, productionFor } from "@/lib/data/production";
 import { DIVISIONS } from "@/lib/divisions";
+import { productionSummaryLine, summariseProduction } from "@/lib/production";
 import { formatPesos, sumCentavos } from "@/lib/money";
 import { civilDateToISO, formatCivilDate, manilaToday, parseISODate } from "@/lib/period";
 
@@ -45,6 +47,39 @@ function CalendarGlyph() {
     >
       <rect x="2" y="3.5" width="14" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M2 7.5h14M6 2v3M12 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/**
+ * A ticked list, drawn.
+ *
+ * `aria-hidden` for the same reason as the calendar's: the heading beside it
+ * already says "Production report".
+ */
+function BenchGlyph() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0 text-accent"
+    >
+      <path
+        d="M2.5 5.25l1.5 1.5 2.5-2.75M2.5 12.25l1.5 1.5 2.5-2.75"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.5 5h6M9.5 12.5h6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
     </svg>
   );
 }
@@ -91,12 +126,20 @@ export default async function ApparelPage() {
   const canSetPrices = isOwnerOrAdmin(user);
 
   const today = manilaToday();
-  const [orders, customers] = await Promise.all([
+  const [orders, customers, marks] = await Promise.all([
     getApparelOrders(),
     getCustomers(),
+    getProductionSteps(),
   ]);
 
   const open = orders.filter((entry) => isOpenOrder(entry.order.status));
+
+  /*
+    Production across the open orders only. A released project's benches are
+    history, and counting them in "3 not started" would have the shop looking
+    for work that has already gone out of the door.
+  */
+  const onTheBench = open.map((detail) => productionFor(detail, marks.steps));
   const closed = orders.filter((entry) => !isOpenOrder(entry.order.status));
 
   // A released order with money still owed stays in sight: the jerseys have
@@ -153,22 +196,50 @@ export default async function ApparelPage() {
         bench today" is worth crossing the screen for in a way that the word
         "Calendar" is not.
       */}
-      <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-        <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
-            <CalendarGlyph />
-            Project calendar
-          </h2>
-          <p className="mt-1 text-sm text-muted">{calendarLine(summary)}</p>
-        </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <CalendarGlyph />
+              Project calendar
+            </h2>
+            <p className="mt-1 text-sm text-muted">{calendarLine(summary)}</p>
+          </div>
 
-        <Link
-          href="/apparel/calendar"
-          className={`${buttonClasses("feature")} w-full sm:w-auto`}
-        >
-          Open the project calendar
-        </Link>
-      </Card>
+          <Link
+            href="/apparel/calendar"
+            className={`${buttonClasses("feature")} w-full sm:w-auto`}
+          >
+            Open the project calendar
+          </Link>
+        </Card>
+
+        {/*
+          The same projects, by bench rather than by day. Beside the calendar
+          rather than under it: the morning question is "what is due?", and the
+          next one is "how far has it got?".
+        */}
+        <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="min-w-0">
+            <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+              <BenchGlyph />
+              Production report
+            </h2>
+            <p className="mt-1 text-sm text-muted">
+              {marks.failed
+                ? "The benches could not be read, so nothing here says where the work has got to."
+                : productionSummaryLine(summariseProduction(onTheBench))}
+            </p>
+          </div>
+
+          <Link
+            href="/production"
+            className={`${buttonClasses("feature")} w-full sm:w-auto`}
+          >
+            Open the production report
+          </Link>
+        </Card>
+      </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card title="Orders in progress">
