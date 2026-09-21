@@ -121,6 +121,14 @@ begin
   end if;
   raise notice 'PASS: staff cannot change settings';
 
+  -- Including the switch that decides whether THEY get signed out (0014).
+  -- It is the owner's call, not the counter's.
+  update public.app_settings set staff_stay_signed_in = false where id = 1;
+  if (select staff_stay_signed_in from public.app_settings where id = 1) <> true then
+    raise exception 'FAIL: staff changed their own sign-out rule';
+  end if;
+  raise notice 'PASS: staff cannot change their own sign-out rule';
+
   -- Permission checkboxes are respected.
   if not public.has_permission('add_sales') then
     raise exception 'FAIL: Juan has add_sales but was refused';

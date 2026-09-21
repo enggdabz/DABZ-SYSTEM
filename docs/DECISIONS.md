@@ -295,7 +295,18 @@ to ask:
 - **26 working days** per month for the daily target (spec 12.3).
 - Warranty period **30 days** (spec 9.3).
 - Unclaimed units flagged at **30 days** (spec 9.4).
-- Auto-logout after **15 minutes** idle (spec 4.1).
+- Auto-logout after **15 minutes** idle (spec 4.1) — **for owner and admin
+  accounts. Staff accounts stay signed in until they sign out** (owner's
+  request, 21 September 2026: the counter staff kept being thrown back to the
+  login screen mid-day). I kept the timer on owner and admin accounts because
+  those can open payroll, the ledger and the bills, and the counter computer is
+  shared. To change it: Settings → *Keep staff accounts signed in until they
+  sign out* (untick to put staff back on the timer); the minutes box beside it
+  still sets the timer, up to 480. Stored in `app_settings.staff_stay_signed_in`
+  (migration `0014`); the rule itself is `idleSignOutMinutes` in
+  `src/lib/settings.ts`. Nothing server-side ends a session early — Supabase's
+  `[auth.sessions]` timebox and inactivity timeout are both left off — so
+  "until they sign out" really does mean that, on that browser.
 - New staff get **Add sales (POS)** permission by default, nothing else
   (spec 4.3).
 - Passwords need **at least 8 characters, with a letter and a number**. Supabase's
