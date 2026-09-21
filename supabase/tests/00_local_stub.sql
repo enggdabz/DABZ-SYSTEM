@@ -34,7 +34,17 @@ begin
   if not exists (select 1 from pg_roles where rolname = 'anon') then
     create role anon nologin;
   end if;
+  /*
+    The role the SERVER uses for the handful of jobs that happen before
+    anybody is signed in - signing in itself, the public page's price lists,
+    the digest cron, and the online shop's order creation. On Supabase it
+    bypasses RLS entirely; here it only needs to exist, so that a migration
+    granting a function to it does not fail.
+  */
+  if not exists (select 1 from pg_roles where rolname = 'service_role') then
+    create role service_role nologin bypassrls;
+  end if;
 end;
 $$;
 
-grant usage on schema public, auth to authenticated, anon;
+grant usage on schema public, auth to authenticated, anon, service_role;

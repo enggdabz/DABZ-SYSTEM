@@ -411,6 +411,38 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     });
   }
 
+  /*
+    The online shop's two figures (Phase 12). Both are the owner's to know and
+    both start empty, exactly like a bill with no due day: the calendar shows
+    no FULL day and Reports show no target meter until somebody says what they
+    are, rather than showing a made-up sixty and a made-up hundred thousand.
+
+    NOT important: the shop takes orders perfectly well without either, and
+    both screens say plainly that the figure has not been set. An item that
+    overstates itself is one that gets ignored.
+  */
+  const missingOnlineFigures = [
+    settings.onlineDailyCapacityPcs === null
+      ? "Pieces you can finish for one date"
+      : null,
+    settings.onlineMonthlyTargetCentavos === null ? "Monthly sales target" : null,
+    settings.onlineNotifyEmail === null ? "Email new orders to" : null,
+  ].filter((label): label is string => label !== null);
+
+  if (missingOnlineFigures.length > 0) {
+    items.push({
+      id: "online-shop-figures",
+      title: `${missingOnlineFigures.length} figure${
+        missingOnlineFigures.length === 1 ? "" : "s"
+      } the online shop is waiting for`,
+      why: "Nothing is guessed here. Without the daily capacity the order calendar never marks a date as full, so it cannot warn you about a day you have overbooked; without the monthly target Reports show the takings and no meter beside them. New orders still reach your phone whether or not the email address is set.",
+      names: missingOnlineFigures,
+      href: "/settings",
+      linkLabel: "Open Settings",
+      important: false,
+    });
+  }
+
   if (activeStaff.length === 0) {
     items.push({
       id: "no-staff",

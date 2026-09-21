@@ -62,6 +62,23 @@ export interface AppSettings {
   publicOpeningHours: string | null;
   /** False takes the public page down without removing anything. */
   publicPageEnabled: boolean;
+
+  /**
+   * The online shop (Phase 12, docs/spec.md).
+   *
+   * The two figures here are the owner's and start NULL. A capacity of sixty
+   * would turn a customer away on a day the shop was free, and a target of
+   * zero would read as reached before the first order - so the calendar shows
+   * no FULL marker and Reports show no meter until somebody says.
+   */
+  onlineNotifyEmail: string | null;
+  onlineDailyCapacityPcs: number | null;
+  onlineMonthlyTargetCentavos: Centavos | null;
+  /** The earliest date a customer may ask for, counted from today in Manila. */
+  onlineMinDaysAhead: number;
+  onlineShowStepsToCustomers: boolean;
+  /** False takes the online shop down without removing anything. */
+  onlineShopEnabled: boolean;
 }
 
 /**
@@ -112,6 +129,14 @@ export const DEFAULT_SETTINGS: AppSettings = {
   mapUrl: null,
   publicOpeningHours: null,
   publicPageEnabled: true,
+
+  // The online shop. Both figures stay empty until the owner types one.
+  onlineNotifyEmail: null,
+  onlineDailyCapacityPcs: null,
+  onlineMonthlyTargetCentavos: null,
+  onlineMinDaysAhead: 2, // docs/spec.md 6.2's own default
+  onlineShowStepsToCustomers: true, // D10, answered yes
+  onlineShopEnabled: true,
 };
 
 /** Shape of the settings row as it comes back from PostgreSQL. */
@@ -137,6 +162,12 @@ export interface SettingsRow {
   map_url?: string | null;
   public_opening_hours?: string | null;
   public_page_enabled?: boolean | null;
+  online_notify_email?: string | null;
+  online_daily_capacity_pcs?: number | null;
+  online_monthly_target_centavos?: number | null;
+  online_min_days_ahead?: number | null;
+  online_show_steps_to_customers?: boolean | null;
+  online_shop_enabled?: boolean | null;
 }
 
 export function settingsFromRow(row: SettingsRow): AppSettings {
@@ -179,7 +210,23 @@ export function settingsFromRow(row: SettingsRow): AppSettings {
     // Missing means the column has not been migrated yet, which is not the
     // same as the owner switching the page off.
     publicPageEnabled: row.public_page_enabled ?? true,
+
+    onlineNotifyEmail: blankToNull(row.online_notify_email),
+    // Null and "not migrated yet" both mean "nobody has said", which is the
+    // answer these two are built around. There is nothing to distinguish.
+    onlineDailyCapacityPcs: numberOrNull(row.online_daily_capacity_pcs),
+    onlineMonthlyTargetCentavos: numberOrNull(row.online_monthly_target_centavos),
+    onlineMinDaysAhead: row.online_min_days_ahead ?? 2,
+    onlineShowStepsToCustomers: row.online_show_steps_to_customers ?? true,
+    onlineShopEnabled: row.online_shop_enabled ?? true,
   };
+}
+
+/** A figure the owner has not given stays missing, never becomes zero. */
+function numberOrNull(value: number | string | null | undefined): number | null {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 /**
@@ -233,6 +280,13 @@ export function validateSettingsForm(form: {
   mapUrl: string;
   publicOpeningHours: string;
   publicPageEnabled: boolean;
+  /** Empty means "nobody has said", which is what both of these start as. */
+  onlineNotifyEmail: string;
+  onlineDailyCapacityPcs: string;
+  onlineMonthlyTargetPesos: string;
+  onlineMinDaysAhead: string;
+  onlineShowStepsToCustomers: boolean;
+  onlineShopEnabled: boolean;
 }): SettingsValidation {
   const errors: Record<string, string> = {};
 
@@ -317,6 +371,45 @@ export function validateSettingsForm(form: {
     }
   }
 
+  /*
+    The two online-shop figures are the owner's to know, so an empty box is a
+    real answer and stays one. A zero would be a different claim: "the shop can
+    finish nothing in a day" and "the target is nothing", and the calendar and
+    the reports would both read as reached.
+  */
+  let capacity: number | null = null;
+  const capacityText = form.onlineDailyCapacityPcs.trim();
+  if (capacityText !== "") {
+    capacity = Number(capacityText);
+    if (!Number.isInteger(capacity) || capacity < 1) {
+      errors.onlineDailyCapacityPcs =
+        "Leave empty if you have not decided, or enter a whole number of pieces above zero.";
+    }
+  }
+
+  let monthlyTarget: Centavos | null = null;
+  const targetText = form.onlineMonthlyTargetPesos.trim();
+  if (targetText !== "") {
+    try {
+      monthlyTarget = parsePesos(targetText);
+      if (monthlyTarget <= 0) throw new Error("not above zero");
+    } catch {
+      monthlyTarget = null;
+      errors.onlineMonthlyTargetPesos =
+        "Leave empty if you have not decided, or enter an amount like 100000.";
+    }
+  }
+
+  const minDaysAhead = Number(form.onlineMinDaysAhead);
+  if (!Number.isInteger(minDaysAhead) || minDaysAhead < 0 || minDaysAhead > 90) {
+    errors.onlineMinDaysAhead = "Enter a whole number of days from 0 to 90.";
+  }
+
+  const notifyEmail = form.onlineNotifyEmail.trim();
+  if (notifyEmail !== "" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(notifyEmail)) {
+    errors.onlineNotifyEmail = "Enter an email address, or leave it empty.";
+  }
+
   if (Object.keys(errors).length > 0) {
     return { ok: false, errors };
   }
@@ -346,6 +439,13 @@ export function validateSettingsForm(form: {
       mapUrl: blank(form.mapUrl),
       publicOpeningHours: blank(form.publicOpeningHours),
       publicPageEnabled: form.publicPageEnabled,
+
+      onlineNotifyEmail: blank(form.onlineNotifyEmail),
+      onlineDailyCapacityPcs: capacity,
+      onlineMonthlyTargetCentavos: monthlyTarget,
+      onlineMinDaysAhead: minDaysAhead,
+      onlineShowStepsToCustomers: form.onlineShowStepsToCustomers,
+      onlineShopEnabled: form.onlineShopEnabled,
     },
   };
 }
@@ -380,6 +480,12 @@ export function settingsToRow(settings: AppSettings): SettingsRow {
     map_url: settings.mapUrl,
     public_opening_hours: settings.publicOpeningHours,
     public_page_enabled: settings.publicPageEnabled,
+    online_notify_email: settings.onlineNotifyEmail,
+    online_daily_capacity_pcs: settings.onlineDailyCapacityPcs,
+    online_monthly_target_centavos: settings.onlineMonthlyTargetCentavos,
+    online_min_days_ahead: settings.onlineMinDaysAhead,
+    online_show_steps_to_customers: settings.onlineShowStepsToCustomers,
+    online_shop_enabled: settings.onlineShopEnabled,
   };
 }
 
@@ -422,6 +528,13 @@ export const SETTINGS_COLUMNS_ADDED_LATER: Readonly<Record<string, string>> = {
   public_page_enabled: "Show the public page",
   // 0014_staff_stay_signed_in
   staff_stay_signed_in: "Staff stay signed in",
+  // 0018_phase12_online_orders
+  online_notify_email: "Where new online orders are emailed",
+  online_daily_capacity_pcs: "Pieces the shop can finish in a day",
+  online_monthly_target_centavos: "Monthly sales target",
+  online_min_days_ahead: "How far ahead an online order must be booked",
+  online_show_steps_to_customers: "Show production steps to customers",
+  online_shop_enabled: "Show the online shop",
 };
 
 /** May this column be left out of a settings write, or is it a real fault? */

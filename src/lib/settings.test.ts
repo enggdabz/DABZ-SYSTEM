@@ -37,6 +37,12 @@ const goodForm = {
   mapUrl: "",
   publicOpeningHours: "",
   publicPageEnabled: true,
+  onlineNotifyEmail: "",
+  onlineDailyCapacityPcs: "",
+  onlineMonthlyTargetPesos: "",
+  onlineMinDaysAhead: "2",
+  onlineShowStepsToCustomers: true,
+  onlineShopEnabled: true,
 };
 
 describe("validateSettingsForm", () => {

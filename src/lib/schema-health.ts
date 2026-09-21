@@ -147,6 +147,29 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0016_phase11_notifications",
     breaks: "notifications on your phone",
   })),
+  ...[
+    "online_categories",
+    "online_design_products",
+    "online_designs",
+    "online_order_files",
+    "online_order_items",
+    "online_order_production",
+    "online_order_roster",
+    "online_order_totals",
+    "online_orders",
+    "online_payments",
+    "online_product_images",
+    "online_product_options",
+    "online_product_prices",
+    "online_product_stats",
+    "online_production_stages",
+    "online_products",
+    "online_status_log",
+  ].map((name) => ({
+    name,
+    migration: "0018_phase12_online_orders",
+    breaks: "the online shop, its orders, the production board and the order calendar",
+  })),
 ];
 
 /*
@@ -203,6 +226,24 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     column: "counter_cash_centavos",
     migration: "0015_phase10_collections",
     breaks: "the breakdown kept with a closed day",
+  },
+  {
+    name: "app_settings",
+    column: "online_min_days_ahead",
+    migration: "0018_phase12_online_orders",
+    breaks: "the online shop's own settings, and saving any other setting",
+  },
+  {
+    /*
+      `customers` was created by 0005 and gained this column in 0018, so no
+      relation probe can see it is absent - the same shape of gap as 0014's.
+      Nothing writes it yet, but it is what the online shop's own tables sit
+      beside, and a database missing it is a database missing all of them.
+    */
+    name: "customers",
+    column: "messenger_psid",
+    migration: "0018_phase12_online_orders",
+    breaks: "linking a customer to their Messenger chat later on",
   },
 ];
 

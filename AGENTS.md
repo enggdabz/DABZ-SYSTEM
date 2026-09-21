@@ -13,6 +13,14 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 Read `docs/PHASES.md` (what is built, what is next) and `docs/DECISIONS.md`
 (open questions) before starting work.
 
+**Dabz Apparel Online Orders** is a module with its own specification. If the
+work touches the online shop, the online orders, their production board,
+calendar or reports, read `docs/spec.md` (the specification), then
+`docs/open-questions.md` (what is waiting on the owner, and every place that
+spec was mapped onto the rules below) and `docs/progress.md` (what is built).
+Those three are not imported here on purpose: a long auto-loaded file is
+followed less well than a short one that is read when it is needed.
+
 ## Working agreement with the owner
 
 The owner is learning to build this as a development partner, not just

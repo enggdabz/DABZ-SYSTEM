@@ -306,6 +306,108 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
+          <h2 className="text-lg font-semibold tracking-tight">
+            The online shop
+          </h2>
+          <p className="mt-1 text-sm text-muted">
+            Where a customer orders jerseys from their phone. The two figures
+            below are yours to decide and both start empty &mdash; the calendar
+            shows no &ldquo;full&rdquo; day and the reports show no target until
+            you say what they are. A guess at either would be a confident wrong
+            answer, which is worse than none.
+          </p>
+        </div>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="onlineShopEnabled"
+            defaultChecked={settings.onlineShopEnabled}
+            className="size-4 rounded border-line"
+          />
+          <span>Show the online shop</span>
+        </label>
+
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            name="onlineShowStepsToCustomers"
+            defaultChecked={settings.onlineShowStepsToCustomers}
+            className="size-4 rounded border-line"
+          />
+          <span>
+            Let customers see the production steps when they track an order
+          </span>
+        </label>
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <Field
+            label="Pieces you can finish for one date"
+            hint="Leave empty if you have not decided. Used to mark a due date as full on the calendar."
+            error={errors.onlineDailyCapacityPcs}
+          >
+            <Input
+              name="onlineDailyCapacityPcs"
+              type="number"
+              min={1}
+              placeholder="Not set"
+              defaultValue={
+                settings.onlineDailyCapacityPcs === null
+                  ? ""
+                  : String(settings.onlineDailyCapacityPcs)
+              }
+            />
+          </Field>
+
+          <Field
+            label="Monthly sales target"
+            hint="Leave empty if you have not decided. Shows as a meter on Reports."
+            error={errors.onlineMonthlyTargetPesos}
+          >
+            <Input
+              name="onlineMonthlyTargetPesos"
+              inputMode="decimal"
+              placeholder="Not set"
+              defaultValue={
+                settings.onlineMonthlyTargetCentavos === null
+                  ? ""
+                  : centavosToDecimalString(settings.onlineMonthlyTargetCentavos)
+              }
+            />
+          </Field>
+
+          <Field
+            label="Earliest date a customer may ask for (days ahead)"
+            hint="Two means today plus two days is the soonest they can pick."
+            error={errors.onlineMinDaysAhead}
+          >
+            <Input
+              name="onlineMinDaysAhead"
+              type="number"
+              min={0}
+              max={90}
+              defaultValue={settings.onlineMinDaysAhead}
+              required
+            />
+          </Field>
+
+          <Field
+            label="Email new orders to"
+            hint="Optional. New orders always reach your phone through notifications; this adds an email as well."
+            error={errors.onlineNotifyEmail}
+          >
+            <Input
+              name="onlineNotifyEmail"
+              type="email"
+              placeholder="Not set"
+              defaultValue={settings.onlineNotifyEmail ?? ""}
+            />
+          </Field>
+        </div>
+      </section>
+
+      <section className="space-y-5">
+        <div>
           <h2 className="text-lg font-semibold tracking-tight">DabzTech repairs</h2>
           <p className="mt-1 text-sm text-muted">
             Set now, used from Phase 7. Confirm these against how you actually

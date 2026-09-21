@@ -36,6 +36,26 @@
   --accent: #d10a0a;
   --on-accent: #ffffff;
   --success: #187c3c;
+
+  /*
+    Four tokens the Online Orders module needs and the system did not have
+    (docs/spec.md 5.1). Nothing else: red is `--accent`, the page is `--page`,
+    secondary text is `--muted`, and a second name for any of those would be a
+    second answer to the same question.
+
+    `--tile` is the ground under a product photo or a chat bubble; `--seg` is
+    the ground under a segmented control, a search field or a progress track -
+    a shade darker, so an empty track is visible against the card it sits on.
+
+    `--gold` is the shop's existing brand gold, lightened in dark mode because
+    #ebb417 on black is a duller thing than it is on white. It is a FILL with
+    black text on it (`--on-gold`), never a text colour on white: it measures
+    1.9:1 there, well under the 4.5:1 floor.
+  */
+  --tile: #f0f0f2;
+  --seg: #e9e9eb;
+  --gold: #ebb417;
+  --on-gold: #141414;
   /* Warnings are never colour-only (spec 3.2): always paired with an icon and
      a text label, so they can't be mistaken for a red brand button. */
   --attention: #92500a;
@@ -65,6 +85,12 @@
   --accent: #d10a0a;
   --on-accent: #ffffff;
   --success: #4caf7a;
+
+  --tile: #262626;
+  --seg: #2c2c30;
+  /* docs/spec.md 5.1's dark gold. Black text still sits on it. */
+  --gold: #f0b323;
+  --on-gold: #141414;
   --attention: #f5a524;
   --attention-bg: #2a1f0a;
 
@@ -95,6 +121,10 @@
   --color-sidebar: var(--sidebar);
   --color-sidebar-ink: var(--sidebar-ink);
   --color-apparel-gold: var(--apparel-gold);
+  --color-tile: var(--tile);
+  --color-seg: var(--seg);
+  --color-gold: var(--gold);
+  --color-on-gold: var(--on-gold);
 
   --radius-card: var(--radius-card);
   --radius-control: var(--radius-control);
