@@ -27,7 +27,7 @@ import {
   weekdayName,
 } from "@/lib/period";
 
-export const metadata = { title: "Apparel calendar · Dabz System" };
+export const metadata = { title: "Project calendar · Dabz System" };
 
 function showDate(iso: string): string {
   const date = parseISODate(iso);
@@ -145,10 +145,11 @@ export default async function ApparelCalendarPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            Apparel calendar
+            Project calendar
           </h1>
           <p className="mt-2 text-muted">
-            Every job order on the day the shop means to have it finished
+            Every Dabz Apparel job order on the day the shop means to have it
+            finished
             &mdash; one day before the customer was promised it. Anything not
             finished by then is carried to today and marked priority.
           </p>

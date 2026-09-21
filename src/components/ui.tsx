@@ -34,29 +34,62 @@ export function Card({
   );
 }
 
-type ButtonVariant = "primary" | "secondary" | "quiet" | "danger";
+type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "feature"
+  | "quiet"
+  | "danger";
 
 const BUTTON_STYLES: Record<ButtonVariant, string> = {
   // Dabz red is the one accent, reserved for the main action on a screen.
   primary: "bg-accent text-on-accent hover:opacity-90",
   secondary: "bg-ink/5 text-ink ring-1 ring-line hover:bg-ink/10",
+  /*
+    A second action the screen wants noticed.
+
+    A screen has one main action and it wears the filled red; a second red
+    button would leave neither of them meaning anything. But grey is not
+    always enough either - the owner could not find the way to the project
+    calendar beside the red "New job order". So this borrows the accent as a
+    tint and a frame rather than a fill: unmistakably an action, clearly not
+    THE action.
+
+    The LABEL stays `text-ink`, and that part is not a style choice. Written
+    the obvious way - accent text on an accent tint, the shape of
+    `Tag tone="accent"` - it measures 3.06:1 against the dark surface, under
+    the 4.5:1 floor, and dark is the shop's default look. A button nobody can
+    read is a worse answer to "make it more visible" than the underlined link
+    it replaced. The frame does the attracting; the text does the telling.
+  */
+  feature: "bg-accent/10 text-ink ring-1 ring-accent/40 hover:bg-accent/20",
   quiet: "text-muted hover:text-ink",
   // Not red: red is the brand colour here, so a destructive action is marked
   // by its label and an outline instead (spec 3.2).
   danger: "bg-transparent text-attention ring-1 ring-attention/40 hover:bg-attention-bg",
 };
 
+const BUTTON_BASE =
+  "inline-flex items-center justify-center gap-2 rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50";
+
+/**
+ * The button shape, for the things that cannot be a `<button>`.
+ *
+ * A link that moves you to another screen is a link - it has an href, it opens
+ * in a new tab on a middle click, a screen reader announces it as a link - but
+ * it can still be shaped like a button. This hands out the same classes so a
+ * `<Link>` styled as a button cannot drift from the real ones.
+ */
+export function buttonClasses(variant: ButtonVariant = "primary"): string {
+  return `${BUTTON_BASE} ${BUTTON_STYLES[variant]}`;
+}
+
 export function Button({
   variant = "primary",
   className = "",
   ...props
 }: ComponentProps<"button"> & { variant?: ButtonVariant }) {
-  return (
-    <button
-      {...props}
-      className={`rounded-control px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${BUTTON_STYLES[variant]} ${className}`}
-    />
-  );
+  return <button {...props} className={`${buttonClasses(variant)} ${className}`} />;
 }
 
 export function Field({

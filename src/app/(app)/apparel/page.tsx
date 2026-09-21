@@ -1,9 +1,14 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, buttonClasses } from "@/components/ui";
 import { ORDER_STATUS_LABELS, isOpenOrder } from "@/lib/apparel";
-import { scheduleNote, scheduleProject } from "@/lib/apparel-calendar";
+import {
+  scheduleAll,
+  scheduleNote,
+  summariseProjects,
+  type CalendarSummary,
+} from "@/lib/apparel-calendar";
 import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getApparelOrders, toCalendarOrder } from "@/lib/data/apparel";
@@ -20,6 +25,63 @@ function showDate(iso: string | null): string {
   if (!iso) return "not set";
   const date = parseISODate(iso);
   return date ? formatCivilDate(date) : iso;
+}
+
+/**
+ * A calendar, drawn rather than typed.
+ *
+ * `aria-hidden` because the heading beside it already says "Project calendar";
+ * a screen reader announcing it twice helps nobody.
+ */
+function CalendarGlyph() {
+  return (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden="true"
+      className="shrink-0 text-accent"
+    >
+      <rect x="2" y="3.5" width="14" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2 7.5h14M6 2v3M12 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** What the calendar has to say today, in one line. Counts, never reassurance. */
+function calendarLine(summary: CalendarSummary): string {
+  const parts: string[] = [];
+
+  if (summary.priority > 0) {
+    parts.push(
+      `${summary.priority} carried over and needing doing first`,
+    );
+  }
+  if (summary.dueToday > 0) {
+    parts.push(`${summary.dueToday} due off the bench today`);
+  }
+
+  if (parts.length === 0) {
+    if (summary.nextOn) {
+      const next = parseISODate(summary.nextOn);
+      parts.push(`Nothing due off the bench today. Next on ${next ? formatCivilDate(next) : summary.nextOn}`);
+    } else if (summary.undated > 0) {
+      // Not "all clear": nobody has said when any of them is due.
+      parts.push(
+        `No promised dates set, so nothing can be planned yet - ${summary.undated} order${
+          summary.undated === 1 ? "" : "s"
+        } waiting on one`,
+      );
+    } else {
+      parts.push("Nothing on the bench.");
+    }
+  } else if (summary.nextOn) {
+    const next = parseISODate(summary.nextOn);
+    parts.push(`next on ${next ? formatCivilDate(next) : summary.nextOn}`);
+  }
+
+  return `${parts.join(" \u00b7 ")}`;
 }
 
 export default async function ApparelPage() {
@@ -45,15 +107,14 @@ export default async function ApparelPage() {
   );
 
   /*
-    What the production calendar says about today, worked out from the orders
+    What the project calendar says about today, worked out from the orders
     already read rather than by asking again. A project whose target day
     passed with work left on it has been carried forward, and this screen is
     where the shop looks first in the morning.
   */
-  const priority = orders
-    .filter((entry) => entry.order.status !== "cancelled")
-    .map((entry) => scheduleProject({ order: toCalendarOrder(entry), today }))
-    .filter((project) => project.priority);
+  const projects = scheduleAll({ orders: orders.map(toCalendarOrder), today });
+  const summary = summariseProjects(projects, today);
+  const priority = projects.filter((project) => project.priority);
 
   const outstanding = sumCentavos(
     orders
@@ -71,21 +132,43 @@ export default async function ApparelPage() {
             is still owed.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <Link
-            href="/apparel/calendar"
-            className={`text-sm underline underline-offset-2 ${TAP_AREA}`}
-          >
-            Production calendar
-          </Link>
-          <NewOrderForm
-            customers={customers
-              .filter((customer) => customer.active)
-              .map((customer) => ({ id: customer.id, name: customer.name }))}
-            today={civilDateToISO(today)}
-          />
-        </div>
+        <NewOrderForm
+          customers={customers
+            .filter((customer) => customer.active)
+            .map((customer) => ({ id: customer.id, name: customer.name }))}
+          today={civilDateToISO(today)}
+        />
       </div>
+
+      {/*
+        The way into the project calendar, given its own row above everything
+        else on the screen.
+
+        It was a line of underlined text beside the red "New job order" button
+        and the owner could not find it - which is the same mistake the
+        Disclosure handle made in Phase 2: a way in that does not look like
+        anything. So it is a real button now, in the accent as a tint rather
+        than a fill (the screen's one filled red stays on New job order), and
+        it carries the count beside it: a button that says "2 due off the
+        bench today" is worth crossing the screen for in a way that the word
+        "Calendar" is not.
+      */}
+      <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+            <CalendarGlyph />
+            Project calendar
+          </h2>
+          <p className="mt-1 text-sm text-muted">{calendarLine(summary)}</p>
+        </div>
+
+        <Link
+          href="/apparel/calendar"
+          className={`${buttonClasses("feature")} w-full sm:w-auto`}
+        >
+          Open the project calendar
+        </Link>
+      </Card>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <Card title="Orders in progress">
@@ -144,7 +227,7 @@ export default async function ApparelPage() {
               href="/apparel/calendar"
               className={`underline underline-offset-2 ${TAP_AREA}`}
             >
-              Open the apparel calendar
+              Open the project calendar
             </Link>
           </p>
         </Notice>

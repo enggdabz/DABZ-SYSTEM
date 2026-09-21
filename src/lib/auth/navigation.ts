@@ -46,9 +46,15 @@ export const NAV_SECTIONS: NavSection[] = [
   { href: "/expenses", label: "Expenses", permission: "record_expenses", group: "Daily", phase: 5 },
   { href: "/stocks", label: "Stocks", permission: "stock_in_out", group: "Daily", phase: 5 },
   { href: "/apparel", label: "Apparel", permission: "apparel_job_orders", group: "Daily", phase: 6 },
+  /*
+    Named for what the owner calls the work rather than for the screen it
+    lives under: "Apparel calendar" read as a corner of the Apparel screen,
+    and these are the shop's projects. It stays in Daily and next to Apparel,
+    because it is opened every morning and it is the same orders.
+  */
   {
     href: "/apparel/calendar",
-    label: "Apparel calendar",
+    label: "Project calendar",
     permission: "apparel_job_orders",
     group: "Daily",
     phase: 6,
