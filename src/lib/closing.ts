@@ -10,7 +10,13 @@
 import { sumCentavos, type Centavos } from "./money";
 
 export interface ClosingInput {
-  /** Sales taken in cash today, excluding voided ones. */
+  /**
+   * Everything collected in cash today, excluding voided rows.
+   *
+   * "Cash sales" was the old name and it was too narrow: since the counter
+   * could always take an apparel down payment, and Phase 10 made that obvious,
+   * this figure has always included apparel and DabzTech cash too.
+   */
   cashSalesCentavos: Centavos;
   /** Money that left the cash drawer today: expenses, cash advances, wages. */
   cashPaidOutCentavos: Centavos;
@@ -18,6 +24,15 @@ export interface ClosingInput {
   gcashCentavos: Centavos;
   mayaCentavos: Centavos;
   bankCentavos: Centavos;
+  /**
+   * Takings that went straight to the owner rather than into the drawer.
+   *
+   * It is money the shop collected, so it belongs in the day's total - but it
+   * is NOT drawer cash, so it stays out of the drawer sum below. Leaving it
+   * out of both, which is what happened before Phase 10, quietly lost it: the
+   * day looked short against its target by exactly that amount.
+   */
+  ownersPocketCentavos: Centavos;
   targetCentavos: Centavos;
 }
 
@@ -40,6 +55,11 @@ export interface ClosingResult {
 }
 
 export function computeClosing(input: ClosingInput): ClosingResult {
+  /*
+    THE DRAWER FORMULA, unchanged: cash collected less cash paid out. The
+    owner's pocket is deliberately absent from it - counting money that never
+    reached the drawer would make an honest drawer read as short.
+  */
   const expectedCashCentavos =
     input.cashSalesCentavos - input.cashPaidOutCentavos;
 
@@ -50,6 +70,7 @@ export function computeClosing(input: ClosingInput): ClosingResult {
     input.gcashCentavos,
     input.mayaCentavos,
     input.bankCentavos,
+    input.ownersPocketCentavos,
   ]);
 
   return {

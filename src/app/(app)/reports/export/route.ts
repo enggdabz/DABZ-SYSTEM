@@ -6,7 +6,7 @@
  * a URL is a public endpoint whether or not anyone linked to it.
  */
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
-import { getReport } from "@/lib/data/reports";
+import { getCollectionsReport, getReport } from "@/lib/data/reports";
 import { civilDateToISO, manilaToday } from "@/lib/period";
 import {
   RANGE_PRESETS,
@@ -33,7 +33,12 @@ export async function GET(request: Request) {
     settings.weekStartsOn,
   );
 
-  const csv = toCsv(await getReport(range));
+  const [report, collections] = await Promise.all([
+    getReport(range),
+    getCollectionsReport(range),
+  ]);
+
+  const csv = toCsv(report, collections);
 
   return new Response(csv, {
     headers: {

@@ -46,6 +46,8 @@ quiet "$HERE/../migrations/0012_clear_apparel_and_repair_prices.sql"
 
 # 0014 IS schema - the staff sign-out switch - so it runs, skipping over 0013.
 quiet "$HERE/../migrations/0014_staff_stay_signed_in.sql"
+# 0015 adds the collections feed, so it has to be here too - 12 tests it.
+quiet "$HERE/../migrations/0015_phase10_collections.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -61,3 +63,4 @@ run "$HERE/08_phase6_rls.test.sql"
 run "$HERE/09_phase7_rls.test.sql"
 run "$HERE/10_phase9_rls.test.sql"
 run "$HERE/11_delete_rules.test.sql"
+run "$HERE/12_phase10_rls.test.sql"

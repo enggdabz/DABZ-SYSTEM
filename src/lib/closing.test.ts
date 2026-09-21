@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { computeClosing } from "./closing";
-import { parsePesos } from "./money";
+import { breakdownCollections, type CollectionRow } from "./collections";
+import { parsePesos, sumCentavos } from "./money";
 
 const base = {
   cashSalesCentavos: parsePesos("5000"),
@@ -10,6 +11,7 @@ const base = {
   gcashCentavos: parsePesos("1200"),
   mayaCentavos: 0,
   bankCentavos: 0,
+  ownersPocketCentavos: 0,
   targetCentavos: parsePesos("5427.97"),
 };
 
@@ -102,6 +104,7 @@ describe("computeClosing", () => {
       gcashCentavos: 0,
       mayaCentavos: 0,
       bankCentavos: 0,
+      ownersPocketCentavos: 0,
       targetCentavos: parsePesos("5427.97"),
     });
     expect(result.balanced).toBe(true);
@@ -124,5 +127,143 @@ describe("computeClosing", () => {
       expect(Number.isInteger(value)).toBe(true);
     }
     expect(result.differenceCentavos).toBe(parsePesos("0.01"));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The owner's pocket (Phase 10)
+// ---------------------------------------------------------------------------
+
+describe("takings that never reached the drawer", () => {
+  it("counts them in the day's total, because the shop did collect them", () => {
+    const result = computeClosing({
+      ...base,
+      ownersPocketCentavos: parsePesos("400"),
+    });
+    // 5,000 cash + 1,200 GCash + 400 to the owner.
+    expect(result.totalSalesCentavos).toBe(parsePesos("6600"));
+  });
+
+  it("leaves them out of the drawer, so an honest drawer never reads as short", () => {
+    const withPocket = computeClosing({
+      ...base,
+      ownersPocketCentavos: parsePesos("400"),
+    });
+    const without = computeClosing(base);
+
+    expect(withPocket.expectedCashCentavos).toBe(without.expectedCashCentavos);
+    expect(withPocket.differenceCentavos).toBe(without.differenceCentavos);
+    expect(withPocket.balanced).toBe(true);
+  });
+
+  it("can be the only thing that carries a day past its target", () => {
+    const quiet = { ...base, cashSalesCentavos: parsePesos("5000"), gcashCentavos: 0 };
+    // 5,000 on its own is short of the 5,427.97 target.
+    expect(computeClosing(quiet).targetReached).toBe(false);
+    expect(
+      computeClosing({ ...quiet, ownersPocketCentavos: parsePesos("500") })
+        .targetReached,
+    ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The breakdown's bottom row has to be the day (spec 3.3)
+// ---------------------------------------------------------------------------
+
+/**
+ * The per-division table and `readDayTotals` are two readings of the same day
+ * - the feed and the ledger - and the screen puts them one above the other. If
+ * they ever part company, one of them is lying to whoever is counting the
+ * drawer, so the shapes are pinned together here as well as in SQL.
+ */
+describe("the end-of-day breakdown against the day's totals", () => {
+  function row(over: Partial<CollectionRow>): CollectionRow {
+    return {
+      id: over.id ?? "r",
+      kind: over.kind ?? "counter_sale",
+      division: over.division ?? "printshoppe",
+      paymentKind: over.paymentKind === undefined ? "sale" : over.paymentKind,
+      reference: over.reference ?? "S-260921-001",
+      customerName: null,
+      amountCentavos: over.amountCentavos ?? 0,
+      source: over.source ?? "cash_drawer",
+      referenceNumber: null,
+      takenAt: "2026-09-21T02:00:00.000Z",
+      recordedForISO: "2026-09-21",
+      takenBy: null,
+      voidedAt: over.voidedAt ?? null,
+      href: "/sales",
+    };
+  }
+
+  const rows: CollectionRow[] = [
+    row({ id: "a", amountCentavos: parsePesos("5000"), source: "cash_drawer" }),
+    row({
+      id: "b",
+      kind: "apparel_payment",
+      division: "apparel",
+      paymentKind: "down_payment",
+      amountCentavos: parsePesos("1200"),
+      source: "gcash",
+    }),
+    row({
+      id: "c",
+      kind: "repair_payment",
+      division: "dabztech",
+      paymentKind: "balance",
+      amountCentavos: parsePesos("400"),
+      source: "owners_pocket",
+    }),
+    // Voided, so it must appear in neither reading.
+    row({
+      id: "d",
+      kind: "apparel_payment",
+      division: "apparel",
+      paymentKind: "balance",
+      amountCentavos: parsePesos("9999"),
+      source: "bank",
+      voidedAt: "2026-09-21T06:00:00.000Z",
+    }),
+  ];
+
+  const breakdown = breakdownCollections(rows);
+
+  /* What `readDayTotals` would return for the same day, read from the ledger
+     those four rows wrote to. Cash paid out is a ledger-only idea and plays no
+     part in either total. */
+  const dayTotals = {
+    cashSalesCentavos: parsePesos("5000"),
+    cashPaidOutCentavos: parsePesos("500"),
+    countedCashCentavos: parsePesos("4500"),
+    gcashCentavos: parsePesos("1200"),
+    mayaCentavos: 0,
+    bankCentavos: 0,
+    ownersPocketCentavos: parsePesos("400"),
+    targetCentavos: parsePesos("5427.97"),
+  };
+
+  it("matches the day's total, to the centavo", () => {
+    expect(breakdown.totalCentavos).toBe(
+      computeClosing(dayTotals).totalSalesCentavos,
+    );
+  });
+
+  it("matches the day's figures method by method", () => {
+    expect(breakdown.totalBySource.cash_drawer).toBe(dayTotals.cashSalesCentavos);
+    expect(breakdown.totalBySource.gcash).toBe(dayTotals.gcashCentavos);
+    expect(breakdown.totalBySource.maya).toBe(dayTotals.mayaCentavos);
+    expect(breakdown.totalBySource.bank).toBe(dayTotals.bankCentavos);
+    expect(breakdown.totalBySource.owners_pocket).toBe(
+      dayTotals.ownersPocketCentavos,
+    );
+  });
+
+  it("agrees that the voided apparel balance happened to neither of them", () => {
+    expect(breakdown.voidedCentavos).toBe(parsePesos("9999"));
+    expect(breakdown.totalBySource.bank).toBe(0);
+    expect(
+      sumCentavos(breakdown.divisions.map((entry) => entry.totalCentavos)),
+    ).toBe(parsePesos("6600"));
   });
 });

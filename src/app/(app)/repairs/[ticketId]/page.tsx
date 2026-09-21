@@ -5,6 +5,7 @@ import { connection } from "next/server";
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { paymentKindLabel } from "@/lib/collections";
 import { getStockOverview } from "@/lib/data/stocks";
 import { getCustomers } from "@/lib/data/pos";
 import {
@@ -366,6 +367,7 @@ export default async function RepairTicketPage({
             ticketId={ticket.id}
             balanceLabel={formatPesos(totals.balanceCentavos)}
             today={today}
+            isFirstPayment={detail.payments.length === 0}
           />
         </div>
 
@@ -381,6 +383,7 @@ export default async function RepairTicketPage({
                     {formatPesos(payment.amountCentavos)}
                   </span>
                   <span className="ml-2 text-xs text-muted">
+                    {paymentKindLabel({ paymentKind: payment.kind })} &middot;{" "}
                     {showDate(payment.paidOn)} &middot;{" "}
                     {MONEY_SOURCE_LABELS[
                       payment.source as keyof typeof MONEY_SOURCE_LABELS
@@ -388,9 +391,17 @@ export default async function RepairTicketPage({
                     {payment.note ? ` · ${payment.note}` : ""}
                   </span>
                 </span>
-                {canVoid ? (
-                  <VoidPaymentForm ticketId={ticket.id} paymentId={payment.id} />
-                ) : null}
+                <span className="flex flex-wrap items-center gap-3">
+                  <Link
+                    href={`/repairs/${ticket.id}/payment/${payment.id}/receipt`}
+                    className={`text-sm underline ${TAP_AREA}`}
+                  >
+                    Receipt
+                  </Link>
+                  {canVoid ? (
+                    <VoidPaymentForm ticketId={ticket.id} paymentId={payment.id} />
+                  ) : null}
+                </span>
               </li>
             ))}
           </ul>

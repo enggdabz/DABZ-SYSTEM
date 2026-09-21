@@ -150,6 +150,12 @@ export interface TicketPayment {
   amountCentavos: Centavos;
   paidOn: string;
   source: string;
+  /**
+   * Down payment or balance - and null for a payment taken before Phase 10
+   * added the column. Null is a real answer, not a gap to be filled in: nobody
+   * can now say which those were, and a guess would be believed.
+   */
+  kind: "down_payment" | "balance" | null;
   note: string | null;
 }
 

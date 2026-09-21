@@ -21,6 +21,21 @@ export function formatManilaDateTime(value: string | Date): string {
   }).format(date);
 }
 
+/**
+ * "1:40 PM" in Manila time.
+ *
+ * For a list that is already headed by one day - the collections feed, the
+ * day's takings - where repeating the date on every row is noise.
+ */
+export function formatManilaTime(value: string | Date): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("en-PH", {
+    timeZone: SHOP_TIMEZONE,
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 /** "18 Sep 2026" in Manila time. */
 export function formatManilaDate(value: string | Date): string {
   const date = typeof value === "string" ? new Date(value) : value;

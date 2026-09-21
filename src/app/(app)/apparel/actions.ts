@@ -462,7 +462,23 @@ export async function recordPaymentAction(
     return { fieldErrors: { source: "Choose where the money went." } };
   }
 
-  const kind = detail.payments.length === 0 ? "down_payment" : "balance";
+  /*
+    Down payment or balance is now CHOSEN rather than worked out (Phase 10).
+
+    It used to be derived - the first payment was a down payment, everything
+    after it a balance - which is the right default and the wrong rule: a
+    customer can hand over a second down payment on a job that has not started
+    yet, and the books would have called it a balance. The form starts on the
+    old answer and lets whoever is at the counter say otherwise.
+  */
+  const kind = String(formData.get("paymentKind") ?? "");
+  if (kind !== "down_payment" && kind !== "balance") {
+    return {
+      fieldErrors: {
+        paymentKind: "Say whether this is a down payment or a balance.",
+      },
+    };
+  }
 
   /*
     The split is worked out HERE, on the server, from the order's own lines -

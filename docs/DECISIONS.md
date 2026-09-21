@@ -284,6 +284,60 @@ note saying so, because that is a slip, not a mistake.
 
 ---
 
+## Decided for Phase 10 — One counter, all three divisions
+
+Phase 10 connects the Counter, Dabz Apparel and DabzTech into one place to take
+money and one place to see it. It adds almost no new storage on purpose:
+`public.collections` is a **view**, so it stores nothing and can never fall out
+of step with the rows underneath it.
+
+**The calls I made**
+
+| Question | What I decided | How to change it |
+|---|---|---|
+| Who may take an Apparel or DabzTech payment at the counter | **The division's own permission.** `Add sales` alone gives neither, and somebody with only `Add sales` does not see the button at all | Tick **Dabz Apparel job orders** or **DabzTech job tickets** on the **Staff** screen. This matches the security rules that already existed — nothing was widened to make the counter work |
+| Which jobs the counter can take money against | **Anything with a balance that is not cancelled**, including a **released** order or ticket | Spec 8 says a shop does let a regular take the jerseys and settle later, so those have to stay findable — an order that disappears is an order nobody chases. To hide them, filter on `isOpenOrder` / `isOpenTicket` in `getPayableJobs` |
+| Whether a payment is a down payment or a balance | **Chosen on the form, not deduced.** It starts on the old rule — the first money is a down payment, everything after is a balance — but a customer *can* hand over a second down payment on a job that has not started | The `defaultPaymentKind` helper in `src/lib/collections.ts` sets where the box starts |
+| DabzTech payments taken before this phase | **They keep no kind at all** and read as plain **Payment** | Nothing to change. `repair_payments.kind` is nullable with no default precisely so those rows stay honest — nobody can now know which they were, and a guess would be trusted |
+| A down payment under your policy | **Warned about with ⚠, never refused.** You may have agreed to take less | `checkPaymentAmount` refuses only nothing and too-much. With no percentage set, nothing is shown at all |
+| Takings paid into the **owner's pocket** | **Counted in the day's total, kept out of the drawer.** It is money the shop collected, so leaving it out of the total understated the day against its target; it never reached the drawer, so putting it in the cash figure would make an honest drawer read as short | `ownersPocketCentavos` in `computeClosing` (`src/lib/closing.ts`), with tests either side of it |
+| Which timestamp the feed calls "when" | **When the row was written**, not the "Paid on" date somebody typed | It has to be, because the matching ledger entry is stamped in the same transaction and the two are required to agree for any day. A backdated payment still says so on screen — the typed date rides along as `recordedForISO` |
+| What a closed day remembers | **Ten nullable per-division columns plus the owner's pocket**, frozen at the moment the drawer was counted | A day closed before Phase 10 stays **null** and the screen says "Breakdown not recorded for this day". Zero would be a claim; null is the truth. Columns are on `day_closings` in `0015` |
+| Down payments held | **A view of existing data, not a new category.** Nothing about how income is recognised changed | `heldForUnfinishedWork` in `src/lib/collections.ts`. It must never be subtracted from anything, or the same peso is counted twice in opposite directions |
+| Which repairs count as "work still owed" | **Any ticket not released**, including **declined** and **cannot be repaired** | The unit is still on the shelf and nothing has been handed back — that is exactly the pile spec 9.4 is about. `getHeldMoney` in `src/lib/data/collections.ts` |
+| A DabzTech down payment percentage | **Not added.** The spec offers one only as a possibility, and inventing a policy would have staff turning a customer away over a rule nobody set | If you want one, add it as a **nullable** setting, leave it **empty**, and list it in `src/lib/data/checklist.ts` like every other figure only you can know |
+
+**Two things that were already wrong, and are now fixed**
+
+- **Maya was missing from every form but the counter.** The database has
+  accepted `maya` on every money table since migration `0005` (open decision
+  17.12, decided), and the End of day screen has counted a Maya line ever
+  since — but `MONEY_SOURCES` in `src/lib/ledger.ts`, which is what builds
+  *every other* form, never included it. So a Maya apparel down payment, a Maya
+  bill payment and a Maya expense were all impossible to record, and the Maya
+  line could only ever be filled by a counter sale. One entry in one list.
+
+- **A deactivated account could still read its own old sales.** `sales_read_own`
+  compared `created_by` to `auth.uid()` and checked nothing else, so it did not
+  obey spec 13.1 the way every other policy does. Signing in already refused a
+  deactivated account, so nothing leaked through a screen — but Row Level
+  Security is the boundary, and a boundary that relies on the layer in front of
+  it is not one. `0015` adds `current_role_name() is not null` to that policy
+  and to the two beside it, which costs an active person nothing. The Phase 10
+  test found it, and now guards it.
+
+**Three things Phase 10 deliberately does not do**
+
+- **It does not create a new way for money to reach the ledger.** The counter's
+  new payment action calls `record_apparel_payment` and `record_repair_payment`
+  — the same two functions those screens have always used. A second path is how
+  two paths end up disagreeing.
+- **It does not build a second void.** Apparel and DabzTech payments are still
+  voided by the owner from their own order or ticket. The Sales feed links
+  there rather than offering its own button.
+- **It does not change how income is categorised or when it is recognised.**
+  Every figure it shows is a reading of money the ledger already holds.
+
 ---
 
 ## Assumptions I am working under

@@ -12,9 +12,11 @@
  * cost - so a month where PHP 100,000 was borrowed does not look like a good
  * month. That rule lives in ledger.ts and this file just obeys it.
  */
+import type { CollectionsReport } from "./collections";
 import { divisionName, type ExpenseTag } from "./divisions";
 import {
   CATEGORY_LABELS,
+  MONEY_SOURCES,
   countsAgainstDailyTarget,
   countsAsIncome,
   countsAsShopExpense,
@@ -343,13 +345,40 @@ export function compareTo(
 // ---------------------------------------------------------------------------
 
 /**
+ * What one income category came to over the period.
+ *
+ * Used for the DabzTech checking fee, which is charged even when the customer
+ * says no to the repair and is therefore worth reading on its own - and which
+ * the ledger already keeps as its own category, so nothing new has to be
+ * stored to answer it.
+ */
+export function categoryAmount(
+  report: PeriodReport,
+  category: string,
+): Centavos {
+  return (
+    report.incomeByCategory.find((line) => line.category === category)
+      ?.amountCentavos ?? 0
+  );
+}
+
+/**
  * The report as comma-separated rows, for a spreadsheet or a bookkeeper.
  *
  * Amounts are written as plain decimals with two places - no peso sign, no
  * thousands separator - because a spreadsheet has to read them as numbers. A
  * comma inside a label would split a row, so every field is quoted.
+ *
+ * `collections` is optional because `buildReport` works on ledger entries
+ * alone and this file has never read a database. When it is given, the export
+ * gains a "Collections by division and kind" block - the one question the
+ * ledger cannot answer on its own, since a ledger entry knows it was tagged
+ * `apparel` but not whether it arrived as a down payment.
  */
-export function toCsv(report: PeriodReport): string {
+export function toCsv(
+  report: PeriodReport,
+  collections?: CollectionsReport,
+): string {
   const rows: string[][] = [
     ["Dabz System report"],
     ["From", report.range.fromISO],
@@ -385,6 +414,38 @@ export function toCsv(report: PeriodReport): string {
       String(line.sharePercent),
     ]),
   ];
+
+  if (collections) {
+    rows.push(
+      [],
+      [
+        "Collections by division and kind",
+        "Cash",
+        "GCash",
+        "Maya",
+        "Bank",
+        "Owner's pocket",
+        "Total",
+        "Payments",
+      ],
+      ...collections.lines.map((line) => [
+        line.label,
+        ...MONEY_SOURCES.map((source) => pesos(line.bySource[source])),
+        pesos(line.amountCentavos),
+        String(line.count),
+      ]),
+      [
+        "All collections",
+        ...MONEY_SOURCES.map((source) => pesos(collections.totalBySource[source])),
+        pesos(collections.totalCentavos),
+        "",
+      ],
+      [],
+      // Beside the collections rather than inside them: it is a slice of
+      // DabzTech income by category, not a fourth door.
+      ["DabzTech checking fees", pesos(categoryAmount(report, "checking_fee"))],
+    );
+  }
 
   return rows.map((row) => row.map(csvField).join(",")).join("\n");
 }

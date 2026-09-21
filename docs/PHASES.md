@@ -1476,6 +1476,174 @@ Then, in the app:
 
 ---
 
+## Phase 10 — One counter, all three divisions ✅
+
+**Built**
+
+Money already came in through three doors — the Counter, a Dabz Apparel job
+order and a DabzTech repair ticket — and all three already wrote to the same
+ledger. What was missing was a way to **see** them together, and a way to take
+an apparel or repair payment **without leaving the counter**.
+
+So this phase connects and shows. It does not re-plumb anything: every peso
+still reaches the ledger through `complete_sale`, `record_apparel_payment` or
+`record_repair_payment`, and no new way in was built.
+
+*One list of everything collected*
+- **Sales** now shows all three doors, not just the counter. Each row says
+  which division, what the payment was for — **Sale**, **Down payment**,
+  **Balance** — the reference, the customer, the amount, the method and the
+  time.
+- Filter chips for the door (All · Counter · Apparel · DabzTech) and for the
+  method (All · Cash · GCash · Maya · Bank · Owner's pocket). They are links,
+  so a filtered view survives a refresh and can be sent to someone.
+- A totals strip on top: everything collected today, then one figure per door.
+- Voided rows **stay**, struck through, with ⚠ and the word Voided, and count
+  towards nothing. A customer may be holding the slip.
+- Underneath it is `public.collections`, a **view** — it stores nothing, so it
+  cannot fall out of step with the rows beneath it. Same reasoning as Phase 8's
+  reports.
+
+*Taking any payment from the counter*
+- **Take payment for an order** on the Counter screen opens a search box: a
+  job order number, a ticket number, a customer's name or a phone number.
+- It finds open jobs **that still have a balance**, and shows the total, what
+  has been paid and what is left — always worked out from the job's own rows,
+  never stored and never typed.
+- The form prefills the balance, lets you change it, asks whether it is a down
+  payment or a balance, takes Cash / GCash / Maya / Bank / Owner's pocket, and
+  works out the change for cash.
+- More than the balance is **refused**. Less than your down payment policy is
+  a **⚠ warning and nothing more** — you may have agreed to take less, and a
+  counter that turned the customer away would be wrong more often than right.
+  With no policy set it says nothing, because nothing has been decided.
+- Afterwards it offers **Print payment receipt**.
+
+*End of day that names every division*
+- **Cash sales** is now **Cash collected**, with a line saying what that means:
+  counter sales, Apparel payments and DabzTech payments. It always did include
+  all three; it just never said so.
+- A new table: one row per door, one column per method, with the down payment /
+  balance split under Apparel and DabzTech. The bottom row equals the day's
+  totals, and the screen says so out loud if it ever does not.
+- **Owner's pocket** is its own column and is never folded into cash — money
+  that never reached the drawer must not make an honest drawer read as short.
+- A closed day now **remembers** its breakdown. Days closed before this stay
+  blank and say "Breakdown not recorded for this day", rather than showing
+  zeroes that would read as a fault.
+
+*Home and Reports*
+- **Collected today** on Home: the total and one figure per door, each linking
+  to Sales with that filter on.
+- **Down payments held** (owner and admin only): money already received for
+  work the shop still owes. It is a *view of existing data* — not a new
+  category, and not subtracted from anything.
+- **Still to collect**: balances across open job orders and repair tickets.
+- **Collections by division and kind** on Reports, by method, with DabzTech's
+  checking-fee income beside it. It is in the printed sheet and the spreadsheet
+  download too.
+
+*Payment receipts*
+- `/apparel/[id]/payment/[id]/receipt` and `/repairs/[id]/payment/[id]/receipt`,
+  in the same narrow black-on-white style and on the same receipt paper as a
+  counter receipt.
+- Order total, paid before, this payment, balance remaining — **every figure
+  added up from the rows printed**, so a customer can check it by hand.
+- A voided payment prints with **VOIDED** across it, adds nothing to what has
+  been paid, and cannot pass as valid.
+
+*Two things fixed on the way*
+- **Maya was missing from every form but the counter.** The database has
+  accepted it on every money table since `0005`, and End of day has counted a
+  Maya line ever since — but the list the other forms are built from never
+  included it, so a Maya apparel down payment or bill payment was impossible to
+  record. It is there now, everywhere.
+- **A deactivated account could still read its own old sales.** Sign-in already
+  refused them, so nothing leaked through a screen — but Row Level Security is
+  the boundary and must not lean on the layer in front of it. Found by the new
+  Phase 10 test, closed in `0015`.
+
+**What I decided and how to change it**
+
+Everything below is also in [DECISIONS.md](DECISIONS.md), with the same notes.
+
+| Decision | How to change it |
+|---|---|
+| Counter staff need the **Apparel** or **DabzTech** permission to take those payments; `Add sales` alone gives neither | Tick the box on the **Staff** screen. It matches the security rules that already existed — nothing was widened |
+| A **released** order or ticket with a balance stays payable from the counter | It is the "let the regular take the jerseys and settle later" case in spec 8. To hide them, filter on open status in `getPayableJobs` |
+| Down payment / balance is now **chosen**, not deduced from whether it is the first payment | The form starts on the old answer; the person at the counter can say otherwise |
+| Old DabzTech payments keep **no kind at all** and read as plain "Payment" | Nothing to change — nobody can now know which they were, and a guess would be believed |
+| Takings paid into the **owner's pocket** now count in the day's total | They are money the shop collected. They stay out of the drawer figure. See `computeClosing` |
+| No DabzTech down payment percentage was added | If you want one, add it as a nullable setting, leave it empty, and list it in `src/lib/data/checklist.ts` |
+
+Nothing new was invented that only you can know, so the **To fill in** screen
+is unchanged.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| Feed totals, filters, breakdown, receipt figures, the counter's refusals, the CSV block | `npm test` | 592 tests (47 new in `collections.test.ts`) |
+| The security rules, against a real PostgreSQL | `npm run test:rls` | 301 checks (was 268) |
+| That every table and column the app asks for exists | `npm run check:schema` | 43 tables |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+The two that matter most are in `supabase/tests/12_phase10_rls.test.sql`:
+
+- **The feed leaks nothing.** The view is `security_invoker`, so the policies
+  already on sales, apparel payments and repair payments still decide what each
+  person sees. The test proves it by asking as five different people — the
+  owner, an admin, a counter assistant with only Add sales, one who is then
+  given the daily sales report permission, and a deactivated account. It also
+  checks the view is `security_invoker` **directly**, because without that flag
+  every other test in the file would pass while the books were wide open.
+- **The feed and the ledger agree.** Every money source, from both sides, over
+  everything in the database — not just the rows the test wrote. If they can
+  ever differ, the feed is wrong, because the ledger is the record.
+
+**Still to do by hand:** the four-width browser check (390 / 768 / 1024 / 1440).
+It needs a real Supabase project, which cannot run here. Two things on this
+phase specifically need eyes, because no unit test can see either: the **Take
+payment for an order** dialog — it is portalled into `<body>`, which is what
+keeps a `fixed inset-0` overlay measuring against the screen and not against
+the blurred top bar — and the **breakdown table** on End of day, which is a
+real table from `sm` up and a stack of cards below it, so six columns never
+have to fit a 390px phone.
+
+**How to check it**
+
+```bash
+npm install
+npm run db:push   # applies 0015
+npm test          # expect: 592 passed
+npm run dev
+```
+
+Then, at the counter:
+
+1. Ring up a **₱30 print sale in cash**.
+2. Create an **Apparel job order**. Then, from the **Counter**, press
+   *Take payment for an order*, find it, and take a **₱500 GCash down
+   payment**. Press **Print payment receipt** — the slip should say ₱0.00 paid
+   before, ₱500.00 this payment, and the balance left.
+3. Create a **DabzTech ticket**, and again from the **Counter** take a
+   **₱200 cash down payment**.
+4. Open **Sales**. All three rows are there. The filters work. The total is
+   **₱730.00** — Counter ₱30, Apparel ₱500, DabzTech ₱200.
+5. Open **End of day**. **Cash collected ₱230.00** (₱30 counter + ₱200
+   DabzTech), and ₱500 sitting under Apparel in the GCash column, marked as a
+   down payment.
+6. As the owner, open the job order and **void the ₱500 down payment**. Sales,
+   End of day, Home and Reports all drop by ₱500 **together**. The voided row
+   is still on the Sales list, struck through. Open its receipt: it now says
+   VOIDED and adds nothing.
+7. Sign in as a staff member who has **only Add sales**. The *Take payment for
+   an order* button is **not there**, and Sales shows counter rows only — with
+   a ⚠ line saying part of the day is not shown to them, so an incomplete
+   total is never mistaken for the whole day.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

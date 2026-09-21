@@ -170,6 +170,10 @@ function toPayment(row: Record<string, unknown>): TicketPayment {
     amountCentavos: Number(row.amount_centavos),
     paidOn: String(row.paid_on),
     source: String(row.source),
+    // Anything that is not one of the two known kinds reads as "not recorded",
+    // which is the honest answer for a payment taken before Phase 10.
+    kind:
+      row.kind === "down_payment" || row.kind === "balance" ? row.kind : null,
     note: (row.note as string | null) ?? null,
   };
 }
@@ -206,7 +210,9 @@ export const getRepairTickets = cache(
       // Voided payments are skipped, exactly as voided ledger entries are.
       supabase
         .from("repair_payments")
-        .select("id, ticket_id, amount_centavos, paid_on, source, note, voided_at")
+        .select(
+          "id, ticket_id, amount_centavos, paid_on, source, kind, note, voided_at",
+        )
         .order("paid_on", { ascending: false }),
     ]);
 

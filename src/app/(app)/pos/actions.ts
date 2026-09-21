@@ -10,11 +10,17 @@
  */
 import { revalidatePath } from "next/cache";
 
+import { orderTotals, splitPaymentByCategory } from "@/lib/apparel";
 import { recordAudit } from "@/lib/audit";
 import { getSettings, requirePermission, requireUser } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { checkPaymentAmount } from "@/lib/collections";
+import { getApparelOrder } from "@/lib/data/apparel";
+import { getRepairTicket } from "@/lib/data/repairs";
 import { DIVISION_IDS, type DivisionId } from "@/lib/divisions";
+import { MONEY_SOURCES } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { splitTicketPayment } from "@/lib/repairs";
 import {
   computeCashPayment,
   computeSale,
@@ -267,6 +273,221 @@ export async function completeSaleAction(
       saleId: result.sale_id,
       saleNumber: result.sale_number,
       changeCentavos: changeCentavos ?? 0,
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Taking an Apparel or DabzTech payment, without leaving the counter (Phase 10)
+// ---------------------------------------------------------------------------
+
+export interface OrderPaymentState {
+  error?: string;
+  fieldErrors?: Record<string, string>;
+  /** Set when the payment went through, so the dialog can offer the receipt. */
+  taken?: {
+    paymentId: string;
+    receiptHref: string;
+    amountCentavos: number;
+    balanceCentavos: number;
+    message: string;
+  };
+}
+
+/**
+ * Takes a payment on a job order or a repair ticket, from the counter.
+ *
+ * WHAT THIS DELIBERATELY DOES NOT DO
+ * It does not write a payment row and it does not write a ledger entry. It
+ * calls `record_apparel_payment` or `record_repair_payment` - the same two
+ * database functions the Apparel and DabzTech screens have always used - so
+ * there is exactly one way money reaches the ledger from each division, and
+ * this screen is a second door onto it rather than a second path.
+ *
+ * Three checks happen on the way, and all three are on the server:
+ *   1. The permission. A Server Action is a public endpoint: the button being
+ *      hidden proves nothing. `add_sales` alone gives neither division.
+ *   2. The amount, against a balance worked out here from the order's own rows
+ *      - never the balance the browser sent.
+ *   3. The split across income categories, worked out here too, which the
+ *      database then refuses if it does not add back up to the payment.
+ */
+export async function takeOrderPaymentAction(
+  _previous: OrderPaymentState,
+  formData: FormData,
+): Promise<OrderPaymentState> {
+  const jobKind = String(formData.get("jobKind") ?? "");
+  if (jobKind !== "apparel_order" && jobKind !== "repair_ticket") {
+    return { error: "Choose an order or a ticket to pay against." };
+  }
+
+  // The permission belongs to the DIVISION, not to the counter. This matches
+  // the policies that already exist; nothing here widens them.
+  const user = await requirePermission(
+    jobKind === "apparel_order" ? "apparel_job_orders" : "dabztech_tickets",
+  );
+
+  const jobId = String(formData.get("jobId") ?? "").trim();
+  if (jobId === "") return { error: "Choose an order or a ticket to pay against." };
+
+  let amountCentavos: number;
+  try {
+    amountCentavos = parsePesos(String(formData.get("amount") ?? ""));
+  } catch {
+    return { fieldErrors: { amount: "Enter the amount taken, like 500." } };
+  }
+
+  const kind = String(formData.get("paymentKind") ?? "");
+  if (kind !== "down_payment" && kind !== "balance") {
+    return { fieldErrors: { paymentKind: "Say whether this is a down payment or a balance." } };
+  }
+
+  const source = String(formData.get("source") ?? "cash_drawer");
+  if (!(MONEY_SOURCES as readonly string[]).includes(source)) {
+    return { fieldErrors: { source: "Choose how the customer is paying." } };
+  }
+
+  const referenceNumber =
+    String(formData.get("referenceNumber") ?? "").trim() || null;
+  const note = String(formData.get("note") ?? "").trim() || null;
+  const paidOn = civilDateToISO(manilaToday());
+
+  const supabase = await createSupabaseServerClient();
+
+  if (jobKind === "apparel_order") {
+    const detail = await getApparelOrder(jobId);
+    if (!detail) return { error: "That job order could not be found." };
+    if (detail.order.status === "cancelled") {
+      return { error: "That order was cancelled, so no money is owed on it." };
+    }
+
+    // The balance is recomputed from the order's own lines and roster. The
+    // browser's figure is a preview and is never the thing that is checked.
+    const totals = orderTotals({
+      lines: detail.lines,
+      roster: detail.roster,
+      payments: detail.payments,
+    });
+
+    const check = checkPaymentAmount({
+      amountCentavos,
+      balanceCentavos: totals.balanceCentavos,
+    });
+    if (!check.ok) return { fieldErrors: { amount: check.error ?? "" } };
+
+    const ledger = splitPaymentByCategory({ lines: totals.lines, amountCentavos });
+
+    const { data, error } = await supabase.rpc("record_apparel_payment", {
+      p_order_id: jobId,
+      p_amount_centavos: amountCentavos,
+      p_paid_on: paidOn,
+      p_source: source,
+      p_kind: kind,
+      p_reference_number: referenceNumber,
+      p_note: note,
+      p_ledger: ledger.map((part) => ({
+        category: part.category,
+        amount_centavos: part.amountCentavos,
+      })),
+    });
+
+    if (error) return { error: `The payment could not be saved: ${error.message}` };
+
+    const paymentId = String(data);
+    const stillOwed = totals.balanceCentavos - amountCentavos;
+
+    await recordAudit({
+      actorId: user.id,
+      actorUsername: user.username,
+      action: "create",
+      entity: "apparel_payment",
+      entityId: jobId,
+      summary: `Took ${formatPesos(amountCentavos)} at the counter on apparel order ${detail.order.orderNumber}`,
+      after: { amount_centavos: amountCentavos, source, kind, from: "counter" },
+    });
+
+    revalidatePath("/pos");
+    revalidatePath("/sales");
+    revalidatePath("/apparel");
+    revalidatePath(`/apparel/${jobId}`);
+    revalidatePath("/ledger");
+    revalidatePath("/overview");
+    revalidatePath("/closing");
+
+    return {
+      taken: {
+        paymentId,
+        receiptHref: `/apparel/${jobId}/payment/${paymentId}/receipt`,
+        amountCentavos,
+        balanceCentavos: stillOwed,
+        message: `${formatPesos(amountCentavos)} taken on ${detail.order.orderNumber}. ${
+          stillOwed > 0 ? `${formatPesos(stillOwed)} still owed.` : "Nothing owed."
+        }`,
+      },
+    };
+  }
+
+  const detail = await getRepairTicket(jobId);
+  if (!detail) return { error: "That repair ticket could not be found." };
+
+  const check = checkPaymentAmount({
+    amountCentavos,
+    balanceCentavos: detail.totals.balanceCentavos,
+  });
+  if (!check.ok) return { fieldErrors: { amount: check.error ?? "" } };
+
+  const ledger = splitTicketPayment({
+    lines: detail.totals.lines,
+    amountCentavos,
+    unitKind: detail.ticket.unitKind,
+  });
+
+  const { data, error } = await supabase.rpc("record_repair_payment", {
+    p_ticket_id: jobId,
+    p_amount_centavos: amountCentavos,
+    p_paid_on: paidOn,
+    p_source: source,
+    p_reference_number: referenceNumber,
+    p_note: note,
+    p_ledger: ledger.map((part) => ({
+      category: part.category,
+      amount_centavos: part.amountCentavos,
+    })),
+    p_kind: kind,
+  });
+
+  if (error) return { error: `The payment could not be saved: ${error.message}` };
+
+  const paymentId = String(data);
+  const stillOwed = detail.totals.balanceCentavos - amountCentavos;
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "create",
+    entity: "repair_payment",
+    entityId: jobId,
+    summary: `Took ${formatPesos(amountCentavos)} at the counter on repair ${detail.ticket.ticketNumber}`,
+    after: { amount_centavos: amountCentavos, source, kind, from: "counter" },
+  });
+
+  revalidatePath("/pos");
+  revalidatePath("/sales");
+  revalidatePath("/repairs");
+  revalidatePath(`/repairs/${jobId}`);
+  revalidatePath("/ledger");
+  revalidatePath("/overview");
+  revalidatePath("/closing");
+
+  return {
+    taken: {
+      paymentId,
+      receiptHref: `/repairs/${jobId}/payment/${paymentId}/receipt`,
+      amountCentavos,
+      balanceCentavos: stillOwed,
+      message: `${formatPesos(amountCentavos)} taken on ${detail.ticket.ticketNumber}. ${
+        stillOwed > 0 ? `${formatPesos(stillOwed)} still owed.` : "Nothing owed."
+      }`,
     },
   };
 }
