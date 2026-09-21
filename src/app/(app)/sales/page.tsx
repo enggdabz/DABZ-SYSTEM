@@ -3,13 +3,16 @@ import { connection } from "next/server";
 
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requireUser } from "@/lib/auth/dal";
-import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { doorViewer, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
+  doorVisibility,
   filterCollections,
   liveCollections,
+  partialReadWarning,
   paymentKindLabel,
+  seesWholeDay,
   totalsByDivision,
   type CollectionRow,
 } from "@/lib/collections";
@@ -56,10 +59,13 @@ export default async function SalesPage({
   const method = readMethod(params.method);
 
   const today = manilaToday();
-  const [rows, voidRequests] = await Promise.all([
+  const [read, voidRequests] = await Promise.all([
     getCollectionsForDay(today),
     getVoidRequests(),
   ]);
+
+  const rows = read.rows;
+  const readWarning = partialReadWarning(read);
 
   const shown = filterCollections(rows, { division, source: method });
   const byDivision = totalsByDivision(rows);
@@ -76,15 +82,21 @@ export default async function SalesPage({
     than deciding anything: the rows are already gone by the time they reach
     here. It only changes whether the screen shows a figure or explains a gap.
   */
-  const canSeeDivision = (id: DivisionId): boolean => {
-    if (isOwnerOrAdmin(user)) return true;
-    if (id === "apparel") return can(user, "apparel_job_orders");
-    if (id === "dabztech") return can(user, "dabztech_tickets");
-    return true;
-  };
-
-  const visibleDivisions = DIVISION_IDS.filter(canSeeDivision);
-  const hiddenDivisions = DIVISION_IDS.filter((id) => !canSeeDivision(id));
+  /*
+    How much of each door this person actually sees. The rule is in
+    `doorVisibility` so this screen, the Overview card and the End of day
+    action cannot drift apart - "own" is the case that used to be printed as
+    if it were "all".
+  */
+  const viewer = doorViewer(user);
+  const visibleDivisions = DIVISION_IDS.filter(
+    (id) => doorVisibility(id, viewer) !== "none",
+  );
+  const hiddenDivisions = DIVISION_IDS.filter(
+    (id) => doorVisibility(id, viewer) === "none",
+  );
+  const counterIsOwnSalesOnly = doorVisibility("printshoppe", viewer) === "own";
+  const wholeDayShown = seesWholeDay(viewer) && !readWarning;
 
   return (
     <div className="space-y-8">
@@ -148,6 +160,9 @@ export default async function SalesPage({
             <div key={id}>
               <dt className="text-xs font-medium text-muted">
                 {DIVISION_DOOR_LABELS[id]}
+                {id === "printshoppe" && counterIsOwnSalesOnly
+                  ? " (your sales)"
+                  : ""}
               </dt>
               <dd className="mt-1 text-2xl font-semibold tracking-tight">
                 {formatPesos(byDivision[id])}
@@ -156,14 +171,31 @@ export default async function SalesPage({
           ))}
         </dl>
 
-        {hiddenDivisions.length > 0 ? (
+        {readWarning ? (
+          <p className="mt-5 flex items-start gap-1.5 text-xs text-attention">
+            <span aria-hidden="true">{"⚠"}</span>
+            <span>{readWarning}</span>
+          </p>
+        ) : null}
+
+        {!wholeDayShown && !readWarning ? (
           <p className="mt-5 flex items-start gap-1.5 text-xs text-attention">
             <span aria-hidden="true">{"⚠"}</span>
             <span>
               Part of today is missing from this figure.{" "}
-              {hiddenDivisions.map((id) => DIVISION_DOOR_LABELS[id]).join(" and ")}{" "}
-              money is not shown to your account, so this is what you can see
-              rather than what the shop took.
+              {[
+                counterIsOwnSalesOnly
+                  ? "Only the counter sales you rang up yourself are shown"
+                  : null,
+                hiddenDivisions.length > 0
+                  ? `${hiddenDivisions
+                      .map((id) => DIVISION_DOOR_LABELS[id])
+                      .join(" and ")} money is not shown to your account`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(", and ")}
+              , so this is what you can see rather than what the shop took.
             </span>
           </p>
         ) : null}

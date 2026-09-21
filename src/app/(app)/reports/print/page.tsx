@@ -218,6 +218,14 @@ export default async function PrintReportPage({
             <h2 className="border-b border-black pb-1 text-sm font-bold">
               Collections by division and kind
             </h2>
+            {collections.partial ? (
+              <p className="mt-2 rounded border border-black/50 p-2 text-xs">
+                <strong>{"\u26a0"} Not the whole period.</strong> There were
+                more payments than one report reads, so the amounts below are a
+                floor rather than a total. The income figures above are
+                unaffected.
+              </p>
+            ) : null}
             <table className="mt-2 w-full text-sm">
               <thead>
                 <tr className="text-xs">

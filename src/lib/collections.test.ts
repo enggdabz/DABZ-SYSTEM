@@ -6,15 +6,21 @@ import {
   collectedTotal,
   collectionsReport,
   defaultPaymentKind,
+  doorVisibility,
   filterCollections,
   heldForUnfinishedWork,
+  isPartialRead,
   liveCollections,
+  partialReadWarning,
   paymentKindLabel,
   receiptFigures,
   searchPayableJobs,
+  seesWholeDay,
   totalsByDivision,
   totalsBySource,
   type CollectionRow,
+  type CollectionsRead,
+  type DoorViewer,
   type PayableJob,
 } from "./collections";
 import { parsePesos, sumCentavos } from "./money";
@@ -587,5 +593,138 @@ describe("money held for work the shop still owes", () => {
     const held = heldForUnfinishedWork({ apparel: [], dabztech: [] });
     expect(held.centavos).toBe(0);
     expect(held.orderCount).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// A read that is not the whole story (Phase 10 follow-up)
+// ---------------------------------------------------------------------------
+
+function read(over: Partial<CollectionsRead> = {}): CollectionsRead {
+  return { rows: [], failed: false, truncated: false, ...over };
+}
+
+describe("isPartialRead", () => {
+  it("is false only for a read that got everything", () => {
+    expect(isPartialRead(read({ rows: [row()] }))).toBe(false);
+  });
+
+  it("is true for a read that failed, even with no rows", () => {
+    // The whole point: no rows from a FAILED read is not an empty day.
+    expect(isPartialRead(read({ failed: true }))).toBe(true);
+  });
+
+  it("is true for a read that hit its cap", () => {
+    expect(isPartialRead(read({ rows: [row()], truncated: true }))).toBe(true);
+  });
+});
+
+describe("partialReadWarning", () => {
+  it("says nothing when the read is whole", () => {
+    expect(partialReadWarning(read({ rows: [row()] }))).toBeNull();
+  });
+
+  it("calls a failed read a fault, not an empty day", () => {
+    const warning = partialReadWarning(read({ failed: true })) ?? "";
+    expect(warning).toContain("could not be read");
+    // A person reading this must not conclude the shop took nothing.
+    expect(warning).toContain("not an empty day");
+  });
+
+  it("says a capped read is short, and how to get the rest", () => {
+    const warning = partialReadWarning(read({ truncated: true })) ?? "";
+    expect(warning).toContain("short");
+    expect(warning).toContain("shorter period");
+  });
+
+  it("reports a failure ahead of a truncation, since it is the worse one", () => {
+    const warning =
+      partialReadWarning(read({ failed: true, truncated: true })) ?? "";
+    expect(warning).toContain("could not be read");
+  });
+});
+
+describe("collectionsReport", () => {
+  it("is not partial unless it is told so", () => {
+    expect(collectionsReport([row()]).partial).toBe(false);
+  });
+
+  it("carries the partial flag onto the report", () => {
+    // The figures are a floor, and the screen and the CSV both have to say so.
+    expect(collectionsReport([row()], { partial: true }).partial).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// How much of a door somebody sees (Phase 10 follow-up)
+// ---------------------------------------------------------------------------
+
+function viewer(over: Partial<DoorViewer> = {}): DoorViewer {
+  return {
+    isOwnerOrAdmin: false,
+    canViewDailySalesReport: false,
+    canApparelJobOrders: false,
+    canDabztechTickets: false,
+    ...over,
+  };
+}
+
+describe("doorVisibility", () => {
+  it("shows an owner or admin all three doors", () => {
+    const owner = viewer({ isOwnerOrAdmin: true });
+    expect(doorVisibility("printshoppe", owner)).toBe("all");
+    expect(doorVisibility("apparel", owner)).toBe("all");
+    expect(doorVisibility("dabztech", owner)).toBe("all");
+    expect(seesWholeDay(owner)).toBe(true);
+  });
+
+  it("gives a counter assistant their OWN sales, never the counter's", () => {
+    /*
+      The bug this exists to stop: printshoppe was treated as simply visible,
+      so one assistant's PHP 1,200 was printed under the whole counter's name.
+      `sales_read_own` returns only their rows, so the honest answer is "own".
+    */
+    const staff = viewer();
+    expect(doorVisibility("printshoppe", staff)).toBe("own");
+    expect(seesWholeDay(staff)).toBe(false);
+  });
+
+  it("opens the whole counter once the daily sales report is allowed", () => {
+    expect(
+      doorVisibility("printshoppe", viewer({ canViewDailySalesReport: true })),
+    ).toBe("all");
+  });
+
+  it("hides apparel and dabztech entirely without their permissions", () => {
+    const staff = viewer({ canViewDailySalesReport: true });
+    expect(doorVisibility("apparel", staff)).toBe("none");
+    expect(doorVisibility("dabztech", staff)).toBe("none");
+    expect(seesWholeDay(staff)).toBe(false);
+  });
+
+  it("is all-or-nothing for apparel and dabztech - never own", () => {
+    // Those two policies have no own-row branch, so "own" would be a lie.
+    const staff = viewer({ canApparelJobOrders: true, canDabztechTickets: true });
+    expect(doorVisibility("apparel", staff)).toBe("all");
+    expect(doorVisibility("dabztech", staff)).toBe("all");
+  });
+
+  it("only calls it the whole day when every door is fully visible", () => {
+    // Every permission but the counter one: still not the whole day.
+    expect(
+      seesWholeDay(
+        viewer({ canApparelJobOrders: true, canDabztechTickets: true }),
+      ),
+    ).toBe(false);
+
+    expect(
+      seesWholeDay(
+        viewer({
+          canViewDailySalesReport: true,
+          canApparelJobOrders: true,
+          canDabztechTickets: true,
+        }),
+      ),
+    ).toBe(true);
   });
 });

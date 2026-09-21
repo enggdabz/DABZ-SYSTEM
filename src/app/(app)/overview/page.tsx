@@ -8,6 +8,7 @@ import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
 import {
   PERMISSION_INFO,
   can,
+  doorViewer,
   isOwnerOrAdmin,
   type Permission,
 } from "@/lib/auth/permissions";
@@ -15,6 +16,8 @@ import { monthTotals } from "@/lib/bills";
 import {
   DIVISION_DOOR_LABELS,
   collectedTotal,
+  doorVisibility,
+  partialReadWarning,
   totalsByDivision as collectionTotalsByDivision,
 } from "@/lib/collections";
 import { getCollectionsForDay, getHeldMoney } from "@/lib/data/collections";
@@ -775,22 +778,22 @@ async function CollectedToday({
   const owner = isOwnerOrAdmin(user);
   const today = manilaToday();
 
-  const [rows, held, standing] = await Promise.all([
+  const [read, held, standing] = await Promise.all([
     getCollectionsForDay(today),
     owner ? getHeldMoney() : Promise.resolve(null),
     owner ? getStanding() : Promise.resolve(null),
   ]);
 
+  const rows = read.rows;
+  const readWarning = partialReadWarning(read);
   const byDivision = collectionTotalsByDivision(rows);
 
-  const canSee = (id: DivisionId) => {
-    if (owner) return true;
-    if (id === "apparel") return can(user, "apparel_job_orders");
-    if (id === "dabztech") return can(user, "dabztech_tickets");
-    return true;
-  };
+  // The same rule the Sales screen and End of day use - see doorVisibility.
+  const viewer = doorViewer(user);
+  const canSee = (id: DivisionId) => doorVisibility(id, viewer) !== "none";
 
   const hidden = DIVISION_IDS.filter((id) => !canSee(id));
+  const counterIsOwnSalesOnly = doorVisibility("printshoppe", viewer) === "own";
 
   return (
     <div className="grid gap-5 lg:grid-cols-2">
@@ -802,7 +805,12 @@ async function CollectedToday({
         <dl className="mt-4 space-y-2 text-sm">
           {DIVISION_IDS.filter(canSee).map((id) => (
             <div key={id} className="flex items-baseline justify-between gap-2">
-              <dt className="text-muted">{DIVISION_DOOR_LABELS[id]}</dt>
+              <dt className="text-muted">
+                {DIVISION_DOOR_LABELS[id]}
+                {id === "printshoppe" && counterIsOwnSalesOnly
+                  ? " (your sales)"
+                  : ""}
+              </dt>
               <dd className="font-medium">
                 {formatPesos(byDivision[id])}{" "}
                 <Link
@@ -816,12 +824,28 @@ async function CollectedToday({
           ))}
         </dl>
 
-        {hidden.length > 0 ? (
+        {readWarning ? (
+          <p className="mt-4 flex items-start gap-1.5 text-xs text-attention">
+            <span aria-hidden="true">{"⚠"}</span>
+            <span>{readWarning}</span>
+          </p>
+        ) : hidden.length > 0 || counterIsOwnSalesOnly ? (
           <p className="mt-4 flex items-start gap-1.5 text-xs text-attention">
             <span aria-hidden="true">{"⚠"}</span>
             <span>
-              {hidden.map((id) => DIVISION_DOOR_LABELS[id]).join(" and ")} money
-              is not shown to your account, so this is not the whole day.
+              {[
+                counterIsOwnSalesOnly
+                  ? "Only the counter sales you rang up yourself are shown"
+                  : null,
+                hidden.length > 0
+                  ? `${hidden
+                      .map((id) => DIVISION_DOOR_LABELS[id])
+                      .join(" and ")} money is not shown to your account`
+                  : null,
+              ]
+                .filter(Boolean)
+                .join(", and ")}
+              , so this is not the whole day.
             </span>
           </p>
         ) : null}
