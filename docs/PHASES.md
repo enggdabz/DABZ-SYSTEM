@@ -20,6 +20,16 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — waiting on owner to confirm** |
 | — | Later: Messenger API, Meta Ads tracking, chatbot, push notifications | Not in first build |
 
+**Seven of those are waiting on you.** Phases 4 to 10 are built and tested but
+nobody has exercised them against the real shop data yet.
+[CONFIRM.md](CONFIRM.md) is every one of their "How to check it" steps pulled
+into a single ordered list, with the setup done once at the top instead of
+seven times — about an hour, start to finish. The per-phase steps further down
+this page are still correct about what to look at, but two things in them have
+since gone stale: the migration is applied with `npm run db:push` rather than
+pasted into the Supabase SQL editor, and the expected test count is 592, not
+the number each phase recorded on the day it was written.
+
 ---
 
 ## Phase 0 — Setup & learning ✅
