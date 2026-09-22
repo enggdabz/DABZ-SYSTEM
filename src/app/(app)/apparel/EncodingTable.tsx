@@ -27,9 +27,10 @@
  * with its own labels - never a sideways scroll, which is how a size gets
  * typed into the wrong column.
  */
+import Link from "next/link";
 import { useActionState, useRef, useState, type KeyboardEvent } from "react";
 
-import { Button, Disclosure, Notice, TAP_AREA } from "@/components/ui";
+import { Button, Disclosure, Notice, TAP_AREA, buttonClasses } from "@/components/ui";
 import { centavosToDecimalString, formatPesos, parsePesos } from "@/lib/money";
 import {
   APPAREL_SIZES,
@@ -305,42 +306,71 @@ export function EncodingTable({
           </div>
         )}
 
-        {!readOnly ? (
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <Button type="button" variant="secondary" onClick={() => addRow()}>
-              Add a row
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          {readOnly ? null : (
+            <>
+              <Button type="button" variant="secondary" onClick={() => addRow()}>
+                Add a row
+              </Button>
+
+              <Button type="submit" disabled={pending || changes === 0}>
+                {pending
+                  ? "Saving..."
+                  : changes === 0
+                    ? "Saved"
+                    : `Save ${changes} change${changes === 1 ? "" : "s"}`}
+              </Button>
+
+              {changes > 0 && !pending ? (
+                <span className="text-xs text-attention">
+                  <span aria-hidden="true">{"⚠"} </span>
+                  Not saved yet
+                </span>
+              ) : null}
+            </>
+          )}
+
+          {/*
+            The hard copy, reachable from where the encoding actually happens
+            rather than only from the top of the screen.
+
+            IT IS OFF WHILE ANYTHING IS UNSAVED, and that is the whole reason
+            it needed building rather than just linking. The sheet is drawn on
+            the server from what is SAVED, so printing it with five people
+            still sitting in this table would hand somebody a list that is
+            missing five shirts - and nothing on the paper would say so. A
+            person cuts from that paper. The button says what to do instead,
+            which is the same instinct as a total that adds up its own rows.
+          */}
+          {changes > 0 ? (
+            <Button type="button" variant="secondary" disabled>
+              Save first to print
             </Button>
+          ) : (
+            <Link
+              href={`/apparel/${orderId}/sheet`}
+              className={buttonClasses("secondary")}
+            >
+              Print the job order
+            </Link>
+          )}
 
-            <Button type="submit" disabled={pending || changes === 0}>
-              {pending
-                ? "Saving..."
-                : changes === 0
-                  ? "Saved"
-                  : `Save ${changes} change${changes === 1 ? "" : "s"}`}
-            </Button>
+          <span className="text-sm text-muted">
+            {summary.upperTotal + summary.shortsTotal === 0
+              ? "Nothing on the table"
+              : `${summary.upperTotal} upper${
+                  summary.upperTotal === 1 ? "" : "s"
+                } · ${summary.shortsTotal} short${
+                  summary.shortsTotal === 1 ? "" : "s"
+                } · ${formatPesos(tableTotal)}`}
+          </span>
+        </div>
 
-            {changes > 0 && !pending ? (
-              <span className="text-xs text-attention">
-                <span aria-hidden="true">{"⚠"} </span>
-                Not saved yet
-              </span>
-            ) : null}
-
-            <span className="text-sm text-muted">
-              {summary.upperTotal + summary.shortsTotal === 0
-                ? "Nothing on the table"
-                : `${summary.upperTotal} upper${
-                    summary.upperTotal === 1 ? "" : "s"
-                  } · ${summary.shortsTotal} short${
-                    summary.shortsTotal === 1 ? "" : "s"
-                  } · ${formatPesos(tableTotal)}`}
-            </span>
-          </div>
-        ) : (
-          <p className="mt-4 text-xs text-muted">
+        {readOnly ? (
+          <p className="mt-3 text-xs text-muted">
             This project was cancelled, so its people are kept as they were.
           </p>
-        )}
+        ) : null}
 
         {problems > 0 ? (
           <div className="mt-3">

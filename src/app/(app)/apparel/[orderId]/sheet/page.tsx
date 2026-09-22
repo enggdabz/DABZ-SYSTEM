@@ -171,7 +171,13 @@ export default async function JobOrderSheetPage({
                     <th className="w-14 pb-1 font-semibold">Short</th>
                     <th className="pb-1 font-semibold">Short name</th>
                     <th className="w-20 pb-1 text-right font-semibold">Price</th>
-                    <th className="pb-1 font-semibold">Remarks</th>
+                    {/*
+                      pl-3 is not decoration. Price is right-aligned and
+                      Remarks is left-aligned, so with no gutter between them
+                      the two headings print as one word - "PriceRemarks" -
+                      on the sheet the customer checks.
+                    */}
+                    <th className="pb-1 pl-3 font-semibold">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -204,7 +210,7 @@ export default async function JobOrderSheetPage({
                           </span>
                         ) : null}
                       </td>
-                      <td className="py-1">{person.note ?? ""}</td>
+                      <td className="py-1 pl-3">{person.note ?? ""}</td>
                     </tr>
                   ))}
                 </tbody>
