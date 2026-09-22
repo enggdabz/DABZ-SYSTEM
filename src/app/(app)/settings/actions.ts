@@ -64,6 +64,12 @@ export async function saveSettingsAction(
     mapUrl: String(formData.get("mapUrl") ?? ""),
     publicOpeningHours: String(formData.get("publicOpeningHours") ?? ""),
     publicPageEnabled: formData.get("publicPageEnabled") !== null,
+    onlineNotifyEmail: String(formData.get("onlineNotifyEmail") ?? ""),
+    onlineDailyCapacityPcs: String(formData.get("onlineDailyCapacityPcs") ?? ""),
+    onlineMonthlyTargetPesos: String(formData.get("onlineMonthlyTargetPesos") ?? ""),
+    onlineMinDaysAhead: String(formData.get("onlineMinDaysAhead") ?? ""),
+    onlineShowStepsToCustomers: formData.get("onlineShowStepsToCustomers") !== null,
+    onlineShopEnabled: formData.get("onlineShopEnabled") !== null,
   });
 
   if (!result.ok) {

@@ -2339,6 +2339,72 @@ cuts and sews from now sit on it.
 
 ---
 
+## Phase 14 — Dabz Apparel online orders ✅
+
+**What it is.** A customer orders jerseys from their phone without chatting
+first, and the shop pushes that order through production without the details
+living in a Messenger thread. It has its own specification, which arrived as a
+separate document: `docs/spec.md`. Read that, then `docs/open-questions.md`
+(what is waiting on the owner, and every place that spec had to be mapped onto
+this system's own rules) and `docs/progress.md` (what is built, and how to
+check it in a browser).
+
+**What the owner gets**
+
+| Where | What |
+|---|---|
+| `/shop` | The customer's shop: search, categories, sorting, a product page that asks for a roster or a size tally, the jersey design gallery, an order, a checkout and a receipt with a Messenger button |
+| `/shop/track` | Track my order, with the order number **and** the mobile it was placed with |
+| `/online-orders` | The orders, five tiles and a row of filters |
+| `/online-orders/[number]` | One order: items, roster, the message to paste into Messenger, the history, the moves, the steps, the money, the customer |
+| `/online-orders/production` | **Online production** in the rail — every order in the card for the step it is waiting for. Not the same screen as Phase 12's production report, which is the shop's own benches |
+| `/online-orders/calendar` | The month of due dates, with the FULL marker once a capacity is set |
+| `/online-orders/reports` | Sales booked, cash collected, orders, average order, the target meter and three charts |
+| `/online-orders/products`, `/online-orders/designs` | The catalogue and the design gallery, Owner/Admin only |
+
+**Decisions made here** (all in `docs/open-questions.md`, with how to change
+each one back)
+
+- Money stays whole centavos, not the `numeric(10,2)` the spec asks for.
+- Tables are prefixed `online_`: `products`, `customers` and `payments` already
+  exist here and mean other things.
+- Settings are columns on `app_settings`, not a key/value table, so the
+  behind-a-migration rule and the column probes can both see them.
+- The shop is at `/shop`, because `/` is already the shop's public page.
+- The module's screens are sections of the existing app behind the existing
+  sidebar, with their own tab bar, rather than a second `/admin` area.
+- **Nothing is seeded but structure** — the five categories and the eight
+  production stages. No products, no designs, no orders, no capacity, no target.
+
+**How it is verified**
+
+| What | How | Result |
+|---|---|---|
+| The module's rules: quantities, totals, the quote split, every status move, the production paths, the calendar, the sorting, the report buckets, `messageFor` | `npm test` | 1,054 tests (262 new) |
+| Security: a stranger reads the catalogue and nothing else, no order table can be written to directly, `anon` cannot call `create_online_order`, five different people | `npm run test:rls` | `17_online_orders_rls.test.sql`, all passing |
+| Every table and column the app asks for | `npm run check:schema` | 63 relations |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+**Not built, and why**
+
+The nine Playwright end-to-end tests the spec asks for (section 14). Every one
+of them begins with either a signed-in staff member or a database full of
+products, and Supabase Auth cannot be run here. What covers each of them
+instead is listed in `docs/open-questions.md`.
+
+**After deploying**, run `npm run db:push` for `0019`, then open
+**System check** — it now asks about the sixteen new tables and the two views.
+
+**Note the numbering.** This module was built alongside two others and gave way
+to both: the production report took Phase 12 and `0018`, then the project
+encoder took Phase 13 and `0019`, so the online shop is Phase 14 and `0020`.
+Two migrations sharing a four-digit prefix are ONE version to
+`supabase_migrations.schema_migrations`, and the second to be pushed is
+recorded as already applied and silently skipped - which shows up as a screen
+reporting PHP 0.00 rather than as an error. Renumbering the newer branch is
+always cheaper than finding that out from production.
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the
