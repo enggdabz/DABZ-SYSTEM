@@ -50,7 +50,7 @@ export default async function ProductPage({
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-10 sm:px-6">
       <div>
-        <Link href="/shop" className={`text-sm text-accent underline ${TAP_AREA}`}>
+        <Link href="/#order-online" className={`text-sm text-accent underline ${TAP_AREA}`}>
           <span aria-hidden="true">{"‹"}</span> Back to the shop
         </Link>
         <p className="mt-3 text-xs font-medium uppercase tracking-wide text-accent">

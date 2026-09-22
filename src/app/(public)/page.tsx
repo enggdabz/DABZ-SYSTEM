@@ -3,15 +3,18 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Card, TAP_AREA } from "@/components/ui";
-import { getOnlineProducts } from "@/lib/data/online";
+import {
+  getOnlineCategories,
+  getOnlineDesigns,
+  getOnlineProducts,
+} from "@/lib/data/online";
 import { getPublicServices, getPublicSettings } from "@/lib/data/public";
 import { DIVISIONS, DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos } from "@/lib/money";
-import { sortForShop } from "@/lib/online/catalogue";
 import { settingsFromRow, type SettingsRow } from "@/lib/settings";
 
 import { EnquiryForm } from "./EnquiryForm";
-import { ShopStrip } from "./ShopStrip";
+import { ShopSection } from "./ShopSection";
 
 export const metadata: Metadata = {
   title: "Dabz Printshoppe · Printing, jerseys and repairs in San Carlos City",
@@ -34,10 +37,12 @@ export const metadata: Metadata = {
 export default async function PublicHomePage() {
   await connection();
 
-  const [divisions, settingsRow, allProducts] = await Promise.all([
+  const [divisions, settingsRow, products, categories, designs] = await Promise.all([
     getPublicServices(),
     getPublicSettings(),
     getOnlineProducts(),
+    getOnlineCategories(),
+    getOnlineDesigns(),
   ]);
 
   const settings = settingsRow
@@ -69,9 +74,6 @@ export default async function PublicHomePage() {
     button that says "order jerseys online" is worse than not offering it.
   */
   const shopOpen = settings?.onlineShopEnabled !== false;
-  const shopProducts = shopOpen
-    ? sortForShop(allProducts, "most_ordered").slice(0, 6)
-    : [];
 
   const messengerUrl = settings?.messengerUsername
     ? `https://m.me/${settings.messengerUsername.replace(/^@/, "")}`
@@ -111,7 +113,7 @@ export default async function PublicHomePage() {
           */}
           {shopOpen ? (
             <Link
-              href="/shop"
+              href="#order-online"
               className="rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
             >
               Order jerseys online
@@ -153,7 +155,13 @@ export default async function PublicHomePage() {
       </section>
 
       {/* ---- Order online ------------------------------------------------ */}
-      <ShopStrip products={shopProducts} />
+      {shopOpen ? (
+        <ShopSection
+          products={products}
+          categories={categories}
+          designs={designs}
+        />
+      ) : null}
 
       {/* ---- What we do -------------------------------------------------- */}
       <section id="what-we-do" className="mx-auto max-w-5xl px-4 py-12 sm:px-6">

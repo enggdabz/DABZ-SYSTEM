@@ -35,7 +35,7 @@ export function SiteFooter({ shopOpen = true }: { shopOpen?: boolean }) {
           </Link>
           {shopOpen ? (
             <>
-              <Link href="/shop" className={`underline ${TAP_AREA}`}>
+              <Link href="/#order-online" className={`underline ${TAP_AREA}`}>
                 Shop
               </Link>
               <Link href="/shop/designs" className={`underline ${TAP_AREA}`}>

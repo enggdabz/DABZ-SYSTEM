@@ -37,7 +37,7 @@ export function OrderLines({
         <p className="rounded-card bg-surface p-6 text-muted ring-1 ring-line/60">
           There is nothing in your order yet.
         </p>
-        <Link href="/shop" className={`text-accent underline ${TAP_AREA}`}>
+        <Link href="/#order-online" className={`text-accent underline ${TAP_AREA}`}>
           Choose something <span aria-hidden="true">{"›"}</span>
         </Link>
       </div>
@@ -150,7 +150,7 @@ export function OrderLines({
         >
           Continue to your details
         </Link>
-        <Link href="/shop" className={`text-sm text-accent underline ${TAP_AREA}`}>
+        <Link href="/#order-online" className={`text-sm text-accent underline ${TAP_AREA}`}>
           Add another product <span aria-hidden="true">{"›"}</span>
         </Link>
       </div>

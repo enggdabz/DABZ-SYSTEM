@@ -47,7 +47,7 @@ export function SiteHeader({ shopOpen = true }: { shopOpen?: boolean }) {
         <nav className="flex flex-wrap items-center gap-2 sm:gap-3">
           {shopOpen ? (
             <>
-              <NavLink href="/shop">Shop</NavLink>
+              <NavLink href="/#order-online">Shop</NavLink>
               {/*
                 Hidden on the narrowest phones, where five items and a theme
                 toggle wrap onto three rows and push the page down. It is in

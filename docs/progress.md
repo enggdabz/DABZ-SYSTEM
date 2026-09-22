@@ -61,7 +61,7 @@ The code is deployed the moment the branch merges; the database is not.
 | Open | You should see |
 | --- | --- |
 | `/` | An "Order jerseys online" button, first on the page |
-| `/shop` | The hero, the three steps, the designs strip, and the products with search, category chips and a sort |
+| `/` | The public page's hero, then **Order online**: the three steps, the designs strip, and the products with search, category chips and a sort. `/shop` redirects here |
 | `/shop/products/<slug>` | The price, the options, the design picker, and either a team roster, a box per size, or one quantity — with the pieces and the running price adding up as you type |
 | `/shop/order` | Your lines, the size summary, and a total that says "₱2,700 + quote" when part of the order has no price yet |
 | `/shop/order/details` | The address asked for only if you chose delivery, and a date box that will not offer a date the shop would refuse |

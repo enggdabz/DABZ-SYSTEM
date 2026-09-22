@@ -2404,7 +2404,7 @@ check it in a browser).
 
 | Where | What |
 |---|---|
-| `/shop` | The customer's shop: search, categories, sorting, a product page that asks for a roster or a size tally, the jersey design gallery, an order, a checkout and a receipt with a Messenger button |
+| `/` | The customer's shop, as a section of the public page: search, categories, sorting, a product page that asks for a roster or a size tally, the jersey design gallery, an order, a checkout and a receipt with a Messenger button. `/shop` redirects here |
 | `/shop/track` | Track my order, with the order number **and** the mobile it was placed with |
 | `/online-orders` | The orders, five tiles and a row of filters |
 | `/online-orders/[number]` | One order: items, roster, the message to paste into Messenger, the history, the moves, the steps, the money, the customer |
@@ -2421,7 +2421,9 @@ each one back)
   exist here and mean other things.
 - Settings are columns on `app_settings`, not a key/value table, so the
   behind-a-migration rule and the column probes can both see them.
-- The shop is at `/shop`, because `/` is already the shop's public page.
+- The shop's catalogue is a section of `/`, the public page, which also keeps
+  its own hero, price lists and enquiry form. `/shop` redirects there. (It was
+  a separate page at `/shop` until 22 Sep 2026 - see `docs/open-questions.md`.)
 - The module's screens are sections of the existing app behind the existing
   sidebar, with their own tab bar, rather than a second `/admin` area.
 - **Nothing is seeded but structure** — the five categories and the eight

@@ -125,19 +125,32 @@ The customer-facing shop obeys spec 5.1: a browser check over every page at
   colour. Six screens in a different palette from the other twenty-three would
   read as a different application.
 
-### Routes: the shop lives under `/shop`
+### Routes: the catalogue is on `/`, the rest under `/shop`
 
-Spec 8 puts the customer's catalogue at `/`. In this system `/` is already the
-**shop's public page** (Phase 9) — three divisions, their price lists, and the
-enquiry form — and `AGENTS.md` says so explicitly. Replacing it would delete a
-built phase.
+Spec 8 puts the customer's catalogue at `/`, and it is there — but it took two
+goes to get it, so the history is worth keeping.
 
-So the online shop is mounted at `/shop`, and the public page gained an "Order
-online" way in. Every other route is as the spec writes it, under that prefix:
+At first the online shop was mounted entirely at `/shop`, because `/` was
+already the **shop's public page** (Phase 9) — three divisions, their price
+lists, the enquiry form — and replacing it would have deleted a built phase.
+The public page gained an "Order online" button pointing at `/shop`.
+
+That was wrong in a way only a customer would notice. The two pages had
+separate headers and separate heroes, so somebody who typed the shop's address
+got a description of the business and a door to what read as a different
+website. The owner asked for one site (22 Sep 2026), and the spec had wanted
+the catalogue on `/` all along.
+
+So the catalogue, the how-it-works cards and the designs strip are now a
+section of `/`, under the Phase 9 hero and above "What we do"; `/shop`
+permanently redirects to `/#order-online`, because customers already have that
+address on receipts and in Messenger threads. Everything else stays where it
+was. **`/` is still the public page** — the shop is a section of it, not a
+replacement for it, so nothing Phase 9 built was lost.
 
 | Spec | Built |
 | --- | --- |
-| `/` | `/shop` |
+| `/` | `/` (the "Order online" section; `/shop` redirects there) |
 | `/designs`, `/designs/[code]` | `/shop/designs`, `/shop/designs/[code]` |
 | `/products/[slug]` | `/shop/products/[slug]` |
 | `/order`, `/order/details` | `/shop/order`, `/shop/order/details` |

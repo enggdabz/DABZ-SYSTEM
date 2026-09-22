@@ -121,7 +121,7 @@ export default async function OrderReceivedPage({
           Track this order
         </Link>
 
-        <Link href="/shop" className={`text-sm text-accent underline ${TAP_AREA}`}>
+        <Link href="/#order-online" className={`text-sm text-accent underline ${TAP_AREA}`}>
           Back to the shop <span aria-hidden="true">{"›"}</span>
         </Link>
       </div>
