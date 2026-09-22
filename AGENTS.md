@@ -624,3 +624,21 @@ The module has its own specification: read `docs/spec.md`, then
 - **A customer's upload is private.** `order-files` has no public URL and no
   write policy; staff reach it through a link that expires in minutes, and the
   upload is checked by its CONTENT rather than by what it is called.
+- **An upload over 1MB needs `serverActions.bodySizeLimit`.** All three uploads
+  in this system are Server Actions, and Next refuses a body over 1MB BEFORE
+  the action runs - so the real limits in `UPLOAD_LIMITS` (5MB for a picture,
+  20MB for a customer's artwork) and the buckets' own `file_size_limit` are
+  both dead letters without the line in `next.config.ts`. Nothing catches this:
+  it builds, it typechecks, every test passes, and a customer attaching a photo
+  off their phone gets an error with nothing in it.
+- **The off switch is checked where the work happens, not where the button
+  was.** "Show the online shop" guards every page a customer could order from
+  AND both Server Actions, because a bookmarked product URL and a checkout page
+  left open both outlive the screen. `shop-closed.test.ts` reads the source and
+  fails if a new shop page forgets. Two pages are exempt on purpose - the track
+  page and a receipt link - since somebody who already ordered is owed their
+  order however long the shop stays shut.
+- **Only a P0001 from `create_online_order` is repeated to a stranger.** Its
+  refusals are written for a person and are worth passing through; a constraint
+  or column name is a description of the database handed to somebody who cannot
+  see it. Anything else gets the ordinary sentence.

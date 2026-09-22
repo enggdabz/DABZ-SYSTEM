@@ -24,6 +24,29 @@ const nextConfig: NextConfig = {
     staleTimes: {
       dynamic: 30,
     },
+
+    /*
+      How big a Server Action's request body may be.
+
+      Next's own default is 1MB, and three uploads in this system go through a
+      Server Action rather than a route handler: a customer's artwork (20MB),
+      a product photo and a design mockup (5MB each). Left at the default,
+      every one of those is refused by the framework BEFORE the action runs -
+      so the size check in `src/lib/online/uploads.ts` never sees the bytes,
+      the content sniffing never happens, and a customer attaching a photo
+      straight off their phone gets an error with nothing in it.
+
+      21MB rather than 20: the limit is on the RAW body, and multipart adds
+      boundaries and part headers on top of the file itself. The real ceiling
+      stays in `UPLOAD_LIMITS`, which is what answers the person in words.
+
+      This is deliberately the only knob Next offers, so it applies to every
+      action in the app and not just the three. What stops a 20MB write of
+      anything else is that each action checks its own input.
+    */
+    serverActions: {
+      bodySizeLimit: "21mb",
+    },
   },
 
   /*

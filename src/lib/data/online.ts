@@ -83,6 +83,20 @@ export const getShopSettings = cache(async (): Promise<AppSettings> => {
   return row ? settingsFromRow(row as SettingsRow) : DEFAULT_SETTINGS;
 });
 
+/**
+ * Is the shop taking orders?
+ *
+ * Every page a customer could order FROM asks this, and so does every Server
+ * Action that could take one - because a Server Action is a public endpoint
+ * and a hidden page is not a rule. The two that deliberately do NOT ask are
+ * the track page and a receipt link: somebody who already ordered is owed
+ * their order however long the shop stays shut.
+ */
+export async function isShopOpen(): Promise<boolean> {
+  const settings = await getShopSettings();
+  return settings.onlineShopEnabled;
+}
+
 // ---------------------------------------------------------------------------
 // The catalogue
 // ---------------------------------------------------------------------------

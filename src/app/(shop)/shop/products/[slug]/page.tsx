@@ -3,8 +3,14 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
-import { getDesignsForProduct, getOnlineProductBySlug } from "@/lib/data/online";
+import {
+  getDesignsForProduct,
+  getOnlineProductBySlug,
+  isShopOpen,
+} from "@/lib/data/online";
 import { designImageUrl, productImageUrl } from "@/lib/online/storage";
+
+import { ShopClosed } from "../../../ShopClosed";
 
 import { ProductOrderForm } from "./ProductOrderForm";
 
@@ -32,6 +38,8 @@ export default async function ProductPage({
   params: Promise<{ slug: string }>;
 }) {
   await connection();
+
+  if (!(await isShopOpen())) return <ShopClosed />;
 
   const { slug } = await params;
   const product = await getOnlineProductBySlug(slug);

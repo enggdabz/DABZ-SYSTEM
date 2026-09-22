@@ -1,7 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
-import { notFound } from "next/navigation";
 
 import { TAP_AREA } from "@/components/ui";
 import {
@@ -11,6 +10,8 @@ import {
   getShopSettings,
 } from "@/lib/data/online";
 import { designImageUrl, productImageUrl } from "@/lib/online/storage";
+
+import { ShopClosed } from "../ShopClosed";
 
 import { CatalogueBrowser } from "./CatalogueBrowser";
 
@@ -37,7 +38,7 @@ export default async function ShopHomePage() {
 
   // The same switch the Phase 9 page has: off takes the shop down without
   // removing anything.
-  if (!settings.onlineShopEnabled) notFound();
+  if (!settings.onlineShopEnabled) return <ShopClosed />;
 
   const imageUrls = Object.fromEntries(
     products.map((product) => [

@@ -72,9 +72,10 @@ export async function GET(request: Request) {
   }
 
   /*
-    The row goes too, once its file has. Left behind it would be counted
-    against that address's hourly upload limit for ever, which would slowly
-    lock out an internet cafe.
+    The row goes too, once its file has. It has nothing left to point at - the
+    limit that reads these rows only counts the last hour, so what a stale one
+    would do is not lock anybody out but sit in the table for ever, and be
+    offered to this query again tomorrow and every day after.
   */
   await admin
     .from("online_rate_events")

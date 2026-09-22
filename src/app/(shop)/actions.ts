@@ -63,6 +63,38 @@ async function callerAddress(): Promise<string> {
 
 const UPLOADS_PER_HOUR = 20;
 
+/**
+ * Is the shop taking orders? Asked here as well as on every page.
+ *
+ * A Server Action is a public endpoint: somebody who kept the checkout page
+ * open, or who has read the page source, can call one whether or not a screen
+ * offered it. So the switch is checked where the work actually happens, not
+ * only where the button was.
+ *
+ * Read with the admin client because the caller is nobody, exactly as the
+ * rest of this file does - and it FAILS SHUT: a settings row that cannot be
+ * read at all leaves the shop closed rather than open, because a stranger
+ * placing an order into a database the server cannot read is the worse of the
+ * two wrong answers.
+ */
+async function shopIsOpen(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from("app_settings")
+    .select("online_shop_enabled")
+    .eq("id", 1)
+    .maybeSingle();
+
+  if (error) return false;
+  // A database still behind 0019 has no column and no row to read; the column
+  // ships `not null default true`, so only an explicit false closes the shop.
+  return data?.online_shop_enabled !== false;
+}
+
+const SHOP_CLOSED =
+  "We are not taking online orders just now. Please message us on Facebook.";
+
 // ---------------------------------------------------------------------------
 // Attaching a file
 // ---------------------------------------------------------------------------
@@ -103,6 +135,8 @@ export async function uploadOrderFileAction(
   }
 
   const admin = createSupabaseAdminClient();
+  if (!(await shopIsOpen(admin))) return { error: SHOP_CLOSED };
+
   const address = await callerAddress();
 
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
@@ -210,6 +244,12 @@ export async function placeOrderAction(
     .eq("id", 1)
     .maybeSingle();
 
+  // The switch, off the row that was just read. Same reason as above: the
+  // page being gone does not mean this cannot still be called.
+  if (settingsRow?.online_shop_enabled === false) {
+    return { error: SHOP_CLOSED };
+  }
+
   const checked = checkCheckout(form, {
     today: manilaToday(),
     minDaysAhead: Number(settingsRow?.online_min_days_ahead ?? 2),
@@ -272,13 +312,21 @@ export async function placeOrderAction(
   });
 
   if (error || !data) {
-    // The database's own message is written for a person - "The smallest
-    // order for Full sublimation jersey is 6 pieces. You have 4." - so it is
-    // passed straight through rather than replaced with something vaguer.
+    /*
+      The database's own message is written for a person - "The smallest order
+      for Full sublimation jersey is 6 pieces. You have 4." - so it is passed
+      straight through rather than replaced with something vaguer.
+
+      ONLY the messages this module raises on purpose, though. Every `raise
+      exception` in `create_online_order` arrives as P0001; anything else is a
+      constraint name, a column name or a type error, and handing one of those
+      to a stranger describes the database to somebody who should not be able
+      to see it. Those get the ordinary refusal.
+    */
+    const spoken = error?.code === "P0001" ? error.message : null;
     return {
       error:
-        error?.message ??
-        "That order could not be placed. Please message us on Facebook.",
+        spoken ?? "That order could not be placed. Please message us on Facebook.",
     };
   }
 

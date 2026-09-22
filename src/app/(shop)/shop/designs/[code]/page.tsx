@@ -4,8 +4,10 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
-import { getOnlineDesigns, getOnlineProducts } from "@/lib/data/online";
+import { getOnlineDesigns, getOnlineProducts, isShopOpen } from "@/lib/data/online";
 import { designImageUrl } from "@/lib/online/storage";
+
+import { ShopClosed } from "../../../ShopClosed";
 
 export default async function DesignPage({
   params,
@@ -13,6 +15,8 @@ export default async function DesignPage({
   params: Promise<{ code: string }>;
 }) {
   await connection();
+
+  if (!(await isShopOpen())) return <ShopClosed />;
 
   const { code } = await params;
   const [designs, products] = await Promise.all([

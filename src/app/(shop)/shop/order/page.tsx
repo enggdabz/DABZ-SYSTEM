@@ -1,7 +1,9 @@
 import { connection } from "next/server";
 
-import { getOnlineDesigns, getOnlineProducts } from "@/lib/data/online";
+import { getOnlineDesigns, getOnlineProducts, isShopOpen } from "@/lib/data/online";
 import { designImageUrl, productImageUrl } from "@/lib/online/storage";
+
+import { ShopClosed } from "../../ShopClosed";
 
 import { OrderLines } from "./OrderLines";
 
@@ -16,6 +18,8 @@ export const metadata = {
 
 export default async function OrderPage() {
   await connection();
+
+  if (!(await isShopOpen())) return <ShopClosed />;
 
   /*
     The cart lives in the browser and carries storage PATHS, not URLs - the

@@ -3,8 +3,10 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
-import { getOnlineDesigns } from "@/lib/data/online";
+import { getOnlineDesigns, isShopOpen } from "@/lib/data/online";
 import { designImageUrl } from "@/lib/online/storage";
+
+import { ShopClosed } from "../../ShopClosed";
 
 export const metadata = {
   title: "Jersey designs · Dabz Apparel",
@@ -14,6 +16,9 @@ export const metadata = {
 
 export default async function DesignGalleryPage() {
   await connection();
+
+  if (!(await isShopOpen())) return <ShopClosed />;
+
   const designs = await getOnlineDesigns();
 
   return (

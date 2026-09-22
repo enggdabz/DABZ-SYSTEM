@@ -262,7 +262,28 @@ section gives two lines later: *"Check type by content, not just by
 extension."* A browser that has the upload URL can put anything at the other
 end of it; a server that has the bytes can look at them. The action checks the
 magic bytes, caps the size, rate-limits by address, and writes to the same
-`tmp/` prefix, which order creation then moves under `order-files/<order_no>/`.
+`tmp/` prefix. The file then STAYS there: order creation claims it in place
+(`claimed_at` on the rate-events row) rather than moving it, because a file
+that no order points at is what the purge is looking for, and being claimed is
+that answer without a second copy. The path on `online_order_files` is the one
+the customer's upload was written to.
+
+### Server Actions carry a 21MB body limit
+
+Next refuses a Server Action request body over 1MB by default, and all three
+uploads in this system are Server Actions - the customer's artwork, a product
+photo and a design mockup. So the 5MB and 20MB ceilings in `UPLOAD_LIMITS`,
+and the matching `file_size_limit` on each bucket, were both unreachable: the
+framework threw a 413 before the action ran, and the content sniffing never
+saw a byte. `next.config.ts` now sets `experimental.serverActions.bodySizeLimit`
+to `'21mb'` - one megabyte over the largest real limit, because the cap is on
+the RAW body and multipart adds boundaries and part headers on top of the file.
+
+It is the only knob Next offers, so it applies to every action in the app. What
+stops a 20MB write of something else is that each action checks its own input.
+To lower it, lower `UPLOAD_LIMITS.orderFileBytes` first and follow it here and
+in the bucket - in that order, so the ceiling a person is told about is never
+higher than the one that is enforced.
 
 ### Playwright is not wired up
 

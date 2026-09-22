@@ -2,9 +2,11 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
-import { getShopSettings } from "@/lib/data/online";
+import { getShopSettings, isShopOpen } from "@/lib/data/online";
 import { earliestDateNeeded } from "@/lib/online/checkout";
 import { manilaToday } from "@/lib/period";
+
+import { ShopClosed } from "../../../ShopClosed";
 
 import { CheckoutForm } from "./CheckoutForm";
 
@@ -19,6 +21,8 @@ export const metadata = {
 
 export default async function CheckoutPage() {
   await connection();
+
+  if (!(await isShopOpen())) return <ShopClosed />;
 
   const settings = await getShopSettings();
   const minDaysAhead = settings.onlineMinDaysAhead;
