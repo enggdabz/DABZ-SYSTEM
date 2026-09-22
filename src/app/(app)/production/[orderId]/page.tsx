@@ -265,6 +265,13 @@ export default async function ProductionProjectPage({
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
                   <div className="min-w-0">
                     <h3 className="font-semibold">{item.name}</h3>
+                    {item.retired ? (
+                      <p className="text-xs text-muted">
+                        Nobody is left on this item &mdash; its people were
+                        re-encoded under other items. It is kept because these
+                        benches were marked on it.
+                      </p>
+                    ) : null}
                     {marks.failed ? (
                       <p className="text-xs text-muted">
                         {item.quantity} piece{item.quantity === 1 ? "" : "s"}

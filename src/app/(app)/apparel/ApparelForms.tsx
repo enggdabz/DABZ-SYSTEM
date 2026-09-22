@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 
 import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
@@ -8,20 +8,16 @@ import { useFormPanel } from "@/components/use-form-panel";
 import {
   ORDER_FLOW,
   ORDER_STATUS_LABELS,
-  type ApparelSize,
   type OrderStatus,
 } from "@/lib/apparel";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS } from "@/lib/ledger";
-import { centavosToDecimalString } from "@/lib/money";
 
 import {
-  addLineAction,
-  addRosterAction,
   createOrderAction,
   recordPaymentAction,
   removeLineAction,
-  removeRosterEntryAction,
   setOrderStatusAction,
+  updateLineAction,
   updateOrderAction,
   voidPaymentAction,
   type ApparelState,
@@ -32,12 +28,23 @@ export interface CustomerChoice {
   name: string;
 }
 
-export interface ProductChoice {
-  id: string;
-  name: string;
-  basePriceCentavos: number | null;
-}
-
+/**
+ * Opening a project: the basic information the owner asked for, in the order
+ * they asked for it (Phase 13).
+ *
+ *   "Team name, Address, Contact person, Contact number, Facebook account
+ *    link, Due date, and the Payment record (Down payment, Balance)."
+ *
+ * ONLY THE TEAM NAME IS REQUIRED. Everything else left empty stays empty and
+ * never blocks the project - a counter that cannot write an order down until
+ * somebody remembers a Facebook link is a counter that keeps the order on a
+ * scrap of paper.
+ *
+ * The BALANCE is not on this form and never will be: it is the total less the
+ * payments, worked out every time. What is here is the down payment, which
+ * usually arrives with the project, and it goes through the same function
+ * every other apparel payment goes through.
+ */
 export function NewOrderForm({
   customers,
   today,
@@ -110,9 +117,51 @@ export function NewOrderForm({
         </Field>
       </div>
 
+      <ContactFields />
+
       <Field label="Note">
         <Input name="note" placeholder="e.g. same design as last year" />
       </Field>
+
+      <div className="rounded-card bg-surface-sunken p-4 ring-1 ring-line/60">
+        <p className="text-sm font-medium">Down payment</p>
+        <p className="mt-0.5 text-xs text-muted">
+          Optional. Leave it empty and take the payment later on the project.
+          The balance is never typed: it is the total less what has been paid.
+        </p>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-3">
+          <Field label="Amount taken" error={answer.fieldErrors?.downPayment}>
+            <Input name="downPayment" inputMode="decimal" placeholder="e.g. 3000" />
+          </Field>
+
+          <Field label="Paid with" error={answer.fieldErrors?.downPaymentSource}>
+            <Select name="downPaymentSource" defaultValue="cash_drawer">
+              {MONEY_SOURCES.map((source) => (
+                <option key={source} value={source}>
+                  {MONEY_SOURCE_LABELS[source]}
+                </option>
+              ))}
+            </Select>
+          </Field>
+
+          <Field label="Reference number" hint="For GCash, Maya or a bank transfer.">
+            <Input name="downPaymentReference" />
+          </Field>
+        </div>
+
+        {/*
+          Said before it is taken, not discovered in a report next month.
+          Nothing is encoded on a project this new, so there are no items to
+          split the money across and it lands in the apparel fallback book.
+        */}
+        <p className="mt-3 text-xs text-attention">
+          <span aria-hidden="true">{"⚠"} </span>
+          Nothing is encoded yet, so this is booked to Sublimation jerseys. If
+          it should be split across books, encode the people first and take the
+          payment on the project.
+        </p>
+      </div>
 
       {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
 
@@ -128,6 +177,13 @@ export function NewOrderForm({
   );
 }
 
+export interface ProjectContact {
+  contactPerson: string | null;
+  contactNumber: string | null;
+  address: string | null;
+  facebookLink: string | null;
+}
+
 export function OrderDetailsForm({
   orderId,
   teamName,
@@ -135,6 +191,7 @@ export function OrderDetailsForm({
   promisedOn,
   layoutNote,
   note,
+  contact,
   customers,
 }: {
   orderId: string;
@@ -143,6 +200,7 @@ export function OrderDetailsForm({
   promisedOn: string | null;
   layoutNote: string | null;
   note: string | null;
+  contact: ProjectContact;
   customers: CustomerChoice[];
 }) {
   const [state, submit, pending] = useActionState<ApparelState, FormData>(
@@ -184,6 +242,8 @@ export function OrderDetailsForm({
         </Field>
       </div>
 
+      <ContactFields contact={contact} />
+
       <Field label="Layout note" hint="What the design is, or what is waiting on the customer.">
         <Input name="layoutNote" defaultValue={layoutNote ?? ""} />
       </Field>
@@ -204,6 +264,59 @@ export function OrderDetailsForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+/**
+ * The project's own contact details.
+ *
+ * ON THE PROJECT, not on the customer record. A team's contact person is a
+ * fact about this project - next season it is a different manager - and the
+ * job order sheet has to say who was actually spoken to when the work came in.
+ * Nothing here is copied to or from the customer record; where a project
+ * leaves one empty, the project screen shows the linked customer's value and
+ * says where it came from.
+ *
+ * Every one of them is optional, which is why none carries a warning: a
+ * missing Facebook link is not a figure only the owner can know, it is simply
+ * something the team did not give.
+ */
+function ContactFields({ contact }: { contact?: ProjectContact }) {
+  return (
+    <>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <Field label="Contact person" hint="Who the shop deals with for this project.">
+          <Input
+            name="contactPerson"
+            defaultValue={contact?.contactPerson ?? ""}
+            placeholder="e.g. Coach Ramos"
+          />
+        </Field>
+
+        <Field label="Contact number">
+          <Input
+            name="contactNumber"
+            type="tel"
+            inputMode="tel"
+            defaultValue={contact?.contactNumber ?? ""}
+            placeholder="e.g. 0917 000 0000"
+          />
+        </Field>
+      </div>
+
+      <Field label="Address">
+        <Input name="address" defaultValue={contact?.address ?? ""} />
+      </Field>
+
+      <Field label="Facebook account link" hint="The page or profile the order came through.">
+        <Input
+          name="facebookLink"
+          type="url"
+          defaultValue={contact?.facebookLink ?? ""}
+          placeholder="https://facebook.com/..."
+        />
+      </Field>
+    </>
   );
 }
 
@@ -289,44 +402,42 @@ export function StatusForm({
   );
 }
 
-export function AddLineForm({
+/**
+ * What an item is made of.
+ *
+ * Items themselves are no longer added by hand - they follow from the encoding
+ * table, one per uniform type. What is still chosen here is the fabric and the
+ * collar, because those are properties of the batch rather than of a person:
+ * one design is cut from one cloth.
+ */
+export function ItemFabricForm({
   orderId,
-  products,
+  lineId,
+  itemName,
+  fabric,
+  collar,
   fabrics,
   collars,
 }: {
   orderId: string;
-  products: ProductChoice[];
+  lineId: string;
+  itemName: string;
+  fabric: string | null;
+  collar: string | null;
   fabrics: string[];
   collars: string[];
 }) {
   const [state, submit, pending] = useActionState<ApparelState, FormData>(
-    addLineAction,
+    updateLineAction,
     {},
   );
   const { open, answer, openPanel, closePanel } = useFormPanel(state);
-  const [picked, setPicked] = useState<ProductChoice | null>(null);
 
   if (!open) {
     return (
       <div className="space-y-2">
-        {/*
-          Secondary, not red. Red marks the ONE main action on a screen, and on
-          an order that is moving the job along - or taking the money. Adding a
-          line is ordinary work inside a list.
-        */}
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={() => {
-            // The dropdown resets itself when the panel closes; the pick
-            // behind it has to go too, or the price box is filled in for an
-            // item the list no longer shows as chosen.
-            setPicked(null);
-            openPanel();
-          }}
-        >
-          Add an item
+        <Button type="button" variant="secondary" onClick={openPanel}>
+          Fabric and collar
         </Button>
         {answer.success ? <Notice tone="success" title={answer.success} /> : null}
       </div>
@@ -334,72 +445,40 @@ export function AddLineForm({
   }
 
   return (
-    <form action={submit} className="space-y-3 rounded-card bg-surface-sunken p-4 ring-1 ring-line/60">
+    <form
+      action={submit}
+      className="space-y-3 rounded-card bg-surface-sunken p-4 ring-1 ring-line/60"
+    >
       <input type="hidden" name="orderId" value={orderId} />
+      <input type="hidden" name="lineId" value={lineId} />
 
-      <Field label="What is being made" error={answer.fieldErrors?.name}>
-        <Select
-          name="productId"
-          defaultValue=""
-          onChange={(event) =>
-            setPicked(
-              products.find((product) => product.id === event.target.value) ?? null,
-            )
-          }
-        >
-          <option value="">Choose...</option>
-          {products.map((product) => (
-            <option key={product.id} value={product.id}>
-              {product.name}
-              {product.basePriceCentavos === null
-                ? " (no price set)"
-                : ` - ₱${centavosToDecimalString(product.basePriceCentavos)}`}
-            </option>
-          ))}
-        </Select>
-      </Field>
+      <p className="text-sm font-medium">{itemName}</p>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <Field
-          label="Price each"
-          hint="Leave empty if it is not priced yet - the order still works."
-          error={answer.fieldErrors?.unitPrice}
-        >
-          <Input
-            name="unitPrice"
-            inputMode="decimal"
-            key={`price-${picked?.id ?? "none"}`}
-            defaultValue={
-              picked?.basePriceCentavos != null
-                ? centavosToDecimalString(picked.basePriceCentavos)
-                : ""
-            }
-            placeholder="e.g. 650"
-          />
-        </Field>
-
-        <Field
-          label="How many"
-          hint="Ignored once you add a name list - the names become the count."
-          error={answer.fieldErrors?.quantity}
-        >
-          <Input name="quantity" inputMode="numeric" defaultValue="1" />
-        </Field>
-
         <Field label="Fabric" hint="Type anything; the list is only a shortcut.">
-          <Input name="fabric" list="apparel-fabrics" placeholder="e.g. Dri-fit" />
+          <Input
+            name="fabric"
+            list="apparel-fabrics"
+            defaultValue={fabric ?? ""}
+            placeholder="e.g. Dri-fit"
+          />
           <datalist id="apparel-fabrics">
-            {fabrics.map((fabric) => (
-              <option key={fabric} value={fabric} />
+            {fabrics.map((entry) => (
+              <option key={entry} value={entry} />
             ))}
           </datalist>
         </Field>
 
         <Field label="Collar">
-          <Input name="collar" list="apparel-collars" placeholder="e.g. Round neck" />
+          <Input
+            name="collar"
+            list="apparel-collars"
+            defaultValue={collar ?? ""}
+            placeholder="e.g. Round neck"
+          />
           <datalist id="apparel-collars">
-            {collars.map((collar) => (
-              <option key={collar} value={collar} />
+            {collars.map((entry) => (
+              <option key={entry} value={entry} />
             ))}
           </datalist>
         </Field>
@@ -409,7 +488,7 @@ export function AddLineForm({
 
       <div className="flex flex-wrap gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Adding..." : "Add to the order"}
+          {pending ? "Saving..." : "Save"}
         </Button>
         <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
@@ -438,114 +517,11 @@ export function RemoveLineForm({
       <Button type="submit" variant="quiet" disabled={pending}>
         {pending ? "Removing..." : "Remove item"}
       </Button>
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
-    </form>
-  );
-}
-
-/**
- * The roster, pasted in one go.
- *
- * A team captain sends a list. Typing fifteen names into fifteen little forms
- * is how a shop ends up keeping the list on paper instead of in here.
- */
-export function RosterForm({
-  orderId,
-  lineId,
-  sizesWithoutPrice,
-}: {
-  orderId: string;
-  lineId: string;
-  sizesWithoutPrice: ApparelSize[];
-}) {
-  const [state, submit, pending] = useActionState<ApparelState, FormData>(
-    addRosterAction,
-    {},
-  );
-  const { open, answer, openPanel, closePanel } = useFormPanel(state);
-
-  if (!open) {
-    return (
-      <div className="space-y-2">
-        <Button type="button" variant="secondary" onClick={openPanel}>
-          Add names and sizes
-        </Button>
-        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
-      </div>
-    );
-  }
-
-  return (
-    <form action={submit} className="space-y-3 rounded-card bg-surface-sunken p-4 ring-1 ring-line/60">
-      <input type="hidden" name="orderId" value={orderId} />
-      <input type="hidden" name="lineId" value={lineId} />
-
-      <Field
-        label="Paste the list"
-        hint="One player per line: name, number, size. Or just name, size. Or just the size."
-        error={answer.fieldErrors?.roster}
-      >
-        <textarea
-          name="roster"
-          rows={8}
-          required
-          autoFocus
-          placeholder={"Dela Cruz, 7, M\nReyes, 10, L\nSantos, 23, 2XL"}
-          className="w-full rounded-control bg-surface px-3 py-2 font-mono text-sm text-ink ring-1 ring-line placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-ink/50"
-        />
-      </Field>
-
-      {sizesWithoutPrice.length > 0 ? (
-        <Notice
-          tone="attention"
-          title={`${sizesWithoutPrice.length} size${
-            sizesWithoutPrice.length === 1 ? " has" : "s have"
-          } no surcharge set`}
-        >
-          {sizesWithoutPrice.join(", ")} will be added at no extra cost, because
-          nobody has said what they cost. Set them on the price list and the
-          next order picks it up.
-        </Notice>
+      {state.error ? (
+        <div className="mt-2">
+          <Notice tone="attention" title={state.error} />
+        </div>
       ) : null}
-
-      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
-      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
-
-      <div className="flex flex-wrap gap-2">
-        <Button type="submit" disabled={pending}>
-          {pending ? "Adding..." : "Add them"}
-        </Button>
-        <Button type="button" variant="quiet" onClick={closePanel}>
-          Done
-        </Button>
-      </div>
-    </form>
-  );
-}
-
-export function RemoveRosterEntryForm({
-  orderId,
-  entryId,
-}: {
-  orderId: string;
-  entryId: string;
-}) {
-  const [, submit, pending] = useActionState<ApparelState, FormData>(
-    removeRosterEntryAction,
-    {},
-  );
-
-  return (
-    <form action={submit} className="inline">
-      <input type="hidden" name="orderId" value={orderId} />
-      <input type="hidden" name="entryId" value={entryId} />
-      <button
-        type="submit"
-        disabled={pending}
-        className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
-      >
-        {pending ? "..." : "Remove"}
-      </button>
     </form>
   );
 }

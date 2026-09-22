@@ -25,14 +25,19 @@ import { MONEY_SOURCE_LABELS } from "@/lib/ledger";
 import { formatPesos } from "@/lib/money";
 import { projectStatusLabel } from "@/lib/production";
 import { formatCivilDate, parseISODate, civilDateToISO, manilaToday } from "@/lib/period";
-
 import {
-  AddLineForm,
+  APPAREL_SIZES,
+  UNIFORM_TYPES,
+  type ApparelSize,
+  type UniformType,
+} from "@/lib/uniforms";
+
+import { EncodingTable } from "../EncodingTable";
+import {
+  ItemFabricForm,
   OrderDetailsForm,
   PaymentForm,
   RemoveLineForm,
-  RemoveRosterEntryForm,
-  RosterForm,
   StatusForm,
   VoidPaymentForm,
 } from "../ApparelForms";
@@ -80,10 +85,6 @@ export default async function ApparelOrderPage({
     percent: settings.apparelDownPaymentPercent,
   });
 
-  const sizesWithoutPrice = sizes
-    .filter((size) => size.extraCentavos === null)
-    .map((size) => size.size);
-
   const stepIndex = ORDER_FLOW.indexOf(order.status);
 
   /*
@@ -93,6 +94,41 @@ export default async function ApparelOrderPage({
     shown, and neither is derived from the other - see src/lib/production.ts.
   */
   const production = productionFor(detail, marks.steps);
+
+  /*
+    What the encoding table needs to pre-fill a price: the price list tagged by
+    uniform type, and what each size adds. Where the owner has tagged nothing,
+    the entry is NULL and the table asks for the price instead of inventing
+    one.
+  */
+  const priceByType: Partial<Record<UniformType, number | null>> = {};
+  for (const type of UNIFORM_TYPES) {
+    const tagged = products.find(
+      (product) => product.active && product.uniformType === type,
+    );
+    priceByType[type] = tagged?.basePriceCentavos ?? null;
+  }
+
+  const sizeExtras: Partial<Record<ApparelSize, number | null>> = {};
+  for (const size of APPAREL_SIZES) {
+    sizeExtras[size] = sizes.find((entry) => entry.size === size)?.extraCentavos ?? null;
+  }
+
+  const itemPriceByLine = Object.fromEntries(
+    detail.lines.map((line) => [line.id, line.unitPriceCentavos]),
+  );
+
+  // Items with nobody encoded on them: a plain block written before Phase 13.
+  const unencoded = totals.lines
+    .filter((entry) => !entry.retired && entry.roster.length === 0)
+    .map((entry) => ({
+      lineId: entry.line.id,
+      name: entry.line.name,
+      quantity: entry.quantity,
+    }));
+
+  const customer = customers.find((entry) => entry.id === order.customerId);
+  const untaggedTypes = UNIFORM_TYPES.filter((type) => priceByType[type] == null);
 
   return (
     <div className="space-y-8">
@@ -118,6 +154,32 @@ export default async function ApparelOrderPage({
           </Link>
         </div>
       </div>
+
+      {/* ---- The payment record, at the top where the owner asked for it -- */}
+      <Card title="The payment record">
+        <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Figure label="Project total" value={formatPesos(totals.totalCentavos)} />
+          <Figure
+            label="Down payment"
+            value={formatPesos(totals.downPaymentCentavos)}
+            tone={totals.downPaymentCentavos > 0 ? "success" : undefined}
+          />
+          <Figure
+            label="Other payments"
+            value={formatPesos(totals.otherPaymentsCentavos)}
+            tone={totals.otherPaymentsCentavos > 0 ? "success" : undefined}
+          />
+          <Figure
+            label="Balance"
+            value={formatPesos(totals.balanceCentavos)}
+            tone={totals.balanceCentavos > 0 ? "attention" : undefined}
+          />
+        </dl>
+        <p className="mt-3 text-xs text-muted">
+          The total adds up the rows below and the balance is the total less what
+          has been paid. Neither is stored, so neither can disagree with them.
+        </p>
+      </Card>
 
       {warnings.length > 0 ? (
         <Notice
@@ -212,9 +274,15 @@ export default async function ApparelOrderPage({
             promisedOn={order.promisedOn}
             layoutNote={order.layoutNote}
             note={order.note}
+            contact={{
+              contactPerson: order.contactPerson,
+              contactNumber: order.contactNumber,
+              address: order.address,
+              facebookLink: order.facebookLink,
+            }}
             customers={customers
               .filter((customer) => customer.active)
-              .map((customer) => ({ id: customer.id, name: customer.name }))}
+              .map((entry) => ({ id: entry.id, name: entry.name }))}
           />
         </div>
 
@@ -224,14 +292,77 @@ export default async function ApparelOrderPage({
         </p>
       </Card>
 
+      {/* ---- Who to contact ---------------------------------------------- */}
+      <Card
+        title="Who to contact"
+        description="This project's own details. Anything left empty stays empty."
+      >
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <Detail
+            label="Contact person"
+            value={order.contactPerson}
+            fallback={customer?.name ?? null}
+          />
+          <Detail
+            label="Contact number"
+            value={order.contactNumber}
+            fallback={customer?.contactNumber ?? null}
+          />
+          <Detail
+            label="Address"
+            value={order.address}
+            fallback={customer?.address ?? null}
+          />
+          <Detail
+            label="Facebook"
+            value={order.facebookLink}
+            fallback={customer?.facebookName ?? null}
+            link={order.facebookLink}
+          />
+        </dl>
+      </Card>
+
+      {/* ---- The people, one row each ------------------------------------ */}
+      <Card
+        title="The people on this project"
+        description="One row per person: their uniform, name, number, sizes, price and remarks. Typing is not saving - press Save when the table is right."
+      >
+        {untaggedTypes.length > 0 && isOwnerOrAdmin(user) ? (
+          <div className="mb-5">
+            <Notice
+              tone="info"
+              title={`${untaggedTypes.length} of the six uniform types has no price to pre-fill from`}
+            >
+              Tag an item on the{" "}
+              <Link href="/apparel/prices" className={`underline ${TAP_AREA}`}>
+                apparel price list
+              </Link>{" "}
+              with its uniform type and the price box fills itself in. Until
+              then the price is typed by hand, which still works - nothing is
+              guessed either way.
+            </Notice>
+          </div>
+        ) : null}
+
+        <EncodingTable
+          orderId={order.id}
+          rows={detail.roster}
+          itemPriceByLine={itemPriceByLine}
+          priceByType={priceByType}
+          sizeExtras={sizeExtras}
+          unencoded={unencoded}
+          readOnly={order.status === "cancelled"}
+        />
+      </Card>
+
       {/* ---- What is being made ------------------------------------------ */}
       <Card
         title="What is being made"
-        description="The total adds up these rows. It is never stored, so it cannot disagree with them."
+        description="One item per uniform type, made by the table above. The fabric and the collar are chosen here, because one design is cut from one cloth."
       >
         {totals.lines.length === 0 ? (
-          <Notice tone="info" title="Nothing on the order yet">
-            Add the jerseys, shirts or jackets being made.
+          <Notice tone="info" title="Nothing on the project yet">
+            Encode the people above and the items appear by themselves.
           </Notice>
         ) : (
           <ul className="space-y-6">
@@ -242,20 +373,21 @@ export default async function ApparelOrderPage({
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
                   <div>
-                    <h3 className="font-semibold">{entry.line.name}</h3>
+                    <h3 className="font-semibold">
+                      {entry.line.name}
+                      {entry.retired ? <span className="ml-2"><Tag>Retired</Tag></span> : null}
+                    </h3>
                     <p className="text-xs text-muted">
-                      {entry.line.unitPriceCentavos > 0
-                        ? `${formatPesos(entry.line.unitPriceCentavos)} each`
-                        : "no price set"}
-                      {entry.line.fabric ? ` · ${entry.line.fabric}` : ""}
+                      {entry.line.fabric ? `${entry.line.fabric}` : "no fabric set"}
                       {entry.line.collar ? ` · ${entry.line.collar}` : ""}
                       {` · ${entry.quantity} piece${entry.quantity === 1 ? "" : "s"}`}
+                      {entry.line.unitPriceCentavos > 0
+                        ? ` · ${formatPesos(entry.line.unitPriceCentavos)} each where a row has no price of its own`
+                        : ""}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold">
-                      {formatPesos(entry.totalCentavos)}
-                    </p>
+                    <p className="font-semibold">{formatPesos(entry.totalCentavos)}</p>
                     {entry.sizeExtrasCentavos > 0 ? (
                       <p className="text-xs text-muted">
                         includes {formatPesos(entry.sizeExtrasCentavos)} of size
@@ -265,135 +397,75 @@ export default async function ApparelOrderPage({
                   </div>
                 </div>
 
-                {entry.line.unitPriceCentavos === 0 ? (
-                  <p className="mt-2 text-xs text-attention">
-                    <span aria-hidden="true">{"⚠"} </span>
-                    Nobody has priced this, so it adds nothing to the total.
+                {entry.retired ? (
+                  <p className="mt-2 text-xs text-muted">
+                    Nobody is left on this item - its people were re-encoded
+                    under other items. It is kept because the shop floor marked
+                    its benches, and it adds nothing to the project total.
                   </p>
                 ) : null}
 
-                {entry.roster.length > 0 ? (
-                  <div className="mt-4 overflow-x-auto">
-                    <table className="w-full min-w-[22rem] text-sm">
-                      <thead>
-                        <tr className="text-left text-xs text-muted">
-                          <th className="pb-1 pr-3 font-medium">Name</th>
-                          <th className="pb-1 pr-3 font-medium">No.</th>
-                          <th className="pb-1 pr-3 font-medium">Size</th>
-                          <th className="pb-1 pr-3 font-medium">Add-on</th>
-                          <th className="pb-1" />
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-line/60">
-                        {entry.roster.map((player) => (
-                          <tr key={player.id}>
-                            <td className="py-1.5 pr-3">
-                              {player.playerName ?? "—"}
-                            </td>
-                            <td className="py-1.5 pr-3 text-muted">
-                              {player.playerNumber ?? "—"}
-                            </td>
-                            <td className="py-1.5 pr-3 font-medium">
-                              {player.size}
-                            </td>
-                            <td className="py-1.5 pr-3 text-muted">
-                              {player.sizeExtraCentavos > 0
-                                ? formatPesos(player.sizeExtraCentavos)
-                                : "—"}
-                            </td>
-                            <td className="py-1.5 text-right">
-                              {isOpenOrder(order.status) ? (
-                                <RemoveRosterEntryForm
-                                  orderId={order.id}
-                                  entryId={player.id}
-                                />
-                              ) : null}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                {entry.line.uniformType === null && !entry.retired ? (
+                  <p className="mt-2 text-xs text-attention">
+                    <span aria-hidden="true">{"⚠"} </span>
+                    No type of uniform recorded, because this item was written
+                    before the table above existed. Set the type on its rows and
+                    it joins the summary.
+                  </p>
+                ) : null}
+
+                {entry.piecesWithoutPrice > 0 ? (
+                  <p className="mt-2 text-xs text-attention">
+                    <span aria-hidden="true">{"⚠"} </span>
+                    {entry.piecesWithoutPrice} piece
+                    {entry.piecesWithoutPrice === 1 ? "" : "s"} nobody has
+                    priced, so {entry.piecesWithoutPrice === 1 ? "it adds" : "they add"}{" "}
+                    nothing to the total.
+                  </p>
                 ) : null}
 
                 {isOpenOrder(order.status) ? (
                   <div className="mt-4 flex flex-wrap items-start gap-3">
-                    <RosterForm
+                    <ItemFabricForm
                       orderId={order.id}
                       lineId={entry.line.id}
-                      sizesWithoutPrice={sizesWithoutPrice}
+                      itemName={entry.line.name}
+                      fabric={entry.line.fabric}
+                      collar={entry.line.collar}
+                      fabrics={options
+                        .filter((option) => option.kind === "fabric" && option.active)
+                        .map((option) => option.label)}
+                      collars={options
+                        .filter((option) => option.kind === "collar" && option.active)
+                        .map((option) => option.label)}
                     />
-                    <RemoveLineForm orderId={order.id} lineId={entry.line.id} />
+                    {entry.roster.length === 0 ? (
+                      <RemoveLineForm orderId={order.id} lineId={entry.line.id} />
+                    ) : null}
                   </div>
                 ) : null}
               </li>
             ))}
           </ul>
         )}
-
-        {isOpenOrder(order.status) ? (
-          <div className="mt-6 border-t border-line/60 pt-6">
-            <AddLineForm
-              orderId={order.id}
-              products={products
-                .filter((product) => product.active)
-                .map((product) => ({
-                  id: product.id,
-                  name: product.name,
-                  basePriceCentavos: product.basePriceCentavos,
-                }))}
-              fabrics={options
-                .filter((option) => option.kind === "fabric" && option.active)
-                .map((option) => option.label)}
-              collars={options
-                .filter((option) => option.kind === "collar" && option.active)
-                .map((option) => option.label)}
-            />
-          </div>
-        ) : null}
       </Card>
 
       {/* ---- Money ------------------------------------------------------- */}
       <Card title="Money">
-        <dl className="grid gap-4 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs font-medium text-muted">Order comes to</dt>
-            <dd className="mt-1 text-2xl font-semibold tracking-tight">
-              {formatPesos(totals.totalCentavos)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-muted">Paid</dt>
-            <dd className="mt-1 text-2xl font-semibold tracking-tight text-success">
-              {formatPesos(totals.paidCentavos)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-muted">Still owed</dt>
-            <dd
-              className={`mt-1 text-2xl font-semibold tracking-tight ${
-                totals.balanceCentavos > 0 ? "text-attention" : ""
-              }`}
-            >
-              {formatPesos(totals.balanceCentavos)}
-            </dd>
-          </div>
-        </dl>
-
         {totals.overpaid ? (
-          <div className="mt-4">
+          <div className="mb-4">
             <Notice
               tone="attention"
-              title={`Paid ${formatPesos(totals.overpaidByCentavos)} more than the order comes to`}
+              title={`Paid ${formatPesos(totals.overpaidByCentavos)} more than the project comes to`}
             >
-              Either something is missing from the order, or the customer is due
-              change. Nothing was adjusted on its own.
+              Either something is missing from the project, or the customer is
+              due change. Nothing was adjusted on its own.
             </Notice>
           </div>
         ) : null}
 
         {advice.policyMissing ? (
-          <p className="mt-4 text-sm text-muted">
+          <p className="text-sm text-muted">
             No down payment policy is set, so nothing is asked for up front.
             {isOwnerOrAdmin(user) ? (
               <>
@@ -406,17 +478,15 @@ export default async function ApparelOrderPage({
             ) : null}
           </p>
         ) : advice.short ? (
-          <div className="mt-4">
-            <Notice
-              tone="attention"
-              title={`Down payment is ${formatPesos(advice.shortByCentavos)} short`}
-            >
-              Your policy asks for {settings.apparelDownPaymentPercent}% up
-              front, which is {formatPesos(advice.expectedCentavos ?? 0)}.
-            </Notice>
-          </div>
+          <Notice
+            tone="attention"
+            title={`Down payment is ${formatPesos(advice.shortByCentavos)} short`}
+          >
+            Your policy asks for {settings.apparelDownPaymentPercent}% up front,
+            which is {formatPesos(advice.expectedCentavos ?? 0)}.
+          </Notice>
         ) : (
-          <p className="mt-4 text-sm text-muted">
+          <p className="text-sm text-muted">
             Down payment policy of {settings.apparelDownPaymentPercent}% is met.
           </p>
         )}
@@ -483,6 +553,74 @@ export default async function ApparelOrderPage({
           </div>
         ) : null}
       </Card>
+    </div>
+  );
+}
+
+function Figure({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "success" | "attention";
+}) {
+  const colour =
+    tone === "success" ? "text-success" : tone === "attention" ? "text-attention" : "";
+  return (
+    <div>
+      <dt className="text-xs font-medium text-muted">{label}</dt>
+      <dd className={`mt-1 text-2xl font-semibold tracking-tight ${colour}`}>{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * One contact detail.
+ *
+ * Where the project has none of its own, the linked customer's is SHOWN and
+ * labelled as coming from there - never copied in. Copying would quietly
+ * freeze a customer's address on to a project, or worse, write a project's
+ * address back on to the customer.
+ */
+function Detail({
+  label,
+  value,
+  fallback,
+  link,
+}: {
+  label: string;
+  value: string | null;
+  fallback: string | null;
+  link?: string | null;
+}) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-muted">{label}</dt>
+      <dd className="mt-1 text-sm break-words">
+        {value ? (
+          link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noreferrer noopener"
+              className={`underline ${TAP_AREA}`}
+            >
+              {value}
+            </a>
+          ) : (
+            value
+          )
+        ) : fallback ? (
+          <span className="text-muted">
+            {fallback}{" "}
+            <span className="text-xs">(from the customer record)</span>
+          </span>
+        ) : (
+          <span className="text-muted">not given</span>
+        )}
+      </dd>
     </div>
   );
 }

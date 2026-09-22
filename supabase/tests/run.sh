@@ -54,6 +54,8 @@ quiet "$HERE/../migrations/0016_phase11_notifications.sql"
 quiet "$HERE/../migrations/0017_deactivated_account_reads_nothing.sql"
 # 0018 adds the production marks - 15 tests them.
 quiet "$HERE/../migrations/0018_phase12_production.sql"
+# 0019 adds the encoding table's columns and its save - 16 tests them.
+quiet "$HERE/../migrations/0019_phase13_encoding.sql"
 # 0020 is the online shop and its orders - 17 tests it.
 quiet "$HERE/../migrations/0020_phase14_online_orders.sql"
 
@@ -75,4 +77,5 @@ run "$HERE/12_phase10_rls.test.sql"
 run "$HERE/13_phase11_rls.test.sql"
 run "$HERE/14_deactivated_account.test.sql"
 run "$HERE/15_phase12_rls.test.sql"
+run "$HERE/16_phase13_rls.test.sql"
 run "$HERE/17_online_orders_rls.test.sql"
