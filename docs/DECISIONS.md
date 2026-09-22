@@ -1248,3 +1248,36 @@ to ask:
   instead" was advice that could not be followed. The button is not offered
   there at all. To give another kind the same treatment — Stop counting a
   bill, say — pass `alternative` where its `DeleteButton` is rendered.
+- **22 September 2026 — the online catalogue is the homepage; the page about
+  the whole shop moved to `/about`.** You asked for the online products website
+  to be the homepage. Until now `/` was the Phase 9 page — the three divisions,
+  their price lists, the address and the enquiry form — and the shop sat behind
+  an "Order jerseys online" button on it. The two swapped places. The reason to
+  prefer the catalogue at the front door is that it is the one thing on this
+  site a customer can **finish by themselves**: everything on the Phase 9 page
+  ends in a message somebody at the shop has to answer, and a customer who came
+  from a Facebook post about jerseys was one tap further away from ordering
+  than they needed to be. Nothing was deleted. The Phase 9 page is the same
+  page at `/about`, reachable from the top of every shop page ("What we do"),
+  from every footer ("Everything else we do") and from the closed-shop notice.
+  **Only `/shop` itself moved**: `/shop/products/...`, `/shop/designs`,
+  `/shop/order` and `/shop/track` are exactly where they were, because
+  `/products` at the root is already the Counter's own product screen and two
+  pages cannot share an address. `/shop` still answers — `next.config.ts`
+  redirects it to `/` — so every link already handed out on Facebook, in
+  Messenger, on a receipt or on a tarpaulin still works. That redirect is
+  **temporary (307), not permanent (308)**, on purpose: a permanent one is
+  cached by the customer's own phone more or less for ever, and this is a
+  decision about the shape of the site you may want to look at again. The cost
+  is a little search-engine credit left on the old address.
+  One consequence worth knowing: with **Show the online shop** switched off,
+  the front door does NOT show the "we are not taking online orders" notice the
+  rest of the shop shows — it sends the customer to `/about` instead, because a
+  homepage that says only that leaves them with no address, no opening hours,
+  no price lists and nothing to ask. `shop-closed.test.ts` checks the front door
+  for that answer by name, so it stays a different answer rather than becoming a
+  forgotten one. To swap the two pages back: move `src/app/(shop)/page.tsx` to
+  `src/app/(shop)/shop/page.tsx` and `src/app/(public)/about/page.tsx` to
+  `src/app/(public)/page.tsx`, then drop the `redirects()` block from
+  `next.config.ts`. The links in both layouts and the two guard tests name the
+  addresses they expect, so they will say which ones need turning round.

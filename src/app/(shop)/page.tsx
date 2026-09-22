@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { connection } from "next/server";
 
 import { TAP_AREA } from "@/components/ui";
@@ -11,10 +12,19 @@ import {
 } from "@/lib/data/online";
 import { designImageUrl, productImageUrl } from "@/lib/online/storage";
 
-import { ShopClosed } from "../ShopClosed";
-
 import { CatalogueBrowser } from "./CatalogueBrowser";
 
+/**
+ * The shop's front door (22 September 2026).
+ *
+ * This page used to live at `/shop`, behind the Phase 9 page about the whole
+ * business. The owner asked for it the other way round: what a customer can
+ * actually finish by themselves is the products, so the products are what they
+ * land on. The rest of the shop - the three divisions, their price lists, the
+ * address and the enquiry form - is one link away at `/about`, and `/shop`
+ * still answers, permanently redirected here in `next.config.ts` for every
+ * link already handed out.
+ */
 export const metadata = {
   title: "Dabz Apparel — custom teamwear, ordered online",
   description:
@@ -26,7 +36,7 @@ export const metadata = {
   },
 };
 
-export default async function ShopHomePage() {
+export default async function HomePage() {
   await connection();
 
   const [products, categories, designs, settings] = await Promise.all([
@@ -36,9 +46,17 @@ export default async function ShopHomePage() {
     getShopSettings(),
   ]);
 
-  // The same switch the Phase 9 page has: off takes the shop down without
-  // removing anything.
-  if (!settings.onlineShopEnabled) return <ShopClosed />;
+  /*
+    The "Show the online shop" switch, answered differently here than anywhere
+    else in the shop.
+
+    Everywhere else, off shows `ShopClosed` - a short honest page instead of a
+    404. On the FRONT DOOR that would be a dead end where the homepage used to
+    be: no address, no opening hours, no price lists, no way to ask. So this
+    one page sends the customer to the page about the rest of the shop, which
+    is exactly what stood here before. `shop-closed.test.ts` holds it to that.
+  */
+  if (!settings.onlineShopEnabled) redirect("/about");
 
   const imageUrls = Object.fromEntries(
     products.map((product) => [

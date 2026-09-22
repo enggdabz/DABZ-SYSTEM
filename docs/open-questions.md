@@ -125,26 +125,31 @@ The customer-facing shop obeys spec 5.1: a browser check over every page at
   colour. Six screens in a different palette from the other twenty-three would
   read as a different application.
 
-### Routes: the shop lives under `/shop`
+### Routes: the catalogue is at `/`, the rest under `/shop`
 
-Spec 8 puts the customer's catalogue at `/`. In this system `/` is already the
-**shop's public page** (Phase 9) — three divisions, their price lists, and the
-enquiry form — and `AGENTS.md` says so explicitly. Replacing it would delete a
-built phase.
+Spec 8 puts the customer's catalogue at `/`. When this module was built `/` was
+already the **shop's public page** (Phase 9) — three divisions, their price
+lists, and the enquiry form — so the whole shop was mounted under `/shop` and
+that page gained an "Order jerseys online" way in.
 
-So the online shop is mounted at `/shop`, and the public page gained an "Order
-online" way in. Every other route is as the spec writes it, under that prefix:
+**On 22 September 2026 the owner asked for the online products website to be the
+homepage**, so the catalogue moved to `/` and the Phase 9 page to `/about`.
+`docs/DECISIONS.md` carries the reasoning and how to swap them back.
 
 | Spec | Built |
 | --- | --- |
-| `/` | `/shop` |
+| `/` | `/` |
 | `/designs`, `/designs/[code]` | `/shop/designs`, `/shop/designs/[code]` |
 | `/products/[slug]` | `/shop/products/[slug]` |
 | `/order`, `/order/details` | `/shop/order`, `/shop/order/details` |
 | `/order/received/[token]` | `/shop/order/received/[token]` |
 | `/track` | `/shop/track` |
 
-`/products` could not be reused: it is already the Counter's product screen.
+The catalogue is the only page that moved to the root, and `/shop` still
+answers: `next.config.ts` redirects it there for every link already handed out.
+`/products` could not be reused: it is already the Counter's product screen —
+which is why the pages under `/shop` stayed where they are rather than all
+moving up.
 
 ### Admin: the sidebar, not `/admin` tabs
 

@@ -12,9 +12,13 @@
  * does not open the whole system.
  */
 export const PUBLIC_PATHS = [
-  // The shop's public page (Phase 9). A customer arriving from Facebook must
-  // not be shown a login screen.
+  // The online catalogue, which has been the homepage since 22 September 2026.
+  // A customer arriving from Facebook must not be shown a login screen.
   "/",
+  // The page about the whole shop (Phase 9). It was the homepage until the
+  // catalogue took that place; it is the same page at a new address, and it is
+  // read by exactly the same person.
+  "/about",
   "/login",
   "/setup",
   // The online shop (Phase 14): the catalogue, a product, the order, the
