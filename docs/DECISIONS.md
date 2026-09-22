@@ -1195,3 +1195,16 @@ to ask:
   worst case: the grid is 434px inside a 310px box, and the page overflow is
   zero. The clipped column at the right edge is its own affordance. To change
   it: the two `overflow-x-auto` wrappers in `src/components/UniformSummary.tsx`.
+
+- **22 September 2026 — the print button refuses while the table is unsaved.**
+  Everywhere else this system says a thing out loud rather than blocking it: a
+  released order with money owed is allowed and reported, an overpayment is
+  shown rather than adjusted. This is the exception, and the reason is that the
+  output leaves the building. The job order sheet is drawn on the server from
+  SAVED rows, so printing it with five people still in the table produces a
+  piece of paper that is wrong in a way the paper cannot show — no warning
+  survives the printer, and the person cutting has no way to know. A screen can
+  carry a ⚠ next to a figure; a sheet of paper in somebody's hand cannot. So
+  the button reads "Save first to print" and does nothing until it is true. To
+  change it: the `changes > 0` branch in the action row of
+  `src/app/(app)/apparel/EncodingTable.tsx`.

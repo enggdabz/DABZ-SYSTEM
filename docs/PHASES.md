@@ -2339,6 +2339,57 @@ cuts and sews from now sit on it.
 
 ---
 
+## 22 September 2026 — a print button where the encoding happens
+
+**What you asked for**
+
+> "Can we have a print button to print this data for our hard copy."
+
+**What was already there, and why it was not enough**
+
+The **Print the job order** button at the top of a project already prints
+exactly this data — every person with their name, number, size, short size,
+short name, price and remarks, grouped by item, then both summary grids, the
+payment record and the signature lines. The problem was where it is. By the
+time you have encoded thirty people you are at the bottom of the screen, and
+the button is off the top of it.
+
+**And a trap underneath that.** The sheet is drawn on the server from what has
+been **saved**. Pressing print with five people still sitting unsaved in the
+table would have handed you a list missing five shirts — and nothing on the
+paper would have said so. Somebody cuts from that paper.
+
+**Built**
+
+- **A second way in, in the row with Save**, where your hands already are.
+- **It is off while anything is unsaved**, and says why: the button reads
+  **Save first to print** until the table is saved. That is not a nicety. A
+  printed list that silently omits the row you just typed is the worst thing
+  this screen could produce, and the honest answer is to refuse rather than to
+  print a lie.
+- **The Remarks column got its gutter back.** Found by rendering the sheet at
+  A4 in a browser rather than by reading the code: Price is right-aligned and
+  Remarks is left-aligned, so with nothing between them the two headings
+  printed as one word — **"PriceRemarks"** — on the sheet the customer checks.
+
+**How to check it**
+
+1. Open a project and change something in the table. The button reads **Save
+   first to print** and does nothing.
+2. Press **Save**. It becomes **Print the job order**.
+3. Press it, then use your browser's Print (Ctrl+P). Every person you encoded
+   is on it, with both summary grids underneath.
+4. Check the arithmetic on the paper by hand. That is the whole point of it
+   adding up its own rows.
+
+| What | How | Result |
+|---|---|---|
+| Nothing about the counting changed | `npm test` | 844 tests |
+| The sheet at A4, in print media | headless browser | white ground, black text, no overflow; the Price/Remarks collision found and fixed |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+---
+
 ## Phase 14 — Dabz Apparel online orders ✅
 
 **What it is.** A customer orders jerseys from their phone without chatting
