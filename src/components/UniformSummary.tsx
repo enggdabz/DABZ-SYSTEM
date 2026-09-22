@@ -6,10 +6,13 @@
  *    same for the shorts: the quantity of shorts per size."
  *
  * Two grids, both counted from the rows every time and neither stored - see
- * `summariseUniforms` in `src/lib/uniforms.ts` for why. This component is
- * shared by the project screen and the printed job order sheet on purpose: two
- * copies of a grid is two chances for the shop floor and the customer to be
- * cutting different amounts.
+ * `summariseUniforms` in `src/lib/uniforms.ts` for why. This ONE component is
+ * shared by the project screen, the printed job order sheet and the production
+ * report: three copies of a grid is three chances for the counter, the
+ * customer and the shop floor to be cutting different amounts.
+ *
+ * It lives in `src/components` rather than beside the apparel screens because
+ * the production report is in another route group and reaches for it too.
  *
  * It is a server component with no state of its own, so the sheet can render
  * it straight into a printed page.

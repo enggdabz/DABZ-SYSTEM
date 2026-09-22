@@ -2288,6 +2288,57 @@ first thing to try after `npm run db:push`.
 
 ---
 
+## 22 September 2026 — the summary on the production report
+
+**What you asked for**
+
+> "The summary should also show on the production report."
+
+**Why it was in the wrong place**
+
+Phase 13 put the summary — how many of each uniform type, per size, and the
+shorts per size — on the project screen and on the printed job order sheet.
+Both are right, and both are the wrong screen for the person it is actually
+for: the project screen is the counter's, and the sheet is the customer's
+piece of paper. **The production report is the screen the shop floor has
+open**, because that is where the benches are ticked. The figures somebody
+cuts and sews from now sit on it.
+
+**Built**
+
+- The two grids on **Production report → open a project**, between the
+  project's status and its items: what to make, then how far along it is.
+- **One component, in three places.** `UniformSummaryGrids` moved to
+  `src/components/` and is now shared by the project screen, the printed sheet
+  and the production report. Three copies of a grid would be three chances for
+  the counter, the customer and the shop floor to be cutting different amounts.
+- **It is counted from the project's own rows, not from the bench marks.** So
+  on a day when the marks cannot be read — the notice at the top of that screen
+  — the summary still says something true, because it never claimed to say
+  where the work had got to.
+- **Not shown on a project with nothing on it at all.** The card below already
+  says so, and says it better, with the way back to the job order. Two "there
+  is nothing here" messages stacked is how a screen teaches somebody to skim
+  past both.
+
+**How to check it**
+
+1. Open **Production report** and open a project that has people encoded on it.
+2. The grids are there, under the status and above the benches, and they say
+   the same numbers as the project screen and the printed sheet.
+3. Tick a bench and save. The grids do not move — they count what is being
+   made, not how far along it is.
+4. On a project with no items at all, there are no grids and the card below
+   explains why.
+
+| What | How | Result |
+|---|---|---|
+| The counting itself, unchanged | `npm test` | 844 tests |
+| The screen at 390 / 768 / 1024 / 1440, worst case of every size in use | headless browser | no sideways scroll of the page at any width; on a phone an eleven-column grid scrolls inside its own box |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

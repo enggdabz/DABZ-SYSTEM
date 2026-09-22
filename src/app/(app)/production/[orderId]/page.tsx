@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
-import { ORDER_STATUS_LABELS } from "@/lib/apparel";
+import { UniformSummaryGrids } from "@/components/UniformSummary";
+import { ORDER_STATUS_LABELS, summariseOrder } from "@/lib/apparel";
 import { requirePermission } from "@/lib/auth/dal";
 import { getApparelOrder } from "@/lib/data/apparel";
 import { getProductionSteps, productionFor } from "@/lib/data/production";
@@ -80,6 +81,20 @@ export default async function ProductionProjectPage({
   const { order } = detail;
   const production = productionFor(detail, marks.steps);
   const cancelled = order.status === "cancelled";
+
+  /*
+    How many of each, per size (owner's request, 22 September 2026).
+
+    This is the screen the shop floor actually has open, so it is the screen
+    the cutting and sewing figures belong on - they were on the project and on
+    the printed sheet, which is the counter's screen and the customer's piece
+    of paper. Same component, same pure function, so the three can never say
+    three different numbers.
+
+    Counted from the project's own rows, NOT from the marks - so it still says
+    something true on a day when the benches cannot be read.
+  */
+  const summary = summariseOrder(detail.totals.lines);
 
   /*
     Only asked when the marks were actually read. Worked out from an empty
@@ -231,6 +246,17 @@ export default async function ProductionProjectPage({
           </div>
         ) : null}
       </Card>
+
+      {/*
+        ---- How many of each ------------------------------------------------
+        Not shown on a project with nothing on it at all: the card below
+        already says so, and says it better - with the way back to the job
+        order. Two "there is nothing here" messages stacked is how a screen
+        teaches somebody to skim past both.
+      */}
+      {production.noItems ? null : (
+        <UniformSummaryGrids summary={summary} title="How many of each, per size" />
+      )}
 
       {/* ---- The items --------------------------------------------------- */}
       {production.noItems ? (
