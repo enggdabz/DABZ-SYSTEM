@@ -112,6 +112,15 @@ export interface ProductionItem {
   name: string;
   /** Roster entries if there are any, otherwise the typed quantity. */
   quantity: number;
+  /**
+   * Nobody is left on this item: its people were re-encoded under other items
+   * (Phase 13), and it is kept only because these benches were marked on it.
+   *
+   * It still counts towards the project's status, because the work it records
+   * was really done - what it does NOT do is add its pieces to the order
+   * total, since they are counted on the item that took them.
+   */
+  retired?: boolean;
 }
 
 export interface ItemProduction extends ProductionItem {

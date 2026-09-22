@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   downPaymentAdvice,
+  summariseOrder,
   formatOrderNumber,
   isOpenOrder,
   lineTotal,
@@ -25,6 +26,9 @@ function line(overrides: Partial<OrderLine> = {}): OrderLine {
     unitPriceCentavos: parsePesos("650"),
     quantity: 1,
     incomeCategory: "sublimation_jerseys",
+    uniformType: "jersey",
+    customTypeName: null,
+    retiredAt: null,
     ...overrides,
   };
 }
@@ -33,9 +37,19 @@ function player(overrides: Partial<RosterEntry> = {}): RosterEntry {
   return {
     id: "r1",
     lineId: "line-1",
+    uniformType: "jersey",
+    customTypeName: null,
     playerName: "Dela Cruz",
     playerNumber: "7",
     size: "M",
+    shortSize: null,
+    shortName: null,
+    // Null on purpose: these fixtures are orders written BEFORE Phase 13, and
+    // the point of most of the tests below is that they still total the same.
+    priceCentavos: null,
+    note: null,
+    quantity: 1,
+    upperIncluded: true,
     sizeExtraCentavos: 0,
     ...overrides,
   };
@@ -440,7 +454,12 @@ describe("orderWarnings", () => {
     ]);
   });
 
-  it("flags an item nobody has priced", () => {
+  it("counts the PIECES nobody has priced, not the items", () => {
+    /*
+      Since Phase 13 the money is on the rows, so an item can be priced on
+      twenty-eight of its thirty people. "1 item with no price" would send
+      somebody looking at the wrong thing.
+    */
     const unpriced = orderTotals({
       lines: [line({ unitPriceCentavos: 0, quantity: 5 })],
       roster: [],
@@ -454,7 +473,232 @@ describe("orderWarnings", () => {
     });
     expect(warnings[0]).toEqual({
       kind: "unpriced_line",
-      label: "1 item with no price",
+      label: "5 pieces with no price",
     });
+  });
+
+  it("names the people with no price, and leaves the priced ones alone", () => {
+    const totals = orderTotals({
+      lines: [line({ unitPriceCentavos: 0 })],
+      roster: [
+        player({ id: "r1", priceCentavos: parsePesos("650") }),
+        player({ id: "r2", priceCentavos: null }),
+      ],
+      payments: [],
+    });
+
+    expect(totals.piecesWithoutPrice).toBe(1);
+    expect(
+      orderWarnings({
+        status: "quoted",
+        promisedOn: "2026-10-01",
+        today,
+        totals,
+      })[0],
+    ).toEqual({ kind: "unpriced_line", label: "1 piece with no price" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Phase 13: the encoding table, and the orders written before it
+// ---------------------------------------------------------------------------
+
+describe("an order written before Phase 13", () => {
+  /*
+    The promise made when the encoding table was built: every project already
+    in the system still opens, totals the same TO THE CENTAVO and prints.
+
+    It holds because a row with no price of its own is totalled the way every
+    roster entry always was - the item's price each, plus that row's own copied
+    size add-on. These are not new sums; they are the old sums, asserted
+    against the figures the old code produced.
+  */
+  const legacy = [
+    player({ id: "r1", size: "M", sizeExtraCentavos: 0 }),
+    player({ id: "r2", size: "2XL", sizeExtraCentavos: parsePesos("50") }),
+    player({ id: "r3", size: "3XL", sizeExtraCentavos: parsePesos("75") }),
+  ];
+
+  it("totals exactly as it did: quantity x price each, plus the add-ons", () => {
+    const result = lineTotal(line({ unitPriceCentavos: parsePesos("650") }), legacy);
+
+    expect(result.quantity).toBe(3);
+    expect(result.baseCentavos).toBe(parsePesos("1950"));
+    expect(result.sizeExtrasCentavos).toBe(parsePesos("125"));
+    expect(result.totalCentavos).toBe(parsePesos("2075"));
+  });
+
+  it("is not counted as unpriced, because its item carries the price", () => {
+    const result = lineTotal(line({ unitPriceCentavos: parsePesos("650") }), legacy);
+
+    expect(result.piecesWithoutPrice).toBe(0);
+  });
+
+  it("keeps the plain block of pieces with no names working", () => {
+    // "50 plain shirts", written as a typed quantity on the item itself.
+    const plain = lineTotal(
+      line({ unitPriceCentavos: parsePesos("180"), quantity: 50 }),
+      [],
+    );
+
+    expect(plain.quantity).toBe(50);
+    expect(plain.totalCentavos).toBe(parsePesos("9000"));
+  });
+});
+
+describe("an order encoded person by person", () => {
+  it("adds up the rows' own prices, and ignores the item's", () => {
+    // The item is priced at zero because the money is on the rows now. A row
+    // that says 750 costs 750, whatever the price list said last month.
+    const result = lineTotal(line({ unitPriceCentavos: 0 }), [
+      player({ id: "r1", priceCentavos: parsePesos("750") }),
+      player({ id: "r2", priceCentavos: parsePesos("650") }),
+    ]);
+
+    expect(result.quantity).toBe(2);
+    expect(result.totalCentavos).toBe(parsePesos("1400"));
+    expect(result.sizeExtrasCentavos).toBe(0);
+  });
+
+  it("counts a nameless block of fifty as fifty pieces", () => {
+    const result = lineTotal(line({ unitPriceCentavos: 0 }), [
+      player({
+        id: "r1",
+        playerName: null,
+        quantity: 50,
+        priceCentavos: parsePesos("180"),
+      }),
+    ]);
+
+    expect(result.quantity).toBe(50);
+    expect(result.totalCentavos).toBe(parsePesos("9000"));
+  });
+
+  it("counts a RETIRED item as nothing at all", () => {
+    /*
+      An item the encoding emptied whose bench marks had to be kept. Its pieces
+      are counted on another item now; counting them here too would overstate
+      the project by a whole batch.
+    */
+    const result = lineTotal(
+      line({ unitPriceCentavos: parsePesos("650"), quantity: 18, retiredAt: "2026-09-21T00:00:00Z" }),
+      [],
+    );
+
+    expect(result.retired).toBe(true);
+    expect(result.quantity).toBe(0);
+    expect(result.totalCentavos).toBe(0);
+  });
+});
+
+describe("orderTotals: the money band at the top of a project", () => {
+  it("keeps the down payment apart from everything paid since", () => {
+    const totals = orderTotals({
+      lines: [line({ unitPriceCentavos: parsePesos("650"), quantity: 10 })],
+      roster: [],
+      payments: [
+        payment({ id: "p1", kind: "down_payment", amountCentavos: parsePesos("3000") }),
+        payment({ id: "p2", kind: "balance", amountCentavos: parsePesos("1500") }),
+      ],
+    });
+
+    expect(totals.totalCentavos).toBe(parsePesos("6500"));
+    expect(totals.downPaymentCentavos).toBe(parsePesos("3000"));
+    expect(totals.otherPaymentsCentavos).toBe(parsePesos("1500"));
+    expect(totals.paidCentavos).toBe(parsePesos("4500"));
+    expect(totals.balanceCentavos).toBe(parsePesos("2000"));
+  });
+
+  it("adds the two apart figures back up to what was paid", () => {
+    // The balance is total less payments, and the split must never change it.
+    const totals = orderTotals({
+      lines: [line({ unitPriceCentavos: parsePesos("650"), quantity: 3 })],
+      roster: [],
+      payments: [
+        payment({ id: "p1", kind: "down_payment", amountCentavos: parsePesos("1000") }),
+        payment({ id: "p2", kind: "down_payment", amountCentavos: parsePesos("500") }),
+        payment({ id: "p3", kind: "balance", amountCentavos: parsePesos("450") }),
+      ],
+    });
+
+    expect(totals.downPaymentCentavos + totals.otherPaymentsCentavos).toBe(
+      totals.paidCentavos,
+    );
+  });
+});
+
+describe("summariseOrder", () => {
+  it("counts the rows, and reports an item with no rows apart from them", () => {
+    const withNames = line({ id: "line-1", uniformType: "jersey" });
+    const plain = line({
+      id: "line-2",
+      name: "Shirt",
+      uniformType: null,
+      unitPriceCentavos: parsePesos("180"),
+      quantity: 50,
+    });
+
+    const totals = orderTotals({
+      lines: [withNames, plain],
+      roster: [
+        player({ id: "r1", lineId: "line-1", size: "M", shortSize: "M" }),
+        player({ id: "r2", lineId: "line-1", size: "L" }),
+      ],
+      payments: [],
+    });
+
+    const summary = summariseOrder(totals.lines);
+
+    expect(summary.upperTotal).toBe(2);
+    expect(summary.shortsTotal).toBe(1);
+    expect(summary.unencodedTotal).toBe(50);
+    expect(summary.unencoded[0].name).toBe("Shirt");
+  });
+
+  it("leaves a retired item out of the summary entirely", () => {
+    const totals = orderTotals({
+      lines: [
+        line({ id: "line-1", uniformType: "jersey" }),
+        line({ id: "line-2", name: "Old batch", quantity: 18, retiredAt: "2026-09-21T00:00:00Z" }),
+      ],
+      roster: [player({ id: "r1", lineId: "line-1", size: "M" })],
+      payments: [],
+    });
+
+    const summary = summariseOrder(totals.lines);
+
+    expect(summary.upperTotal).toBe(1);
+    expect(summary.unencoded).toEqual([]);
+  });
+});
+
+describe("orderWarnings: an item with no type of uniform", () => {
+  const today = "2026-09-21";
+
+  it("asks a LIVE project to set the types, so it joins the summary", () => {
+    const totals = orderTotals({
+      lines: [line({ uniformType: null })],
+      roster: [player({ priceCentavos: parsePesos("650") })],
+      payments: [],
+    });
+
+    expect(
+      orderWarnings({ status: "in_production", promisedOn: null, today, totals })
+        .map((warning) => warning.kind),
+    ).toContain("untyped_item");
+  });
+
+  it("says nothing about a released one, where there is nothing left to do", () => {
+    // A warning nobody can act on is how people learn to scroll past warnings.
+    const totals = orderTotals({
+      lines: [line({ uniformType: null })],
+      roster: [player({ priceCentavos: parsePesos("650") })],
+      payments: [payment({ amountCentavos: parsePesos("650") })],
+    });
+
+    expect(
+      orderWarnings({ status: "released", promisedOn: null, today, totals })
+        .map((warning) => warning.kind),
+    ).not.toContain("untyped_item");
   });
 });

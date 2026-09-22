@@ -2119,6 +2119,175 @@ after `npm run db:push`.
 
 ---
 
+## Phase 13 — Encoding a team project, person by person ✅
+
+**What you asked for, 21 September 2026**
+
+> "When we receive a project we enter its basic information: Team name,
+> Address, Contact person, Contact number, Facebook account link, Due date, and
+> the Payment record (Down payment, Balance). After that, inside that project,
+> our staff manually encode the individual specification of every person. It is
+> a team project, so everyone can have their own name, size and so on... After
+> everything is encoded, show a summary: how many Jersey, T-Shirt, Polo Shirt,
+> Longsleeve, Jacket and Custom there are per size, and the same for the
+> shorts."
+
+**In plain language, what was built**
+
+A project is still a Dabz Apparel job order — the same screen, the same order
+number, the same money. What changed is what lives inside it. Where before a
+job order held "18 sublimation jerseys" with a pasted list of names under it,
+it now holds **one row per person**, and each row carries its own uniform type,
+name, number, size, short size, short name, price and remarks.
+
+Everything else follows from those rows rather than being typed a second time:
+
+- **The items make themselves.** Rows of the same uniform type are one item —
+  your own suggestion, and it is what keeps the production report, the payment
+  split, the fabric and collar, the printed sheet and the project calendar
+  working exactly as they did. Nobody chooses an item any more.
+- **The project total is the sum of the row prices.** Added up every time,
+  never stored, whole centavos. A row with no price is marked with a ⚠ and adds
+  nothing; it is never given a made-up one.
+- **The summary is counted from the rows.** Two grids — uppers per type per
+  size, and shorts per size — on the screen and on the printed job order sheet.
+
+**Built**
+
+- **The project's own basic information.** Contact person, contact number,
+  address and Facebook account link now live on the project itself, typed on
+  the form without visiting the Customers screen. Only the team name is
+  required; anything left empty stays empty and never blocks the project. Where
+  a project has no value of its own and a customer record is linked, the
+  screen shows the customer's and says where it came from — shown, never copied
+  in, and never written back.
+- **The payment record at the top of the project**: Project total · Down
+  payment · Other payments · Balance. None of it is stored. The balance is the
+  total less what has been paid, and it is never typed.
+- **A down payment can be taken while the project is being written.** It goes
+  through `record_apparel_payment` like every other apparel payment, with the
+  payment method and reference number, so the ledger entry is written in the
+  same transaction.
+- **The encoding table.** Eight columns in your order — type of uniform, name,
+  jersey number, size, short size, short name, price, remarks — plus a pieces
+  box and the row's own Copy / Remove. Choosing **Custom** opens a box to type
+  the uniform in. Add a row, copy a row, remove a row. A new row starts with the
+  type of the row above it. **Tab** moves along a row and **Enter** moves down a
+  column, adding a row when it reaches the bottom — thirty names, then thirty
+  sizes, without the mouse.
+- **The price box fills itself in** from the apparel price list plus the size
+  add-on, and what is SAVED is the figure in the box. Next month's price rise
+  cannot rewrite this project. A pre-fill only ever fills an EMPTY box, so a
+  figure somebody typed is never overwritten.
+- **Typing is not saving, and the table says so** — the same pattern as the
+  production report. The button counts the changes waiting in it and ⚠ **Not
+  saved yet** sits beside it until they land. One Save sends the whole table in
+  one transaction: thirty people sent as thirty requests can fail halfway and
+  leave half a team encoded.
+- **The paste-in stayed**, as a shortcut that fills rows of the table rather
+  than saving anything. `Dela Cruz, 7, M` · `Reyes, L` · `Santos, 23, 2XL, M`
+  (a second size is read as the short size) · anything left over becomes the
+  note.
+- **The summary**, under the table and on the printed sheet. A line per uniform
+  type — each distinct Custom name its own line, matched past capitals and
+  spacing — a column per size in use, a total per type, per size and overall;
+  then a second grid of shorts per size. On screen it counts what is ON the
+  table, including changes not saved yet, and says so.
+- **Every one of the six types has its own book** (spec 10.1), so a payment
+  splits properly across a project holding jerseys and jackets. Custom books to
+  a new category, **Other apparel**: a custom cap is not a jersey.
+- **Changing or removing a row is written to the audit log** with the whole
+  table before and after.
+- **Nothing that exists changed.** Every project, name and payment entered
+  before today still opens, totals the same to the centavo, and prints —
+  without a data migration, because a row with no price of its own is totalled
+  exactly the way it always was: the item's price each, plus that row's copied
+  size add-on.
+
+**The decisions inside it** (all recorded in `docs/DECISIONS.md`)
+
+The contact details are **on the project**, because a team's contact person is
+a fact about this project and next season it is a different manager. The six
+types find a price through a **tag on the price list** that you set once, and
+an untagged type simply asks for the price rather than guessing one from the
+item's name. **Fifty plain shirts are one row saying fifty**, not fifty empty
+rows. **A size may be left empty** while encoding and is counted in a column
+that says "not set". **A shorts-only row is said out loud**, not guessed from
+an empty size. And an item the encoding empties is removed — unless the shop
+floor has marked its benches, in which case its marks follow its people, or the
+item is kept and counts as nothing.
+
+**How to run it**
+
+```bash
+npm run db:push     # applies 0019
+npm run dev
+```
+
+Then: **Apparel** → **New job order**, or open a project you already have.
+
+**How to check it by hand**
+
+1. **Apparel → New job order.** Type only a team name and press Open. It opens:
+   nothing else is required. Then open it and use **Edit the details** to add
+   the contact person, number, address and Facebook link.
+2. Write another one, this time with a **down payment** filled in. Open it: the
+   band at the top reads Project total ₱0.00 · Down payment what you typed ·
+   Balance ₱0.00, and the payment is in **Money in/out** under Apparel.
+3. On a project, **Add a row**, choose **Jersey**, type a name and a size. The
+   price box fills itself in if you have tagged a price-list item with
+   "Jersey" on **Apparel → Prices**; if not, it stays empty and the row is
+   marked ⚠ **No price**. Notice the button now says *Save 1 change* and ⚠
+   *Not saved yet* is beside it. Press Save.
+4. Press **Enter** in the name box. It moves to the name box of the next row,
+   and on the last row it adds one. Press **Tab**: it moves along the row.
+5. **Copy** a row: everything comes across except the name, the number and the
+   short name — the three things that are never the same twice.
+6. Choose **Custom** on a row. A box appears to type the uniform in; leave it
+   empty and Save refuses that row by name.
+7. Set one row's size to **Shorts only** and give it a short size. The summary
+   counts it under shorts and not under any uniform type — it never had an
+   upper.
+8. Leave one row's size as **Not set**. The summary grows a ⚠ **Not set**
+   column rather than folding it into M.
+9. Add a row with no name and **Pieces** 50. The summary counts fifty.
+10. **Paste a list** — paste three lines, press *Put them on the table*. They
+    appear as unsaved rows for you to check. Nothing is saved until you press
+    Save.
+11. Mix two types on one project, then look at **What is being made**: there
+    are now two items, one per type, and each carries its own fabric and
+    collar. Take a payment and check **Money in/out**: it is split across the
+    two books.
+12. **Print the job order.** The sheet carries every person with their price
+    and remarks, then both summary grids.
+13. Take the last person off an item and Save: the item goes with them. If the
+    **Production report** has marked one of its benches, the marks follow the
+    people to the item that took them.
+14. Open a project written before today. It totals **exactly** what it did
+    before, its names are all there, and it says ⚠ *1 item with no type of
+    uniform recorded*. Set the types on its rows and Save: the total does not
+    move, and the project joins the summary.
+15. Sign in as a staff member without **Apparel job orders**: the section is
+    not in the sidebar, and the project bounces back.
+
+| What | How | Result |
+|---|---|---|
+| The summary, the row prices, the paste parser, and that the app's six types and their books match the migration | `npm test` | 844 tests (52 new) |
+| That an order written before Phase 13 totals the same to the centavo | `npm test` | asserted against the old arithmetic, row by row |
+| The security rules on every new column, the function, and the check constraints, against a real PostgreSQL | `npm run test:rls` | 386 checks, 36 of them new |
+| Every table and column the app asks for | `npm run check:schema` | 216 table references and 1053 column references, against 45 tables — the checker now follows a named column list (`const ORDER_COLUMNS = "..."`), which it used to skip, and was proved by breaking one |
+| The screens at 390 / 768 / 1024 / 1366 / 1440 / 1920, both themes | headless browser | no sideways scroll anywhere; a card per row below 85rem and a ten-column row above it; smallest tap target 28px |
+| Contrast of the row warnings, the "not saved yet" line and the summary's "not set" column | headless browser | 8.68:1 dark, 6.22:1 light — all above 4.5:1 |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+**Not checked here** — the screens were measured in a headless browser against
+the real compiled stylesheet, but they were not driven against a live Supabase,
+because this build environment has no project to sign in to. Encoding a real
+team, saving it, and watching the before/after appear in **Activity** is the
+first thing to try after `npm run db:push`.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

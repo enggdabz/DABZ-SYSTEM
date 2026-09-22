@@ -21,6 +21,7 @@ import { getStockItems } from "@/lib/data/stocks";
 import { getApparelProducts, getSizePrices } from "@/lib/data/apparel";
 import { getRepairServices } from "@/lib/data/repairs";
 import { getSettings } from "@/lib/auth/dal";
+import { UNIFORM_TYPES, UNIFORM_TYPE_LABELS } from "@/lib/uniforms";
 
 export interface ChecklistItem {
   id: string;
@@ -264,6 +265,34 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       href: "/apparel/prices",
       linkLabel: "Open apparel prices",
       important: true,
+    });
+  }
+
+  /*
+    Which of the six uniform types the price list can pre-fill a price for
+    (Phase 13). Not a figure only the owner can know - the prices themselves
+    already have their own entry above - but the same instinct: the encoding
+    table will not guess that "Sublimation jersey set" means Jersey, so until
+    somebody says so the price is typed by hand on every one of thirty rows.
+    Unimportant on purpose: the shop works perfectly well without it.
+  */
+  const taggedTypes = new Set(
+    activeApparel
+      .map((item) => item.uniformType)
+      .filter((type): type is NonNullable<typeof type> => type !== null),
+  );
+  const untaggedTypes = UNIFORM_TYPES.filter((type) => !taggedTypes.has(type));
+  if (activeApparel.length > 0 && untaggedTypes.length > 0) {
+    items.push({
+      id: "apparel-uniform-types",
+      title: `${untaggedTypes.length} uniform type${
+        untaggedTypes.length === 1 ? "" : "s"
+      } with no price to pre-fill from`,
+      why: "On a project's encoding table the price box fills itself in from the price list. Tag one item with each uniform type and thirty rows stop being typed by hand. Nothing is guessed either way.",
+      names: untaggedTypes.map((type) => UNIFORM_TYPE_LABELS[type]),
+      href: "/apparel/prices",
+      linkLabel: "Open apparel prices",
+      important: false,
     });
   }
 

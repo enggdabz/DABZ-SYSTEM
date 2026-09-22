@@ -13,6 +13,8 @@ import {
 import { formatPesos } from "@/lib/money";
 
 import { deleteApparelProductAction } from "../actions";
+import { UNIFORM_TYPE_LABELS } from "@/lib/uniforms";
+
 import { OptionForm, ProductForm, SizePriceForm } from "./PriceForms";
 
 export const metadata = { title: "Apparel prices · Dabz System" };
@@ -111,6 +113,9 @@ export default async function ApparelPricesPage() {
                   ) : (
                     formatPesos(product.basePriceCentavos)
                   )}
+                  {product.uniformType
+                    ? ` · pre-fills ${UNIFORM_TYPE_LABELS[product.uniformType]}`
+                    : ""}
                   {product.note ? ` · ${product.note}` : ""}
                 </span>
               </span>

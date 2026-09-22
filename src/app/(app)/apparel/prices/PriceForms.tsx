@@ -6,6 +6,7 @@ import { Button, Field, Input, Notice, Select } from "@/components/ui";
 import { useFormPanel } from "@/components/use-form-panel";
 import type { ApparelSize } from "@/lib/apparel";
 import { centavosToDecimalString } from "@/lib/money";
+import { UNIFORM_TYPES, UNIFORM_TYPE_LABELS, type UniformType } from "@/lib/uniforms";
 
 import {
   saveApparelOptionAction,
@@ -20,6 +21,7 @@ const INCOME_CATEGORIES = [
   { value: "jackets", label: "Jackets" },
   { value: "long_sleeves", label: "Long sleeves" },
   { value: "dtf_prints", label: "DTF prints" },
+  { value: "other_apparel", label: "Other apparel" },
 ];
 
 export function ProductForm({
@@ -32,6 +34,7 @@ export function ProductForm({
     incomeCategory: string;
     active: boolean;
     note: string | null;
+    uniformType: UniformType | null;
   };
 }) {
   const [state, submit, pending] = useActionState<ApparelState, FormData>(
@@ -87,6 +90,27 @@ export function ProductForm({
           </Select>
         </Field>
       </div>
+
+      {/*
+        Optional, and null is the honest default: guessing "Jersey" from the
+        words "Sublimation jersey set" would have the encoding table
+        pre-filling a price for something nobody said it was. Untagged simply
+        means the price is typed on the row instead.
+      */}
+      <Field
+        label="Pre-fills the price for"
+        hint="Which of the six uniform types this is, on a project's encoding table. Leave it if it is none of them."
+        error={answer.fieldErrors?.uniformType}
+      >
+        <Select name="uniformType" defaultValue={product?.uniformType ?? ""}>
+          <option value="">Not one of the six</option>
+          {UNIFORM_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {UNIFORM_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </Select>
+      </Field>
 
       <Field label="Note">
         <Input name="note" defaultValue={product?.note ?? ""} />

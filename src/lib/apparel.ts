@@ -19,42 +19,37 @@
  */
 import { splitAmountByCategory } from "./ledger";
 import { sumCentavos, type Centavos } from "./money";
+import {
+  rowIsPriced,
+  rowTotal,
+  summariseUniforms,
+  type EncodedRow,
+  type UniformSummary,
+  type UniformType,
+} from "./uniforms";
 
-// ---------------------------------------------------------------------------
-// Sizes (spec 8, open decision 17.10)
-// ---------------------------------------------------------------------------
+/*
+  The size ladder moved to `uniforms.ts` in Phase 13, because it is vocabulary
+  the encoding table and the summary need as much as the totals do. It is
+  re-exported here so that every screen which already asks this file for it
+  keeps working - one move, no churn.
+*/
+export {
+  APPAREL_SIZES,
+  isApparelSize,
+  sizeExtra,
+  type ApparelSize,
+  type SizePrice,
+} from "./uniforms";
 
 /**
- * The standard jersey size ladder. The surcharge for the big sizes is a figure
- * only the owner can know, so every one of these starts with NO extra.
+ * One person on a project: their own name, number, size, shorts and price.
+ *
+ * The word "roster" is kept because that is what fifteen names on a jersey
+ * order have always been called here. Phase 13 gave each of them their own
+ * uniform type and their own price - see `src/lib/uniforms.ts`.
  */
-export const APPAREL_SIZES = [
-  "XS",
-  "S",
-  "M",
-  "L",
-  "XL",
-  "2XL",
-  "3XL",
-  "4XL",
-  "5XL",
-] as const;
-export type ApparelSize = (typeof APPAREL_SIZES)[number];
-
-export interface SizePrice {
-  size: ApparelSize;
-  /** Extra on top of the item price. Null means the owner has not said. */
-  extraCentavos: Centavos | null;
-}
-
-/** What a size adds, or null while nobody has said. Never assumed to be zero. */
-export function sizeExtra(
-  sizes: readonly SizePrice[],
-  size: ApparelSize,
-): Centavos | null {
-  const found = sizes.find((entry) => entry.size === size);
-  return found ? found.extraCentavos : null;
-}
+export type RosterEntry = EncodedRow;
 
 // ---------------------------------------------------------------------------
 // Order status (spec 8)
@@ -106,20 +101,6 @@ export function isOpenOrder(status: OrderStatus): boolean {
 // The order itself
 // ---------------------------------------------------------------------------
 
-export interface RosterEntry {
-  id: string;
-  lineId: string;
-  playerName: string | null;
-  playerNumber: string | null;
-  size: ApparelSize;
-  /**
-   * The size surcharge as it was when the entry was added - copied, not looked
-   * up. Raising the 2XL surcharge next month must not rewrite what a customer
-   * was already quoted.
-   */
-  sizeExtraCentavos: Centavos;
-}
-
 export interface OrderLine {
   id: string;
   orderId: string;
@@ -131,37 +112,98 @@ export interface OrderLine {
   /** Used only when the line has no roster - plain shirts, no names. */
   quantity: number;
   incomeCategory: string;
+  /**
+   * The uniform type this item is (Phase 13). One item per type per project.
+   * Null on an item written before then: "not recorded", never guessed.
+   */
+  uniformType: UniformType | null;
+  customTypeName: string | null;
+  /**
+   * Set when encoding emptied this item but its bench marks had to be kept.
+   * A retired item counts as NOTHING - its pieces are counted on another item
+   * now, and adding them twice would overstate the order.
+   */
+  retiredAt: string | null;
 }
 
 export interface LineTotal {
   line: OrderLine;
   roster: RosterEntry[];
-  /** Roster entries if there are any, otherwise the typed quantity. */
+  /** Pieces: the rows' quantities where there are rows, else the typed one. */
   quantity: number;
-  /** quantity x unit price. */
+  /** The rows' own prices, or the item's price each where they have none. */
   baseCentavos: Centavos;
-  /** What the big sizes add. */
+  /** What the big sizes added, on rows written before Phase 13. */
   sizeExtrasCentavos: Centavos;
   totalCentavos: Centavos;
+  /** Pieces nobody has priced. Warned about, never priced by the system. */
+  piecesWithoutPrice: number;
+  /** True when this item was retired: it counts as nothing (see OrderLine). */
+  retired: boolean;
 }
 
 /**
- * One line's total.
+ * One item's total.
  *
- * When the line has a roster, the roster IS the quantity - fifteen names means
- * fifteen jerseys. A typed quantity beside fifteen names is two answers to the
- * same question, and the names are the one the customer checked.
+ * When the item has rows, THE ROWS ARE THE QUANTITY - fifteen names means
+ * fifteen jerseys, and a nameless block of fifty says fifty on one row. A
+ * typed quantity beside them would be a second answer to the same question,
+ * and the rows are the one the customer checked.
+ *
+ * Each row costs what it says it costs. A row with no price of its own falls
+ * back to the item's price each plus its own copied size add-on, which is
+ * EXACTLY the arithmetic every order written before Phase 13 was totalled
+ * with - so those orders come to the same figure, to the centavo. See
+ * `rowPrice` in `src/lib/uniforms.ts`.
  */
 export function lineTotal(
   line: OrderLine,
   roster: readonly RosterEntry[],
 ): LineTotal {
   const own = roster.filter((entry) => entry.lineId === line.id);
-  const quantity = own.length > 0 ? own.length : line.quantity;
 
-  const baseCentavos = line.unitPriceCentavos * quantity;
+  if (line.retiredAt !== null) {
+    return {
+      line,
+      roster: own,
+      quantity: 0,
+      baseCentavos: 0,
+      sizeExtrasCentavos: 0,
+      totalCentavos: 0,
+      piecesWithoutPrice: 0,
+      retired: true,
+    };
+  }
+
+  if (own.length === 0) {
+    // No rows at all: a plain block of pieces, priced on the item itself.
+    const baseCentavos = line.unitPriceCentavos * line.quantity;
+    return {
+      line,
+      roster: own,
+      quantity: line.quantity,
+      baseCentavos,
+      sizeExtrasCentavos: 0,
+      totalCentavos: baseCentavos,
+      piecesWithoutPrice: line.unitPriceCentavos > 0 ? 0 : line.quantity,
+      retired: false,
+    };
+  }
+
+  const quantity = own.reduce((count, entry) => count + entry.quantity, 0);
+
+  // Split in two only so the screen can still say "includes X of size add-ons"
+  // on the orders that have them. The total is the same either way.
+  const baseCentavos = sumCentavos(
+    own.map((entry) =>
+      entry.quantity *
+      (entry.priceCentavos !== null ? entry.priceCentavos : line.unitPriceCentavos),
+    ),
+  );
   const sizeExtrasCentavos = sumCentavos(
-    own.map((entry) => entry.sizeExtraCentavos),
+    own.map((entry) =>
+      entry.priceCentavos !== null ? 0 : entry.quantity * entry.sizeExtraCentavos,
+    ),
   );
 
   return {
@@ -171,7 +213,46 @@ export function lineTotal(
     baseCentavos,
     sizeExtrasCentavos,
     totalCentavos: baseCentavos + sizeExtrasCentavos,
+    piecesWithoutPrice: own.reduce(
+      (count, entry) => count + (rowIsPriced(entry, line) ? 0 : entry.quantity),
+      0,
+    ),
+    retired: false,
   };
+}
+
+/**
+ * The project's summary: how many of each uniform type, per size, and the
+ * shorts per size.
+ *
+ * Here rather than in either screen, so the project screen and the printed job
+ * order sheet cannot disagree about what is being made - the same reason
+ * `toCalendarOrder` and `toProductionItems` live beside the orders they map.
+ *
+ * An item with no rows on it is a plain block of pieces nobody has been named
+ * for. It is reported separately rather than folded into the grid, because
+ * nothing says what type or size those pieces are, and inventing a column for
+ * them is exactly the confident wrong answer the person cutting would follow.
+ */
+export function summariseOrder(lines: readonly LineTotal[]): UniformSummary {
+  return summariseUniforms({
+    rows: lines.flatMap((entry) => entry.roster),
+    unencoded: lines
+      .filter((entry) => !entry.retired && entry.roster.length === 0)
+      .map((entry) => ({
+        lineId: entry.line.id,
+        name: entry.line.name,
+        quantity: entry.quantity,
+      })),
+  });
+}
+
+/** One row's whole cost, for a screen that lists rows rather than items. */
+export function rosterEntryTotal(
+  entry: RosterEntry,
+  line: Pick<OrderLine, "unitPriceCentavos">,
+): Centavos {
+  return rowTotal(entry, line);
 }
 
 export interface OrderPayment {
@@ -189,6 +270,19 @@ export interface OrderTotals {
   itemCount: number;
   totalCentavos: Centavos;
   paidCentavos: Centavos;
+  /**
+   * The payments the counter marked as a down payment, and everything else.
+   *
+   * Two figures rather than one because the owner asks for the project to say
+   * "Total, Down payment, Other payments, Balance" at the top - and because a
+   * customer can hand over a second down payment on a job that has not started
+   * yet, so which is which is a CHOICE at the counter, not "the first one".
+   * Neither is stored: both are added up from the payments every time.
+   */
+  downPaymentCentavos: Centavos;
+  otherPaymentsCentavos: Centavos;
+  /** Pieces on this project nobody has priced. */
+  piecesWithoutPrice: number;
   /** Total less what has been paid. Never below zero. */
   balanceCentavos: Centavos;
   /** True when more was paid than the order comes to. */
@@ -208,6 +302,11 @@ export function orderTotals(options: {
   const paidCentavos = sumCentavos(
     options.payments.map((payment) => payment.amountCentavos),
   );
+  const downPaymentCentavos = sumCentavos(
+    options.payments
+      .filter((payment) => payment.kind === "down_payment")
+      .map((payment) => payment.amountCentavos),
+  );
 
   const difference = totalCentavos - paidCentavos;
 
@@ -216,6 +315,12 @@ export function orderTotals(options: {
     itemCount: lines.reduce((count, entry) => count + entry.quantity, 0),
     totalCentavos,
     paidCentavos,
+    downPaymentCentavos,
+    otherPaymentsCentavos: paidCentavos - downPaymentCentavos,
+    piecesWithoutPrice: lines.reduce(
+      (count, entry) => count + entry.piecesWithoutPrice,
+      0,
+    ),
     balanceCentavos: Math.max(0, difference),
     overpaid: difference < 0,
     overpaidByCentavos: Math.max(0, -difference),
@@ -331,7 +436,8 @@ export interface OrderWarning {
     | "due_soon"
     | "no_promised_date"
     | "released_with_balance"
-    | "unpriced_line";
+    | "unpriced_line"
+    | "untyped_item";
   label: string;
 }
 
@@ -349,7 +455,7 @@ export function orderWarnings(options: {
   status: OrderStatus;
   promisedOn: string | null;
   today: string;
-  totals: Pick<OrderTotals, "balanceCentavos" | "lines">;
+  totals: Pick<OrderTotals, "balanceCentavos" | "lines" | "piecesWithoutPrice">;
 }): OrderWarning[] {
   const warnings: OrderWarning[] = [];
 
@@ -360,17 +466,39 @@ export function orderWarnings(options: {
     });
   }
 
-  const unpriced = options.totals.lines.filter(
-    (entry) => entry.line.unitPriceCentavos <= 0,
-  );
-  if (unpriced.length > 0) {
+  /*
+    Counted in PIECES rather than items since Phase 13, because the money is on
+    the rows now: an item can be perfectly well priced on twenty-eight of its
+    thirty people, and "1 item with no price" would send somebody looking at
+    the wrong thing.
+  */
+  const unpriced = options.totals.piecesWithoutPrice;
+  if (unpriced > 0) {
     warnings.push({
       kind: "unpriced_line",
-      label: `${unpriced.length} item${unpriced.length === 1 ? "" : "s"} with no price`,
+      label: `${unpriced} piece${unpriced === 1 ? "" : "s"} with no price`,
     });
   }
 
+  /*
+    Only while the project is live. It is a prompt to go and set the types so
+    the project joins the summary - and there is nothing to go and do on a job
+    that has been released or cancelled, where the cutting is long finished.
+    A warning nobody can act on is how people learn to scroll past warnings.
+  */
   if (!isOpenOrder(options.status)) return warnings;
+
+  const untyped = options.totals.lines.filter(
+    (entry) => !entry.retired && entry.line.uniformType === null,
+  );
+  if (untyped.length > 0) {
+    warnings.push({
+      kind: "untyped_item",
+      label: `${untyped.length} item${
+        untyped.length === 1 ? "" : "s"
+      } with no type of uniform recorded`,
+    });
+  }
 
   if (options.promisedOn === null) {
     warnings.push({ kind: "no_promised_date", label: "No promised date set" });
