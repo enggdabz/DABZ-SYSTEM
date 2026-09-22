@@ -18,7 +18,7 @@ import {
   type CleanRosterEntry,
 } from "@/lib/online/items";
 import { SIZES, type Design, type Product, type Size } from "@/lib/online/types";
-import { useCart } from "../../../useCart";
+import { useCart } from "@/lib/online/useCart";
 
 import { FileAttachment } from "./FileAttachment";
 

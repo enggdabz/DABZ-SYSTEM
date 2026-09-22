@@ -8,7 +8,7 @@ import { formatPesos } from "@/lib/money";
 import { cartPreview } from "@/lib/online/cart";
 import { sizeSummary, sizesFromRoster } from "@/lib/online/items";
 
-import { useCart } from "../../useCart";
+import { useCart } from "@/lib/online/useCart";
 
 /**
  * The customer's order, before their details (docs/spec.md 8.3).

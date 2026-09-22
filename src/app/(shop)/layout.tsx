@@ -1,51 +1,25 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
 
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { TAP_AREA } from "@/components/ui";
+import { isShopOpen } from "@/lib/data/online";
 
-import { ShopHeader } from "./ShopHeader";
+import { SiteFooter } from "@/components/SiteFooter";
+import { SiteHeader } from "@/components/SiteHeader";
 
 /**
  * The frame around the online shop.
  *
- * Its own, and not the app's: a customer has no sections to navigate, no
- * account and nothing to sign out of. What they get is the shop's name, the
- * way to the designs, and their own order.
- *
- * It is also not the Phase 9 public page's frame. That one is the whole shop -
- * three divisions, their price lists and an enquiry form - and this one is
- * Dabz Apparel's counter. The link back to it is in the footer.
+ * The same frame the public page wears, and that is the point: the shop is not
+ * a separate website bolted on beside this one, it is the part of it a customer
+ * can finish by themselves. `SiteHeader` has the whole story.
  */
-export default function ShopLayout({ children }: { children: ReactNode }) {
+export default async function ShopLayout({ children }: { children: ReactNode }) {
+  const shopOpen = await isShopOpen();
+
   return (
     <>
-      <ShopHeader />
-
+      <SiteHeader shopOpen={shopOpen} />
       <main className="flex-1">{children}</main>
-
-      <footer
-        data-app-chrome
-        className="border-t border-line/60 px-4 py-8 text-sm text-muted sm:px-6"
-      >
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-4">
-          <p>
-            Dabz Apparel &middot; part of Dabz Printshoppe
-            <span className="block text-xs">
-              San Carlos City, Pangasinan &middot; since 18 June 2017
-            </span>
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
-            <Link href="/shop/track" className={`underline ${TAP_AREA}`}>
-              Track my order
-            </Link>
-            <Link href="/" className={`underline ${TAP_AREA}`}>
-              Everything else we do
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-      </footer>
+      <SiteFooter shopOpen={shopOpen} />
     </>
   );
 }

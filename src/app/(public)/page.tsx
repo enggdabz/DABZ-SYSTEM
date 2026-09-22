@@ -3,17 +3,20 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { Card, TAP_AREA } from "@/components/ui";
+import { getOnlineProducts } from "@/lib/data/online";
 import { getPublicServices, getPublicSettings } from "@/lib/data/public";
 import { DIVISIONS, DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos } from "@/lib/money";
+import { sortForShop } from "@/lib/online/catalogue";
 import { settingsFromRow, type SettingsRow } from "@/lib/settings";
 
 import { EnquiryForm } from "./EnquiryForm";
+import { ShopStrip } from "./ShopStrip";
 
 export const metadata: Metadata = {
   title: "Dabz Printshoppe · Printing, jerseys and repairs in San Carlos City",
   description:
-    "Printing, photocopying, tarpaulins and mugs; sublimation jerseys and shirts; Epson printer, laptop and desktop repairs. San Carlos City, Pangasinan, since 2017.",
+    "Order custom jerseys and shirts online, or drop by for printing, photocopying, tarpaulins and mugs, and Epson printer, laptop and desktop repairs. San Carlos City, Pangasinan, since 2017.",
 };
 
 /**
@@ -31,9 +34,10 @@ export const metadata: Metadata = {
 export default async function PublicHomePage() {
   await connection();
 
-  const [divisions, settingsRow] = await Promise.all([
+  const [divisions, settingsRow, allProducts] = await Promise.all([
     getPublicServices(),
     getPublicSettings(),
+    getOnlineProducts(),
   ]);
 
   const settings = settingsRow
@@ -58,6 +62,16 @@ export default async function PublicHomePage() {
       </section>
     );
   }
+
+  /*
+    The shop's own off switch decides whether this page mentions it at all.
+    Sending a customer to a page that says "we are not taking orders" from a
+    button that says "order jerseys online" is worse than not offering it.
+  */
+  const shopOpen = settings?.onlineShopEnabled !== false;
+  const shopProducts = shopOpen
+    ? sortForShop(allProducts, "most_ordered").slice(0, 6)
+    : [];
 
   const messengerUrl = settings?.messengerUsername
     ? `https://m.me/${settings.messengerUsername.replace(/^@/, "")}`
@@ -95,15 +109,25 @@ export default async function PublicHomePage() {
             can finish by themselves - everything else here ends in a message
             somebody has to answer.
           */}
-          <Link
-            href="/shop"
-            className="rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
-          >
-            Order jerseys online
-          </Link>
+          {shopOpen ? (
+            <Link
+              href="/shop"
+              className="rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
+            >
+              Order jerseys online
+            </Link>
+          ) : null}
+          {/*
+            Takes the leading style when the shop is switched off, so the hero
+            still has one primary action rather than a row of quiet ones.
+          */}
           <a
             href="#contact"
-            className="rounded-control bg-ink/5 px-5 py-3 text-sm font-medium ring-1 ring-line hover:bg-ink/10"
+            className={
+              shopOpen
+                ? "rounded-control bg-ink/5 px-5 py-3 text-sm font-medium ring-1 ring-line hover:bg-ink/10"
+                : "rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
+            }
           >
             Ask us about a job
           </a>
@@ -127,6 +151,9 @@ export default async function PublicHomePage() {
           </p>
         ) : null}
       </section>
+
+      {/* ---- Order online ------------------------------------------------ */}
+      <ShopStrip products={shopProducts} />
 
       {/* ---- What we do -------------------------------------------------- */}
       <section id="what-we-do" className="mx-auto max-w-5xl px-4 py-12 sm:px-6">

@@ -9,7 +9,7 @@ import { cartPreview, cartToOrderItems, clearCart } from "@/lib/online/cart";
 import { civilDateToISO, type CivilDate } from "@/lib/period";
 
 import { placeOrderAction, type PlaceOrderState } from "../../../actions";
-import { useCart } from "../../../useCart";
+import { useCart } from "@/lib/online/useCart";
 
 /**
  * Your details, and the one button that turns a cart into an order
