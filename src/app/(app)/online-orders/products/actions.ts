@@ -20,6 +20,12 @@ import { recordAudit } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { parsePesos } from "@/lib/money";
 import { uniqueSlug } from "@/lib/online/catalogue";
+import {
+  isSameSet,
+  movePhoto,
+  PHOTO_MOVE_LABELS,
+  type PhotoMove,
+} from "@/lib/online/photos";
 import { PRODUCT_IMAGES_BUCKET } from "@/lib/online/storage";
 import {
   checkUpload,
@@ -38,6 +44,13 @@ export interface OnlineProductState {
 
 /** docs/spec.md 6.2: at most eight, enforced here rather than in the table. */
 const MAX_IMAGES = 8;
+
+/*
+  The moves a form may ask for, taken from the labels so the two cannot drift:
+  a move added to `photos.ts` and forgotten here would be refused by an action
+  whose own button had just offered it.
+*/
+const PHOTO_MOVES = Object.keys(PHOTO_MOVE_LABELS) as PhotoMove[];
 
 function revalidateShop() {
   revalidatePath("/online-orders/products");
@@ -367,6 +380,94 @@ export async function removeOnlineProductPhotoAction(
 
   revalidateShop();
   return { success: "Photo removed." };
+}
+
+/**
+ * Put a product's photos in a different order.
+ *
+ * The first one is the picture on the card, so this is how the owner chooses
+ * it without deleting the three in front of it and uploading them again.
+ *
+ * The browser sends the id and the move, NOT the new order. Re-deriving it
+ * here from what the database currently holds is the same rule as
+ * `complete_sale` and `create_online_order`: the screen's arrangement is a
+ * preview, and this is the record. It also means a stale tab - one opened
+ * before a photo was removed - asks for a move that no longer makes sense and
+ * is told so, instead of writing an order built on a photo that has gone.
+ */
+export async function reorderOnlineProductPhotoAction(
+  _previous: OnlineProductState,
+  formData: FormData,
+): Promise<OnlineProductState> {
+  const actor = await requireOwnerOrAdmin();
+  const imageId = String(formData.get("imageId") ?? "");
+  const move = String(formData.get("move") ?? "");
+
+  if (!PHOTO_MOVES.includes(move as PhotoMove)) {
+    return { error: "That is not a way to move a photo." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: image } = await supabase
+    .from("online_product_images")
+    .select("id, product_id")
+    .eq("id", imageId)
+    .maybeSingle();
+
+  if (!image) return { error: "That photo has already gone." };
+
+  const productId = image.product_id as string;
+  const { data: current } = await supabase
+    .from("online_product_images")
+    .select("id")
+    .eq("product_id", productId)
+    // `created_at` breaks a tie. Photos uploaded before anything renumbered
+    // them can all sit at 0, and without a second key the "order" the browser
+    // was shown and the one re-derived here need not be the same list.
+    .order("sort_order")
+    .order("created_at");
+
+  const before = (current ?? []).map((row) => row.id as string);
+  const after = movePhoto(before, imageId, move as PhotoMove);
+
+  // Nothing to do: the first photo asked to move left, or somebody tapped
+  // twice. Saying "photo moved" would be a claim, so it says what happened.
+  if (!isSameSet(before, after) || after.join() === before.join()) {
+    return { success: "That photo is already where it can go." };
+  }
+
+  const { error } = await supabase.rpc("reorder_online_product_images", {
+    p_product_id: productId,
+    p_image_ids: after,
+  });
+
+  if (error) {
+    return {
+      error:
+        error.code === "P0001"
+          ? error.message
+          : "The photos could not be reordered. Try again.",
+    };
+  }
+
+  await recordAudit({
+    actorId: actor.id,
+    actorUsername: actor.username,
+    action: "update",
+    entity: "online_product",
+    entityId: productId,
+    summary: "Changed the order of an online shop product's photos",
+    before: { order: before },
+    after: { order: after },
+  });
+
+  revalidateShop();
+  return {
+    success:
+      after[0] === imageId && before[0] !== imageId
+        ? "That photo is now the main one."
+        : "Photo moved.",
+  };
 }
 
 export async function toggleOnlineProductAction(

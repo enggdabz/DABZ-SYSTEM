@@ -13,11 +13,17 @@ import {
   TAP_AREA,
 } from "@/components/ui";
 import { centavosToDecimalString } from "@/lib/money";
+import {
+  canMovePhoto,
+  PHOTO_MOVE_LABELS,
+  type PhotoMove,
+} from "@/lib/online/photos";
 import type { Category, Product } from "@/lib/online/types";
 
 import {
   deleteOnlineProductAction,
   removeOnlineProductPhotoAction,
+  reorderOnlineProductPhotoAction,
   saveOnlineProductAction,
   toggleOnlineProductAction,
   type OnlineProductState,
@@ -389,7 +395,7 @@ export function ProductForm({
 
       <Field
         label="Photos"
-        hint="JPG, PNG or WebP, up to 5MB each, eight in all. The first one is the picture on the card."
+        hint="JPG, PNG or WebP, up to 5MB each, eight in all. The first one is the picture on the card, and you can change which that is once they are up."
       >
         <input
           type="file"
@@ -410,24 +416,46 @@ export function ProductForm({
   );
 }
 
-/** The photos already on a product, each with a way to take it off. */
+/**
+ * The photos already on a product: which one is the card picture, how to
+ * change that, and how to take one off.
+ *
+ * The order is not decoration - `images[0]` is the picture on the shop card,
+ * on this list and in the Messenger message - so it needs a way to be changed
+ * that is not "delete the three in front of it and upload them again".
+ *
+ * Each move is its own little form rather than a drag. A drag needs a pointer,
+ * a steady hand and a screen wider than a phone, and the owner does this at
+ * the counter; three buttons work with one thumb and with a keyboard, and they
+ * say in words what they will do.
+ */
 export function ProductPhotos({
   photos,
 }: {
   photos: { id: string; url: string | null; alt: string | null }[];
 }) {
-  const [state, submit] = useActionState<OnlineProductState, FormData>(
+  const [removed, remove] = useActionState<OnlineProductState, FormData>(
     removeOnlineProductPhotoAction,
+    {},
+  );
+  const [moved, move] = useActionState<OnlineProductState, FormData>(
+    reorderOnlineProductPhotoAction,
     {},
   );
 
   if (photos.length === 0) return null;
 
+  const ids = photos.map((photo) => photo.id);
+  // Both actions report into the same place. Two notices, one above the other,
+  // would leave "Photo removed." sitting under "Photo moved." with no way to
+  // tell which one just happened.
+  const answer = moved.error || moved.success ? moved : removed;
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap gap-3">
-        {photos.map((photo) => (
-          <div key={photo.id} className="w-28 space-y-1">
+        {photos.map((photo, index) => (
+          <div key={photo.id} className="w-32 space-y-1">
             <div className="aspect-square overflow-hidden rounded-control bg-tile">
               {photo.url ? (
                 <Image
@@ -439,7 +467,46 @@ export function ProductPhotos({
                 />
               ) : null}
             </div>
-            <form action={submit}>
+
+            {index === 0 ? (
+              <p className="text-xs font-medium">Main photo</p>
+            ) : null}
+
+            <div className="flex items-center gap-1">
+              <MovePhoto
+                submit={move}
+                imageId={photo.id}
+                move="up"
+                enabled={canMovePhoto(ids, photo.id, "up")}
+                glyph="←"
+              />
+              <MovePhoto
+                submit={move}
+                imageId={photo.id}
+                move="down"
+                enabled={canMovePhoto(ids, photo.id, "down")}
+                glyph="→"
+              />
+            </div>
+
+            {/*
+              On every photo that is not the main one, including the second -
+              where the left arrow beside it happens to do the same thing. The
+              rule "any other photo can become the main one" is easier to see
+              than an exception at position two, and it keeps every tile in the
+              strip the same height.
+            */}
+            {index > 0 ? (
+              <form action={move}>
+                <input type="hidden" name="imageId" value={photo.id} />
+                <input type="hidden" name="move" value="first" />
+                <button type="submit" className={`text-xs underline ${TAP_AREA}`}>
+                  Make it the main photo
+                </button>
+              </form>
+            ) : null}
+
+            <form action={remove}>
               <input type="hidden" name="imageId" value={photo.id} />
               <button
                 type="submit"
@@ -451,8 +518,49 @@ export function ProductPhotos({
           </div>
         ))}
       </div>
-      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
     </div>
+  );
+}
+
+/**
+ * One arrow.
+ *
+ * Drawn even where it cannot act, and disabled: an arrow that disappears on
+ * the first photo makes the row of buttons under each picture a different
+ * width, and the whole strip jumps sideways every time something moves.
+ * `size-9` is 36px, comfortably past the 24px this system asks of anything
+ * tapped at the counter.
+ */
+function MovePhoto({
+  submit,
+  imageId,
+  move,
+  enabled,
+  glyph,
+}: {
+  submit: (formData: FormData) => void;
+  imageId: string;
+  move: PhotoMove;
+  enabled: boolean;
+  glyph: string;
+}) {
+  return (
+    <form action={submit}>
+      <input type="hidden" name="imageId" value={imageId} />
+      <input type="hidden" name="move" value={move} />
+      <button
+        type="submit"
+        disabled={!enabled}
+        aria-label={PHOTO_MOVE_LABELS[move]}
+        title={PHOTO_MOVE_LABELS[move]}
+        className="flex size-9 items-center justify-center rounded-control ring-1 ring-line/60 text-sm transition-colors hover:bg-ink/5 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <span aria-hidden="true">{glyph}</span>
+      </button>
+    </form>
   );
 }
 

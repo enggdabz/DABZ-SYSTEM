@@ -177,7 +177,10 @@ export const getOnlineProducts = cache(
       supabase
         .from("online_product_images")
         .select("id, product_id, storage_path, alt, sort_order")
-        .order("sort_order"),
+        // Same tie-break as the reorder action: `images[0]` is the card
+        // picture, so it must not depend on the order rows come back in.
+        .order("sort_order")
+        .order("created_at"),
       supabase.from("online_product_stats").select("product_id, pieces, order_count"),
     ]);
 
