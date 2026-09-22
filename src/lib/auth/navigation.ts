@@ -73,7 +73,7 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 
   /*
-    The online shop's orders (Phase 13). They are Dabz Apparel's work too, so
+    The online shop's orders (Phase 14). They are Dabz Apparel's work too, so
     the permission is the same one that opens the job orders - a person
     trusted with those is the person who runs these.
 

@@ -87,7 +87,7 @@ async function shopIsOpen(
     .maybeSingle();
 
   if (error) return false;
-  // A database still behind 0019 has no column and no row to read; the column
+  // A database still behind 0020 has no column and no row to read; the column
   // ships `not null default true`, so only an explicit false closes the shop.
   return data?.online_shop_enabled !== false;
 }

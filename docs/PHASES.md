@@ -2119,7 +2119,7 @@ after `npm run db:push`.
 
 ---
 
-## Phase 13 — Dabz Apparel online orders ✅
+## Phase 14 — Dabz Apparel online orders ✅
 
 **What it is.** A customer orders jerseys from their phone without chatting
 first, and the shop pushes that order through production without the details
@@ -2161,7 +2161,7 @@ each one back)
 | What | How | Result |
 |---|---|---|
 | The module's rules: quantities, totals, the quote split, every status move, the production paths, the calendar, the sorting, the report buckets, `messageFor` | `npm test` | 1,054 tests (262 new) |
-| Security: a stranger reads the catalogue and nothing else, no order table can be written to directly, `anon` cannot call `create_online_order`, five different people | `npm run test:rls` | `16_online_orders_rls.test.sql`, all passing |
+| Security: a stranger reads the catalogue and nothing else, no order table can be written to directly, `anon` cannot call `create_online_order`, five different people | `npm run test:rls` | `17_online_orders_rls.test.sql`, all passing |
 | Every table and column the app asks for | `npm run check:schema` | 63 relations |
 | Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
 
@@ -2176,7 +2176,7 @@ instead is listed in `docs/open-questions.md`.
 **System check** — it now asks about the sixteen new tables and the two views.
 
 **Note the numbering.** The production report took Phase 12 and migration
-`0018` while this branch was open, so this module is Phase 13 and `0019`. Two
+`0018` while this branch was open, so this module is Phase 14 and `0019`. Two
 migrations sharing a `0018` prefix would be one version to
 `supabase_migrations.schema_migrations`, and the second would be recorded as
 already applied and silently skipped.

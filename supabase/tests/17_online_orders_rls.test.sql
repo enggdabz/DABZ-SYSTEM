@@ -1,4 +1,4 @@
--- Security tests for Phase 13: the Dabz Apparel online shop (docs/spec.md).
+-- Security tests for Phase 14: the Dabz Apparel online shop (docs/spec.md).
 --
 -- This module is the second place in the system where somebody who is not
 -- signed in causes a row to exist, and the first where they cause TWELVE of
@@ -39,7 +39,7 @@ declare
   v_table text;
   v_count integer;
 begin
-  raise notice '--- phase 13: structure ---';
+  raise notice '--- phase 14: structure ---';
 
   foreach v_table in array array[
     'online_categories', 'online_products', 'online_product_images',
@@ -186,7 +186,7 @@ set test.user_id = '';
 
 do $$
 begin
-  raise notice '--- phase 13: a stranger ---';
+  raise notice '--- phase 14: a stranger ---';
 
   if (select count(*) from public.online_products) <> 3 then
     raise exception 'FAIL: a stranger sees % products, expected the 3 visible ones',
@@ -247,7 +247,7 @@ declare
   v_order_id uuid;
   v_item record;
 begin
-  raise notice '--- phase 13: the website places an order ---';
+  raise notice '--- phase 14: the website places an order ---';
 
   v_result := public.create_online_order(
     'Barangay Ball Club', '09171234567', 'BBC Team', 'pickup', null,
@@ -345,7 +345,7 @@ do $$
 declare
   v_ignored jsonb;
 begin
-  raise notice '--- phase 13: what the function refuses ---';
+  raise notice '--- phase 14: what the function refuses ---';
 
   begin
     v_ignored := public.create_online_order(
@@ -516,7 +516,7 @@ set role authenticated;
 set test.user_id = '44444444-4444-4444-4444-444444444444';
 do $$
 begin
-  raise notice '--- phase 13: staff without the apparel permission ---';
+  raise notice '--- phase 14: staff without the apparel permission ---';
 
   if (select count(*) from public.online_orders) <> 0 then
     raise exception 'FAIL: a staff member without the apparel permission reads the orders';
@@ -552,7 +552,7 @@ do $$
 declare
   v_order_id uuid;
 begin
-  raise notice '--- phase 13: staff with the apparel permission ---';
+  raise notice '--- phase 14: staff with the apparel permission ---';
 
   select id into v_order_id from public.online_orders limit 1;
   if v_order_id is null then
@@ -623,7 +623,7 @@ declare
   v_totals record;
   v_payment_id uuid;
 begin
-  raise notice '--- phase 13: quoting, confirming and payments ---';
+  raise notice '--- phase 14: quoting, confirming and payments ---';
 
   select id into v_order_id from public.online_orders order by created_at limit 1;
 
@@ -714,7 +714,7 @@ declare
   v_order_id uuid;
   v_totals record;
 begin
-  raise notice '--- phase 13: the owner voids a payment ---';
+  raise notice '--- phase 14: the owner voids a payment ---';
 
   select id, order_id into v_payment_id, v_order_id
   from public.online_payments where voided_at is null limit 1;
@@ -752,7 +752,7 @@ declare
   v_order_id uuid;
   v_stage record;
 begin
-  raise notice '--- phase 13: production steps ---';
+  raise notice '--- phase 14: production steps ---';
 
   select id into v_order_id from public.online_orders order by created_at limit 1;
 
@@ -866,7 +866,7 @@ declare
   v_order_id uuid;
   v_steps integer;
 begin
-  raise notice '--- phase 13: the DTF path ---';
+  raise notice '--- phase 14: the DTF path ---';
 
   v_result := public.create_online_order(
     'Shirt Buyer', '09998887777', null, 'pickup', null,
@@ -952,7 +952,7 @@ do $$
 declare
   v_order_id uuid;
 begin
-  raise notice '--- phase 13: the date and the last look from outside ---';
+  raise notice '--- phase 14: the date and the last look from outside ---';
 
   select id into v_order_id from public.online_orders order by created_at limit 1;
 

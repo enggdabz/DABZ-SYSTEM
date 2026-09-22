@@ -301,9 +301,9 @@ What is covered instead, and where:
 | --- | --- |
 | 1, 2 — ordering, totals, mixed orders | `src/lib/online/*.test.ts` — the totals, quantity and validation rules the browser and the server both run |
 | 3, 4 — production steps, undo, DTF path | `src/lib/online/production.test.ts` |
-| 5 — soft delete keeps past orders | the snapshot columns, and `16_online_orders_rls.test.sql` |
+| 5 — soft delete keeps past orders | the snapshot columns, and `17_online_orders_rls.test.sql` |
 | 6 — sorting and search | `src/lib/online/catalogue.test.ts` |
-| 7 — staff cannot open owner pages | `16_online_orders_rls.test.sql`, as five different people, plus `requireOwnerOrAdmin` on the screen |
+| 7 — staff cannot open owner pages | `17_online_orders_rls.test.sql`, as five different people, plus `requireOwnerOrAdmin` on the screen |
 | 8, 9 — phone width, palette | by hand in a browser; no unit test can see a pixel (`AGENTS.md` says the same about overlays and the rail) |
 
 To wire Playwright up later: a Supabase project with a seeded staff account,

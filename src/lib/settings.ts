@@ -64,7 +64,7 @@ export interface AppSettings {
   publicPageEnabled: boolean;
 
   /**
-   * The online shop (Phase 13, docs/spec.md).
+   * The online shop (Phase 14, docs/spec.md).
    *
    * The two figures here are the owner's and start NULL. A capacity of sixty
    * would turn a customer away on a day the shop was free, and a target of
@@ -528,7 +528,7 @@ export const SETTINGS_COLUMNS_ADDED_LATER: Readonly<Record<string, string>> = {
   public_page_enabled: "Show the public page",
   // 0014_staff_stay_signed_in
   staff_stay_signed_in: "Staff stay signed in",
-  // 0019_phase13_online_orders
+  // 0020_phase14_online_orders
   online_notify_email: "Where new online orders are emailed",
   online_daily_capacity_pcs: "Pieces the shop can finish in a day",
   online_monthly_target_centavos: "Monthly sales target",

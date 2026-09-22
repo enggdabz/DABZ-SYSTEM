@@ -415,7 +415,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
   }
 
   /*
-    The online shop's catalogue (Phase 13). An empty shop is a real state and
+    The online shop's catalogue (Phase 14). An empty shop is a real state and
     the page says so honestly to a customer - but it is also the one gap that
     cannot show up as a missing FIGURE, because there is no row to hang a
     warning on. Same reason the three lists above are here.
@@ -443,7 +443,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
   }
 
   /*
-    The online shop's two figures (Phase 13). Both are the owner's to know and
+    The online shop's two figures (Phase 14). Both are the owner's to know and
     both start empty, exactly like a bill with no due day: the calendar shows
     no FULL day and Reports show no target meter until somebody says what they
     are, rather than showing a made-up sixty and a made-up hundred thousand.

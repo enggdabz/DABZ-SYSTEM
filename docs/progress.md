@@ -35,7 +35,7 @@ wired up". Everything else in that table is done.
 
 The code is deployed the moment the branch merges; the database is not.
 
-1. **`npm run db:push`** applies `0019`, which creates sixteen tables, two
+1. **`npm run db:push`** applies `0020`, which creates sixteen tables, two
    views, three storage buckets and the six new settings columns. Then open
    **System check** (`/system`) — it now asks the live database about every one
    of them by name.

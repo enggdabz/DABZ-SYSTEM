@@ -173,7 +173,7 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     "online_rate_events",
   ].map((name) => ({
     name,
-    migration: "0019_phase13_online_orders",
+    migration: "0020_phase14_online_orders",
     breaks: "the online shop, its orders, the production board and the order calendar"
   })),
 ];
@@ -236,7 +236,7 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
   {
     name: "app_settings",
     column: "online_min_days_ahead",
-    migration: "0019_phase13_online_orders",
+    migration: "0020_phase14_online_orders",
     breaks: "the online shop's own settings, and saving any other setting",
   },
   {
@@ -248,7 +248,7 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     */
     name: "customers",
     column: "messenger_psid",
-    migration: "0019_phase13_online_orders",
+    migration: "0020_phase14_online_orders",
     breaks: "linking a customer to their Messenger chat later on",
   },
 ];
