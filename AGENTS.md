@@ -77,6 +77,20 @@ receiving code.
   at it. They were the checks most worth automating: they are what stops a
   policy change quietly opening the books, and by hand they only ran when
   somebody remembered.
+- **A pull request with a merge conflict gets NO CI RUN AT ALL**, and that is
+  not the same as a failing one. GitHub cannot build the merge ref, so no
+  `pull_request` workflow is created: the pull request does not go red, it goes
+  QUIET. An empty check list reads exactly like "the run has not started yet",
+  and a green tick from an earlier commit can still be sitting beside it, so
+  "waiting for CI" and "conflicted" look identical from the outside. Read
+  `mergeable_state`, not the check list - and if there is no run against the
+  head commit, look for a conflict before waiting for one. Merge `main` in,
+  resolve it, push, and the run appears.
+  This is the same cause as the four-digit prefix rule above: the project now
+  routinely has more than one branch open, and `main` moves under a branch
+  while it is being worked on. **Before finishing any branch, fetch `main` and
+  check both** - the highest migration number on it, and whether it still
+  merges. It has cost two branches a cycle each.
 - **A new table or view must be added to `src/lib/schema-health.ts`** - and so
   must a **column added to a table an EARLIER migration created**
   (`REQUIRED_COLUMNS`, one per table per migration). A migration that adds only
