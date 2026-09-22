@@ -1182,6 +1182,20 @@ to ask:
   than pixels so the fit is identical at any browser font size. To change it:
   `--breakpoint-wide` in `src/app/globals.css`.
 
+- **22 September 2026 — a size grid scrolls sideways on a phone; it does not
+  become cards.** That looks like an exception to the rule that a wide table
+  gets a card per row below a wide screen, and it is a deliberate one. That
+  rule is about a surface somebody TYPES into — the encoding table, where a
+  sideways scroll is how a size gets typed into the short size box. A summary
+  grid is read, not typed into, and the whole reason it is a grid is to compare
+  one size against another across a row. Cards would put each size on its own
+  line and destroy the only thing it is for. So the grid keeps its shape and
+  scrolls inside its own box (`overflow-x-auto` on the wrapper), and the PAGE
+  never scrolls sideways — measured at 390px with all nine sizes in use, the
+  worst case: the grid is 434px inside a 310px box, and the page overflow is
+  zero. The clipped column at the right edge is its own affordance. To change
+  it: the two `overflow-x-auto` wrappers in `src/components/UniformSummary.tsx`.
+
 - **22 September 2026 — the print button refuses while the table is unsaved.**
   Everywhere else this system says a thing out loud rather than blocking it: a
   released order with money owed is allowed and reported, an overpayment is

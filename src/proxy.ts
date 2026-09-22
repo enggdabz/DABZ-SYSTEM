@@ -14,15 +14,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/**
- * Pages a signed-out visitor is allowed to open.
- *
- * "/" is the shop's public page (Phase 9) - a customer arriving from Facebook
- * must not be shown a login screen. It matches the root EXACTLY: the check
- * below is `pathname === path || pathname.startsWith(path + "/")`, and
- * "//" never matches a real path, so "/" here does not open the whole system.
- */
-const PUBLIC_PATHS = ["/", "/login", "/setup"];
+import { isPublicPath } from "@/lib/auth/public-paths";
 
 export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -57,11 +49,8 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_PATHS.some(
-    (path) => pathname === path || pathname.startsWith(`${path}/`),
-  );
 
-  if (!user && !isPublic) {
+  if (!user && !isPublicPath(pathname)) {
     const loginUrl = new URL("/login", request.url);
     // Remember where they were headed, so they land there after signing in.
     if (pathname !== "/") loginUrl.searchParams.set("next", pathname);

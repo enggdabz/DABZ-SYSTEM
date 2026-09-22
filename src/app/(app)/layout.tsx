@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 import { AppSidebar } from "@/components/AppSidebar";
@@ -20,6 +21,17 @@ import { idleSignOutMinutes } from "@/lib/settings";
  * requireUser() / requirePermission() as well - this layout is for the frame,
  * not for the guard.
  */
+/**
+ * Nothing behind the sign-in is for a search engine.
+ *
+ * Every screen under here already redirects a stranger to /login, so this is
+ * belt beside braces - but a URL that leaks into a search result is a URL
+ * somebody tries, and the title alone can say more than it should.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const user = await requireUser();
 

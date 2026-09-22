@@ -20,6 +20,7 @@ import { getStaff } from "@/lib/data/staff";
 import { getStockItems } from "@/lib/data/stocks";
 import { getApparelProducts, getSizePrices } from "@/lib/data/apparel";
 import { getRepairServices } from "@/lib/data/repairs";
+import { getOnlineProducts } from "@/lib/data/online";
 import { getSettings } from "@/lib/auth/dal";
 import { UNIFORM_TYPES, UNIFORM_TYPE_LABELS } from "@/lib/uniforms";
 
@@ -53,6 +54,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
     sizes,
     settings,
     repairServices,
+    onlineProducts,
   ] =
     await Promise.all([
       getBills(),
@@ -64,6 +66,7 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       getSizePrices(),
       getSettings(),
       getRepairServices(),
+      getOnlineProducts(true),
     ]);
 
   const items: ChecklistItem[] = [];
@@ -434,6 +437,66 @@ export const getChecklist = cache(async (): Promise<Checklist> => {
       } missing from your public page`,
       why: "Neither is needed to open the shop, and the page reads properly without them. But a customer who wants to email rather than ring has no address to write to, and one who wants to drive over has nothing to tap - the Get directions button only appears once a map link is set.",
       names: missingOptionalPublicDetails,
+      href: "/settings",
+      linkLabel: "Open Settings",
+      important: false,
+    });
+  }
+
+  /*
+    The online shop's catalogue (Phase 14). An empty shop is a real state and
+    the page says so honestly to a customer - but it is also the one gap that
+    cannot show up as a missing FIGURE, because there is no row to hang a
+    warning on. Same reason the three lists above are here.
+  */
+  if (onlineProducts.length === 0) {
+    items.push({
+      id: "no-online-products",
+      title: "Nothing on the online shop yet",
+      why: "A customer who taps Order jerseys online is shown an empty shop. Nothing was put there for you: a price is something only you can decide. Add what you already make, and price anything you quote after seeing the design as Price on quote — that is a real answer, not a gap.",
+      names: [],
+      href: "/online-orders/products",
+      linkLabel: "Open the online shop",
+      important: true,
+    });
+  } else if (onlineProducts.every((product) => !product.isVisible)) {
+    items.push({
+      id: "online-products-all-hidden",
+      title: "Every online product is hidden",
+      why: "The products are there, but every one of them is switched off, so a customer still sees an empty shop.",
+      names: [],
+      href: "/online-orders/products",
+      linkLabel: "Open the online shop",
+      important: true,
+    });
+  }
+
+  /*
+    The online shop's two figures (Phase 14). Both are the owner's to know and
+    both start empty, exactly like a bill with no due day: the calendar shows
+    no FULL day and Reports show no target meter until somebody says what they
+    are, rather than showing a made-up sixty and a made-up hundred thousand.
+
+    NOT important: the shop takes orders perfectly well without either, and
+    both screens say plainly that the figure has not been set. An item that
+    overstates itself is one that gets ignored.
+  */
+  const missingOnlineFigures = [
+    settings.onlineDailyCapacityPcs === null
+      ? "Pieces you can finish for one date"
+      : null,
+    settings.onlineMonthlyTargetCentavos === null ? "Monthly sales target" : null,
+    settings.onlineNotifyEmail === null ? "Email new orders to" : null,
+  ].filter((label): label is string => label !== null);
+
+  if (missingOnlineFigures.length > 0) {
+    items.push({
+      id: "online-shop-figures",
+      title: `${missingOnlineFigures.length} figure${
+        missingOnlineFigures.length === 1 ? "" : "s"
+      } the online shop is waiting for`,
+      why: "Nothing is guessed here. Without the daily capacity the order calendar never marks a date as full, so it cannot warn you about a day you have overbooked; without the monthly target Reports show the takings and no meter beside them. New orders still reach your phone whether or not the email address is set.",
+      names: missingOnlineFigures,
       href: "/settings",
       linkLabel: "Open Settings",
       important: false,

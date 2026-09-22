@@ -45,7 +45,7 @@ import {
 } from "@/lib/uniforms";
 
 import { saveEncodingAction, type ApparelState } from "./actions";
-import { UniformSummaryGrids } from "./UniformSummary";
+import { UniformSummaryGrids } from "@/components/UniformSummary";
 
 /** A row as it sits on the screen: every box is text until it is saved. */
 interface Draft {
