@@ -676,3 +676,20 @@ The module has its own specification: read `docs/spec.md`, then
   refusals are written for a person and are worth passing through; a constraint
   or column name is a description of the database handed to somebody who cannot
   see it. Anything else gets the ordinary sentence.
+- **The orders list pages what is DRAWN, never what is read.** The five tiles
+  and every filter chip's count are statements about the whole shop, and
+  `src/lib/online/list.ts` works them out from the same array the cards come
+  from - that shared array is what stops a tile and the rows under a chip
+  disagreeing about "open". Fetching one page would mean counting the tiles
+  separately in SQL, which is how those two start drifting. `pageOfOrders`
+  caps the rendering and says so. When the READ becomes the cost, move the
+  tiles and the list into the database together, feeding both from one query.
+- **`reorder_online_product_images` is `security invoker`, and that is the
+  point.** Every function is published by PostgREST as a URL, so a `definer`
+  one would be a way for a staff member to rearrange the shop front - a second
+  answer to a question `online_product_images_write` already answers.
+  `19_reorder_photos.test.sql` checks the flag directly, because without it
+  every other test in that file passes while the shop front is open. Note the
+  consequence: a policy that refuses removes rows from an UPDATE silently, so
+  the function counts what it changed and raises when the count is short -
+  otherwise the screen redraws in an order the database never stored.

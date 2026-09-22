@@ -2538,6 +2538,122 @@ than because deleting was impossible.
 
 ---
 
+## 22 September 2026 — the shop front's photos, and a list that stays quick
+
+**What you asked for**
+
+> "proceed all"
+
+Two things were left on the online orders module's own list of what to do next
+(`docs/progress.md`), and these are both of the ones that could be built here.
+The other three need either your live database or a decision only you can make;
+they are listed at the bottom.
+
+### Putting a product's photos in order
+
+**The problem.** The FIRST photo on a product is the picture everyone sees — on
+the shop card, in this system's own product list, in the Messenger message. But
+the order was the order they were uploaded in, and the only way to change which
+one came first was to **remove the photos in front of it and upload them
+again** — which threw away the files and their descriptions to answer "use the
+other picture".
+
+**What is there now.** Under each product in **Manage → Online shop**:
+
+- the first photo is labelled **Main photo**, so which one it is, is never a
+  guess;
+- **←** and **→** nudge a photo one place either way;
+- **Make it the main photo** takes any other photo straight to the front, in
+  one tap. That matters on a product with eight photos, where tapping ← seven
+  times is how the wrong picture ends up on the card and stays there.
+
+Nothing is dragged. A drag needs a pointer, a steady hand and a screen wider
+than a phone, and this gets done at the counter; buttons work with one thumb
+and with a keyboard, and they say in words what they will do.
+
+**The part worth knowing.** Reordering renumbers several rows at once, and
+several rows at once through Supabase is several separate requests — if the
+third one fails, the photos are left in an order nobody chose. So it goes
+through one database function, `reorder_online_product_images` in migration
+`0022`, which does the whole renumber in one transaction: it either all happens
+or none of it does.
+
+That function is deliberately **not** `security definer`. Every function is
+published as a URL, so a `definer` one here would have been a way for a staff
+member to rearrange the shop front — a second answer to a question the Phase 14
+policies had already answered. It runs as whoever called it, which means the
+existing "Owner and Admin may write" policy is still the thing that decides.
+`19_reorder_photos.test.sql` checks that flag directly, because without it every
+other test in that file would still pass while the shop front was open to
+anybody signed in.
+
+It also refuses a list that is not exactly that product's photos — one short,
+one extra, another product's photo, the same photo twice. A short list is the
+dangerous one: renumbering three of four photos leaves the fourth at whatever
+number it had, interleaved with the new ones — an order that is neither the old
+one nor the one that was asked for.
+
+### A pager on the orders list
+
+**The problem, which you do not have yet.** The Online orders screen drew every
+order it had. At six orders that is right. At nine hundred it is nine hundred
+cards painted to show the six that are due this week.
+
+**What is there now.** Fifty orders to a page, with **Showing 51–100 of 214 ·
+page 2 of 5** and Previous/Next under the list. Below fifty orders the pager is
+not drawn at all, so nothing about the screen changes for you today.
+
+**What it deliberately does NOT do**, because this is the kind of thing that
+goes wrong quietly: it does not page the *reading*. The five tiles at the top
+and the number on every filter chip are statements about the whole shop —
+"Overdue 3" has to mean three, not three on this page — and they are worked out
+from the same list the cards are drawn from. Paging the read would have meant
+counting the tiles separately, in the database, which is exactly how a tile and
+the list under it start disagreeing. When the *reading* becomes the cost —
+thousands of orders, not hundreds — the answer is to move the tiles and the
+list into the database together, and that is written down in the code where
+somebody will meet it.
+
+Changing a filter chip now starts you at the top again, rather than carrying
+page 3 across to a chip that has one page.
+
+### How to check it
+
+1. `npm run db:push` (this needs `0022`, along with `0020` and `0021`).
+2. **Manage → Online shop**, on a product with two or more photos. The first
+   says **Main photo**. Tap **Make it the main photo** on the last one — it
+   jumps to the front, and the picture on the product card above changes with
+   it. Check the shop page shows the same one.
+3. With one photo, ← and → are there but greyed: there is nowhere to move it.
+4. Sign in as a staff member. The photos are visible — a customer can see them
+   too — and there are no move buttons, because Manage is Owner/Admin.
+5. **Online orders**: unchanged, until the shop passes fifty in one filter.
+
+### What was checked
+
+| What | How | Result |
+| --- | --- | --- |
+| Moving a photo, every edge of it | `npm test` | 1,144 passed, 20 of them new for the moves |
+| Paging, clamping, an empty shop | `npm test` | included above, 8 new |
+| Who may rearrange the shop front | `npm run test:rls` | 482 checks, 12 of them new |
+| Every table and column the app asks for | `npm run check:schema` | 294 table references, 1,325 column references |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+| The photo strip at 390, 768, 1024 and 1440px | Chromium, against the built stylesheet | no sideways scroll, every tile the same height, nothing tapped under 24px |
+
+### What is still waiting, and why
+
+Three things on that list were not built, and none of them is a matter of time:
+
+- **The nine end-to-end tests** (spec 14) need a real Supabase project with a
+  staff account to sign in to. Supabase Auth cannot be run here.
+- **Whether an online order's money should reach the ledger** is a decision
+  about your books, not a detail — see `docs/open-questions.md`. Today a
+  payment on an online order is recorded against the order and nowhere else.
+- **Checking the storage policies landed** needs the live database, so it is
+  part of `db:push` rather than something to build.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

@@ -1248,3 +1248,44 @@ to ask:
   instead" was advice that could not be followed. The button is not offered
   there at all. To give another kind the same treatment — Stop counting a
   bill, say — pass `alternative` where its `DeleteButton` is rendered.
+- **22 September 2026 — a product's photos can be put in order, and the
+  function that does it runs as the caller.** The first photo is the picture on
+  the shop card, and the only way to change which one that was, was to delete
+  the photos in front of it and upload them again. The move itself is three
+  buttons rather than a drag: a drag needs a pointer and a screen wider than a
+  phone, and this happens at the counter. **Make it the main photo** exists
+  alongside the arrows because moving a photo to the front is one thing
+  somebody wants, and asking for seven taps of ← is how the wrong picture stays
+  on the card. It is offered on every photo that is not already the main one,
+  including the second — where the arrow beside it does the same thing —
+  because "any other photo can become the main one" is an easier rule to see
+  than an exception at position two, and it keeps every tile in the strip the
+  same height. The renumber goes through one database function so a failure
+  halfway cannot leave the photos in an order nobody chose, and that function
+  is **`security invoker`, which is the whole point**: every function is
+  published as a URL, so a `definer` one would have let a staff member
+  rearrange the shop front — a second answer to a question the Phase 14 write
+  policy had already answered. Because a policy that refuses removes rows from
+  an update silently, the function counts the rows it changed and raises if the
+  count is short; otherwise the screen would redraw in an order the database
+  never stored. To change the rule about who may reorder: the
+  `online_product_images_write` policy in `0020`, and nothing else — that is
+  the advantage of not having written a second one. See
+  `0022_reorder_product_photos.sql` and `src/lib/online/photos.ts`.
+- **22 September 2026 — the orders list pages what is DRAWN, not what is
+  read.** Fifty orders to a page, and no pager at all below fifty, so the shop
+  as it is today never meets it. The tempting version of this was to fetch one
+  page from the database — and that would have broken something worth more than
+  the saving. The five tiles and the count on every filter chip are statements
+  about the whole shop ("Overdue 3" has to mean three, not three on this page),
+  and they are worked out in `src/lib/online/list.ts` from the same array the
+  cards are drawn from. That shared array is the reason a tile and the rows
+  under a chip cannot disagree about what "open" means. Paging the read would
+  have meant counting the tiles separately in SQL, which is precisely how those
+  two start drifting. So the cap is on rendering, which is the cost that bites
+  first. **When the reading itself becomes the cost** — thousands of orders,
+  not hundreds — the answer is to move the tiles and the list into the database
+  *together*, feeding both from one query, and not to page the read beside
+  tiles that still count everything. That note is in `pageOfOrders`' own
+  comment, where whoever meets the problem will be standing. To change the page
+  size: `ORDERS_PER_PAGE` in the same file.

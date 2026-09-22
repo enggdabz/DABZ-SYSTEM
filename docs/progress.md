@@ -36,9 +36,11 @@ wired up". Everything else in that table is done.
 The code is deployed the moment the branch merges; the database is not.
 
 1. **`npm run db:push`** applies `0020`, which creates sixteen tables, two
-   views, three storage buckets and the six new settings columns. Then open
+   views, three storage buckets and the six new settings columns, and `0022`,
+   which adds the one function that puts a product's photos in order. Then open
    **System check** (`/system`) — it now asks the live database about every one
-   of them by name.
+   of them by name. Until `0022` is applied the move buttons under a photo
+   report that they could not be reached, rather than pretending to work.
 2. **Settings → The online shop.** Two figures are yours and start empty:
    how many pieces you can finish for one date, and the monthly sales target.
    Leaving either empty is a real answer — the calendar then marks no day full
@@ -72,7 +74,8 @@ The code is deployed the moment the branch merges; the database is not.
 
 | Open | You should see |
 | --- | --- |
-| **Online orders** | Five tiles, the filter chips, and the orders with the soonest due at the top |
+| **Online orders** | Five tiles, the filter chips, and the orders with the soonest due at the top. Past fifty orders a pager appears under the list — the tiles and the chip counts still count every order, not the page |
+| **Manage → Online shop** | Under each product, its photos with **Main photo** on the first, arrows to nudge one along, and **Make it the main photo** on every other |
 | An order | The items and the roster, the message to paste into Messenger, the history, the moves that are allowed, the steps, the money and the customer |
 | **Production board** | Every order in the card for the step it is waiting for. Tap OK and it moves to the next card |
 | **Calendar** | The month of due dates. With a capacity set, a day over it is marked FULL in red |
@@ -85,7 +88,7 @@ The code is deployed the moment the branch merges; the database is not.
 The same five commands as the rest of the system (`AGENTS.md`):
 
 ```bash
-npm test              # 1,054 unit tests, 262 of them this module's
+npm test              # 1,144 unit tests, 286 of them this module's
 npm run test:rls      # the security rules against a real PostgreSQL
 npm run check:schema  # every table and column the app asks for exists
 npm run typecheck && npm run lint && npm run build
@@ -142,17 +145,20 @@ reading the code.
 
 Then, in rough order of value:
 
-0. **Check the storage policies landed.** `0018` creates three buckets and the
+0. **Check the storage policies landed.** `0020` creates three buckets and the
    policies on `storage.objects` that guard them. If your project's `postgres`
    role may not write those, the migration says so by name and tells you to
    paste that block into the SQL editor - it fails rather than skipping,
    because a bucket with no write policy is one nobody can upload to and the
    screen would just do nothing.
 1. **Wire up Playwright** against a Supabase project with a seeded staff
-   account. The nine flows are listed in spec 14.
+   account. The nine flows are listed in spec 14. Still the only acceptance
+   criterion of spec 16 that is not met, and the only one of these five that
+   cannot be done from here: it needs a real Supabase project to sign in to.
 2. **Ask the owner about the ledger.** It is the one structural question the
    module left open, and it gets harder the more orders there are.
-3. **Reorderable product photos.** The form uploads and removes them; the
-   order is the order they were added in.
-4. **Paginate the orders list** past a few hundred rows. It reads every order
-   today, which is right for a shop this size and will not stay right.
+3. ~~**Reorderable product photos.**~~ Done, 22 September 2026 - `0022` and
+   `src/lib/online/photos.ts`.
+4. ~~**Paginate the orders list.**~~ Done, 22 September 2026 - `pageOfOrders`
+   in `src/lib/online/list.ts`. It pages what the browser DRAWS and
+   deliberately not what is read; the reason is in that function's comment.
