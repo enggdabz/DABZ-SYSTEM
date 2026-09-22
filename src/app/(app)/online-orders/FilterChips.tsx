@@ -29,6 +29,13 @@ export function FilterChips({
         {ORDER_FILTERS.map((filter) => {
           const next = new URLSearchParams(params.toString());
           next.set("show", filter);
+          /*
+            A new filter starts at the top. Carrying `page` over would land
+            somebody on page 3 of a chip that has one page - the pager clamps
+            it, so they would see the last few completed orders and think that
+            was all of them.
+          */
+          next.delete("page");
           const selected = filter === current;
           const count = counts[filter];
 

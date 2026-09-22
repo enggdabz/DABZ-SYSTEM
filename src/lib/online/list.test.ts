@@ -4,7 +4,10 @@ import {
   applyOrderFilter,
   itemsLabel,
   listTiles,
+  ORDERS_PER_PAGE,
+  pageOfOrders,
   parseOrderFilter,
+  parsePageNumber,
   sortOrders,
 } from "./list";
 import type { OrderStatus, OrderSummary } from "./types";
@@ -190,5 +193,100 @@ describe("itemsLabel", () => {
 
   it("says plainly when an order has nothing in it", () => {
     expect(itemsLabel(order({ id: "1", firstItemName: null }))).toBe("No items");
+  });
+});
+
+describe("one page of the list", () => {
+  const orders = Array.from({ length: 214 }, (_, index) =>
+    order({ id: String(index) }),
+  );
+
+  it("draws the first fifty, and says so", () => {
+    const first = pageOfOrders(orders, 1);
+
+    expect(first.rows).toHaveLength(ORDERS_PER_PAGE);
+    expect(first.rows[0].orderNo).toBe("DA-0");
+    expect(first.page).toBe(1);
+    expect(first.pageCount).toBe(5);
+    expect(first.total).toBe(214);
+    expect(first.firstShown).toBe(1);
+    expect(first.lastShown).toBe(50);
+  });
+
+  it("gives the short last page its real numbers", () => {
+    const last = pageOfOrders(orders, 5);
+
+    expect(last.rows).toHaveLength(14);
+    expect(last.firstShown).toBe(201);
+    expect(last.lastShown).toBe(214);
+    expect(last.rows[0].orderNo).toBe("DA-200");
+  });
+
+  it("shows every order exactly once across the pages", () => {
+    const seen = [1, 2, 3, 4, 5].flatMap(
+      (page) => pageOfOrders(orders, page).rows,
+    );
+
+    expect(seen).toHaveLength(orders.length);
+    expect(new Set(seen.map((row) => row.orderNo)).size).toBe(orders.length);
+  });
+
+  /*
+    A bookmarked page number on a list that has since shrunk. Showing an empty
+    list there would read as "nothing matches that filter", which is a
+    different statement and an untrue one.
+  */
+  it("clamps a page past the end to the last one", () => {
+    const asked = pageOfOrders(orders, 99);
+
+    expect(asked.page).toBe(5);
+    expect(asked.rows).toHaveLength(14);
+  });
+
+  it("clamps a page below the first", () => {
+    expect(pageOfOrders(orders, 0).page).toBe(1);
+    expect(pageOfOrders(orders, -3).page).toBe(1);
+    expect(pageOfOrders(orders, Number.NaN).page).toBe(1);
+  });
+
+  it("copes with a shop that has no orders yet", () => {
+    const empty = pageOfOrders([], 1);
+
+    expect(empty.rows).toEqual([]);
+    expect(empty.pageCount).toBe(1);
+    expect(empty.total).toBe(0);
+    // Not "1-0 of 0": there is no first row to number.
+    expect(empty.firstShown).toBe(0);
+    expect(empty.lastShown).toBe(0);
+  });
+
+  it("keeps a shop this size on one page", () => {
+    const small = pageOfOrders(orders.slice(0, 6), 1);
+
+    expect(small.pageCount).toBe(1);
+    expect(small.rows).toHaveLength(6);
+    expect(small.lastShown).toBe(6);
+  });
+
+  it("does not reorder what it was given", () => {
+    const page = pageOfOrders(orders, 2);
+    expect(page.rows.map((row) => row.orderNo)).toEqual(
+      orders.slice(50, 100).map((row) => row.orderNo),
+    );
+  });
+});
+
+describe("the page number in the URL", () => {
+  it("reads a number", () => {
+    expect(parsePageNumber("3")).toBe(3);
+  });
+
+  it("falls back to the first page for anything else", () => {
+    expect(parsePageNumber(undefined)).toBe(1);
+    expect(parsePageNumber(null)).toBe(1);
+    expect(parsePageNumber("")).toBe(1);
+    expect(parsePageNumber("nonsense")).toBe(1);
+    expect(parsePageNumber("0")).toBe(1);
+    expect(parsePageNumber("-2")).toBe(1);
   });
 });

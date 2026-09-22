@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Disclosure, Notice, TAP_AREA } from "@/components/ui";
+import { buttonClasses, Card, Disclosure, Notice, TAP_AREA } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getOnlineOrders, getOnlineProducts, getProductionStages } from "@/lib/data/online";
@@ -10,9 +10,13 @@ import {
   applyOrderFilter,
   itemsLabel,
   listTiles,
+  pageOfOrders,
   parseOrderFilter,
+  parsePageNumber,
   sortOrders,
   ORDER_FILTERS,
+  type OrderFilter,
+  type OrderPage,
 } from "@/lib/online/list";
 import { stageNote } from "@/lib/online/production";
 import { isOverdue } from "@/lib/online/status";
@@ -30,7 +34,7 @@ export const metadata = { title: "Online orders · Dabz System" };
 export default async function OnlineOrdersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ show?: string }>;
+  searchParams: Promise<{ show?: string; page?: string }>;
 }) {
   await connection();
   const user = await requirePermission("apparel_job_orders");
@@ -47,6 +51,12 @@ export default async function OnlineOrdersPage({
   const filter = parseOrderFilter(params.show);
   const tiles = listTiles(orders, today);
   const shown = sortOrders(applyOrderFilter(orders, filter, today), today);
+  /*
+    The tiles and the chip counts above are worked out from EVERY order, and
+    stay that way: "Overdue 3" is a statement about the shop, not about this
+    page. Only the cards below are paged. See `pageOfOrders`.
+  */
+  const listed = pageOfOrders(shown, parsePageNumber(params.page));
 
   const counts = Object.fromEntries(
     ORDER_FILTERS.map((option) => [
@@ -117,7 +127,7 @@ export default async function OnlineOrdersPage({
       ) : null}
 
       <section className="space-y-3">
-        {shown.map((order) => {
+        {listed.rows.map((order) => {
           const late = isOverdue(order, today);
           const note =
             order.status === "in_production"
@@ -189,7 +199,49 @@ export default async function OnlineOrdersPage({
           );
         })}
       </section>
+
+      <Pager page={listed} filter={filter} />
     </div>
+  );
+}
+
+/**
+ * How far down the list you are, and the way to the rest of it.
+ *
+ * Drawn only when there is more than one page, so the shop as it is today
+ * never sees it. It says the total as well as the range because "Showing
+ * 1-50" on its own leaves the obvious question unanswered, and somebody
+ * checking whether an order arrived needs to know there are four more pages
+ * of it.
+ */
+function Pager({ page, filter }: { page: OrderPage; filter: OrderFilter }) {
+  if (page.pageCount <= 1) return null;
+
+  const href = (to: number) => `/online-orders?show=${filter}&page=${to}`;
+
+  return (
+    <nav
+      aria-label="More orders"
+      className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 pt-4"
+    >
+      <p className="text-sm text-muted">
+        Showing {page.firstShown}&ndash;{page.lastShown} of {page.total} &middot;
+        page {page.page} of {page.pageCount}
+      </p>
+
+      <div className="flex items-center gap-2">
+        {page.page > 1 ? (
+          <Link href={href(page.page - 1)} className={buttonClasses("secondary")}>
+            Previous page
+          </Link>
+        ) : null}
+        {page.page < page.pageCount ? (
+          <Link href={href(page.page + 1)} className={buttonClasses("secondary")}>
+            Next page
+          </Link>
+        ) : null}
+      </div>
+    </nav>
   );
 }
 

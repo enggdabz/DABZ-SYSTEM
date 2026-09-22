@@ -122,6 +122,77 @@ export function sortOrders(
   });
 }
 
+/**
+ * How many orders are drawn at once.
+ *
+ * Fifty is enough that a shop this size never meets the pager at all, and few
+ * enough that a shop four years from now is not painting nine hundred cards
+ * to show the six that are due this week.
+ */
+export const ORDERS_PER_PAGE = 50;
+
+export interface OrderPage {
+  rows: OrderSummary[];
+  /** 1-based, and always a page that exists. */
+  page: number;
+  pageCount: number;
+  total: number;
+  /** 1-based positions of the first and last row shown, for "1-50 of 214". */
+  firstShown: number;
+  lastShown: number;
+}
+
+/**
+ * One page of an already-filtered, already-sorted list.
+ *
+ * WHAT THIS DOES NOT DO, deliberately: it does not page the READ. Every order
+ * is still fetched, because the five tiles and the count on every filter chip
+ * are statements about the whole shop - "Overdue 3" has to mean three, not
+ * three on this page - and `listTiles` works them out from the same array the
+ * list is drawn from. That is the point of this file: the number on a tile and
+ * the rows under a chip come from one idea of what "open" means. Moving the
+ * tiles into SQL to page the read would split that in two, which is the bug
+ * this module was built to avoid.
+ *
+ * So this caps what the BROWSER is asked to draw, which is the cost that bites
+ * first. When the read itself becomes the cost - thousands of orders, not
+ * hundreds - the answer is aggregates in the database feeding both, together,
+ * and not a paged read beside tiles that still count everything.
+ */
+export function pageOfOrders(
+  orders: readonly OrderSummary[],
+  page: number,
+): OrderPage {
+  const total = orders.length;
+  const pageCount = Math.max(1, Math.ceil(total / ORDERS_PER_PAGE));
+
+  /*
+    Clamped, not refused. A bookmarked `?page=9` on a list that has shrunk to
+    two pages should show the last page - an empty list there would read as
+    "nothing matches that filter", which is a different and untrue statement.
+  */
+  const safe = Number.isFinite(page) ? Math.trunc(page) : 1;
+  const current = Math.min(Math.max(safe, 1), pageCount);
+
+  const start = (current - 1) * ORDERS_PER_PAGE;
+  const rows = orders.slice(start, start + ORDERS_PER_PAGE);
+
+  return {
+    rows,
+    page: current,
+    pageCount,
+    total,
+    firstShown: total === 0 ? 0 : start + 1,
+    lastShown: start + rows.length,
+  };
+}
+
+/** `?page=` as typed, before `pageOfOrders` clamps it. */
+export function parsePageNumber(value: string | null | undefined): number {
+  const parsed = Number.parseInt(value ?? "", 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 /** "Jersey +2" - the first item's name and how many more there are. */
 export function itemsLabel(order: OrderSummary): string {
   if (order.firstItemName === null) return "No items";
