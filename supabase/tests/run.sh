@@ -58,6 +58,8 @@ quiet "$HERE/../migrations/0018_phase12_production.sql"
 quiet "$HERE/../migrations/0019_phase13_encoding.sql"
 # 0020 is the online shop and its orders - 17 tests it.
 quiet "$HERE/../migrations/0020_phase14_online_orders.sql"
+# 0021 lets a project that nothing has happened to be deleted - 18 tests it.
+quiet "$HERE/../migrations/0021_delete_a_project_nothing_happened.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -79,3 +81,4 @@ run "$HERE/14_deactivated_account.test.sql"
 run "$HERE/15_phase12_rls.test.sql"
 run "$HERE/16_phase13_rls.test.sql"
 run "$HERE/17_online_orders_rls.test.sql"
+run "$HERE/18_delete_project_rls.test.sql"

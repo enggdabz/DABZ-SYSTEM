@@ -539,12 +539,18 @@ begin
     raise notice 'PASS: a cancelled project keeps its people as they were';
   end;
 
-  -- And it is cancelled, never deleted - the customer may hold the sheet.
+  /*
+    And it cannot be deleted - not because deleting is impossible (`0021`
+    allows it for a project nothing has happened to) but because THIS project
+    has bench marks on it, which the block above moved on to its t-shirt item.
+    A mark is somebody's statement about work they did, so the project is
+    cancelled with a reason and kept.
+  */
   delete from public.apparel_orders where id = v_order_id;
   if found then
-    raise exception 'FAIL: a job order was deleted - it should only ever be cancelled';
+    raise exception 'FAIL: a project with bench marks on it was deleted';
   end if;
-  raise notice 'PASS: the test project cannot be deleted, only cancelled';
+  raise notice 'PASS: a project with bench marks on it cannot be deleted';
 end;
 $$;
 

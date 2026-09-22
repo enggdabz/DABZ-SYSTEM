@@ -20,12 +20,24 @@
  * tested, since they are the part the owner actually reads.
  */
 
-export type CatalogueKind =
-  | "bill"
-  | "loan"
-  | "product"
-  | "apparel item"
-  | "repair service";
+/**
+ * Everything this file has a rule for.
+ *
+ * An array rather than a bare union type, so that a test can walk it: the
+ * union existed first and `deletable.test.ts` kept its own hand-written copy,
+ * which promptly fell a kind behind. A list that cannot drift is worth more
+ * than a comment asking somebody to remember.
+ */
+export const CATALOGUE_KINDS = [
+  "bill",
+  "loan",
+  "product",
+  "apparel item",
+  "repair service",
+  "apparel project",
+] as const;
+
+export type CatalogueKind = (typeof CATALOGUE_KINDS)[number];
 
 interface Rule {
   noun: string;
@@ -65,6 +77,19 @@ const RULES: Record<CatalogueKind, Rule> = {
     because: "it has already been charged on a ticket",
     instead:
       "Stop offering it instead: it disappears from new tickets and the ones already written still read correctly.",
+  },
+  /*
+    A whole job order, not a catalogue row - and the only one here where the
+    thing being deleted is a JOB rather than a list entry. It earns its place
+    because the rule is identical: a project written by mistake can go, and one
+    with money, bench marks or a customer holding the sheet cannot.
+  */
+  "apparel project": {
+    noun: "project",
+    because:
+      "money has been taken against it, the shop floor has marked its benches, or it has already been released",
+    instead:
+      "Cancel it with a reason instead: it keeps every figure and every name, and the list says why it stopped.",
   },
 };
 

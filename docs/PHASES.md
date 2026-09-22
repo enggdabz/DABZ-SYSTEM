@@ -2456,6 +2456,79 @@ reporting PHP 0.00 rather than as an error. Renumbering the newer branch is
 always cheaper than finding that out from production.
 ---
 
+## 22 September 2026 — deleting a project written by mistake
+
+**What you asked for**
+
+> "Add also a delete button for an encoded project, but pop up a verification
+> if it is going to really delete."
+
+**The rule it had to get past**
+
+Since Phase 6 a job order has had **no delete policy at all**: an order is
+cancelled with a reason, never erased, because the customer may be holding the
+sheet. That is still right for every real job — and it never covered the one
+you were actually asking about, a project typed in by mistake. A wrong team
+name, a duplicate, a test entry: "cancelled" is the right answer for a job that
+fell through and an odd one for a typo five seconds old, which then sits on the
+list for ever.
+
+So the door is not opened. A gap is opened in it **exactly the width of the
+mistake**, using the rule the rest of the system already follows: *delete only
+where nothing has happened.*
+
+**Built**
+
+- **A Delete this project card** at the bottom of a project, for you and any
+  admin. Not for staff: deleting a whole project is not counter work, and a
+  staff member cancels it instead — the same shape as voiding a sale.
+- **It asks first, and names the project**, using the same confirmation the
+  Bills, Loans and Products screens have used since Phase 2. "Are you sure?"
+  beside eleven identical cards is a question about nothing in particular.
+- **The confirmation says what goes with it** — how many people and how many
+  items — because they cascade away and that is the point of reading it.
+- **Three things stop it**, and each is proven on its own: a **payment**
+  (voided or not — its ledger entries are still pointing at it), a
+  **production mark** on any item, or the project having been **released**.
+  Each one makes the card show the reason instead of the button. A missing
+  button teaches nothing.
+- **Cancelled is not one of them.** Cancelling records a decision about the
+  work, not that money moved, and a project cancelled by mistake is exactly
+  what this is for.
+- **The whole project is written to Activity first** — every person, every
+  item, the contact details, the note — because all of it cascades away and
+  that log is the only record of it afterwards.
+
+**How to check it**
+
+1. Open a project you have just written, with nothing else done to it. The
+   card at the bottom offers **Delete**. Press it: it asks, and names the
+   project and what goes with it. Press again and it is gone; **Activity**
+   has the whole thing.
+2. On a project with a payment taken, the card says so instead and offers
+   cancelling. Same for one with a bench ticked on **Production report**, and
+   for one already released.
+3. Tick a bench, then clear it again: the project becomes deletable. The rule
+   is about what *has* happened, and somebody clearing a tick is saying it did
+   not.
+4. Sign in as a staff member with **Apparel job orders**: there is no card at
+   all, and the project is theirs to cancel.
+
+| What | How | Result |
+|---|---|---|
+| The sentences the owner reads, over every kind | `npm test` | 1113 tests (3 new) |
+| The policy, the three stoppers, and that nobody else may, against a real PostgreSQL | `npm run test:rls` | 469 checks, 18 of them new |
+| Every table and column the app asks for | `npm run check:schema` | 292 table references, 1318 column references |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+Two existing security tests were touched, and both deliberately. Phase 12's
+suite asserted a job order could never be deleted; it now asserts the new rule,
+because the project it uses has had its only item removed and so qualifies.
+Phase 13's still refuses — but for a stated reason now, its bench marks, rather
+than because deleting was impossible.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the
