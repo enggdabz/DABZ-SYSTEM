@@ -22,8 +22,13 @@
  * And when the row cannot be deleted it says so, instead of hiding the button.
  * A missing button teaches nothing; a sentence explaining that the bill has
  * been paid and offering Stop instead teaches the rule once.
+ *
+ * That sentence NAMES the alternative, and `alternative` is where the thing
+ * that does it goes. Telling somebody to cancel the project instead, while
+ * leaving them to go and find the button that cancels it, is the same mistake
+ * as the project calendar whose only way in was a line of grey text.
  */
-import { useActionState } from "react";
+import { useActionState, type ReactNode } from "react";
 
 import { Button, Notice } from "@/components/ui";
 import { useFormPanel } from "@/components/use-form-panel";
@@ -53,6 +58,13 @@ export function DeleteButton({
   action,
   /** Anything else worth saying before the row goes, e.g. a bill it unlinks. */
   consequence,
+  /**
+   * The control that does the thing the refusal recommends - Stop counting it,
+   * Cancel the project. Shown ONLY in the refusal, and only when the caller
+   * has one: a released project, for instance, cannot be cancelled either, and
+   * a button that is not there is better than one that refuses.
+   */
+  alternative,
 }: {
   kind: CatalogueKind;
   name: string;
@@ -64,6 +76,7 @@ export function DeleteButton({
     formData: FormData,
   ) => Promise<DeleteActionState>;
   consequence?: string;
+  alternative?: ReactNode;
 }) {
   const [state, submit, pending] = useActionState<DeleteActionState, FormData>(
     action,
@@ -73,7 +86,10 @@ export function DeleteButton({
 
   if (!canDelete(hasHistory)) {
     return (
-      <p className="text-sm text-muted">{deleteRefusal(kind, true)}</p>
+      <div className="space-y-3">
+        <p className="text-sm text-muted">{deleteRefusal(kind, true)}</p>
+        {alternative}
+      </div>
     );
   }
 

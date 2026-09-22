@@ -129,6 +129,18 @@ describe("a whole project, not a catalogue row", () => {
     expect(refusal).toContain("Cancel it with a reason");
   });
 
+  it("does not promise cancelling on a project that cannot be cancelled", () => {
+    /*
+      One of the three things that stops a delete is the project having been
+      RELEASED - and a released project cannot be cancelled either. A flat
+      "cancel it instead" would send somebody looking for a button that is
+      correctly not there, so the sentence is bounded.
+    */
+    expect(deleteRefusal("apparel project", true)).toContain(
+      "while it is still open",
+    );
+  });
+
   it("says nothing was deleted rather than claiming it was", () => {
     // A DELETE matching no policy removes nothing and raises nothing, so this
     // sentence is the only thing standing between the owner and a false

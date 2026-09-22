@@ -88,8 +88,14 @@ const RULES: Record<CatalogueKind, Rule> = {
     noun: "project",
     because:
       "money has been taken against it, the shop floor has marked its benches, or it has already been released",
+    /*
+      "while it is still open" is not padding. One of the three things that
+      stops a delete is the project having been RELEASED - and a released
+      project cannot be cancelled either, so a flat "cancel it instead" would
+      send somebody looking for a button that is correctly not there.
+    */
     instead:
-      "Cancel it with a reason instead: it keeps every figure and every name, and the list says why it stopped.",
+      "Cancel it with a reason instead, while it is still open: it keeps every figure and every name, and the list says why it stopped.",
   },
 };
 

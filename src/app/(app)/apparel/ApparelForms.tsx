@@ -320,7 +320,67 @@ function ContactFields({ contact }: { contact?: ProjectContact }) {
   );
 }
 
-/** Moving an order along, and cancelling it. */
+/**
+ * Cancelling a project, with its reason.
+ *
+ * Its own component because it is now offered in TWO places: here under the
+ * status, and beside the Delete card as the alternative when a project has too
+ * much behind it to be deleted. Two copies of this form would be two places
+ * for the wording to drift, and the wording is the part that has to agree -
+ * the same reason every delete refusal lives in `src/lib/deletable.ts`.
+ */
+export function CancelProjectForm({
+  orderId,
+  openLabel = "Cancel the order",
+}: {
+  orderId: string;
+  openLabel?: string;
+}) {
+  const [state, submit, pending] = useActionState<ApparelState, FormData>(
+    setOrderStatusAction,
+    {},
+  );
+  const { open, answer, openPanel, closePanel } = useFormPanel(state);
+
+  if (!open) {
+    return (
+      <div className="space-y-2">
+        <Button type="button" variant="quiet" onClick={openPanel}>
+          {openLabel}
+        </Button>
+        {answer.success ? <Notice tone="success" title={answer.success} /> : null}
+      </div>
+    );
+  }
+
+  return (
+    <form action={submit} className="space-y-3">
+      <input type="hidden" name="orderId" value={orderId} />
+      <input type="hidden" name="status" value="cancelled" />
+
+      <Field
+        label="Why is it cancelled?"
+        hint="Kept on the order, because work may already have been done."
+        error={answer.fieldErrors?.cancelReason}
+      >
+        <Input name="cancelReason" placeholder="e.g. team pulled out" required autoFocus />
+      </Field>
+
+      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
+
+      <div className="flex flex-wrap gap-2">
+        <Button type="submit" variant="danger" disabled={pending}>
+          {pending ? "Saving..." : "Cancel this order"}
+        </Button>
+        <Button type="button" variant="quiet" onClick={closePanel}>
+          Keep it open
+        </Button>
+      </div>
+    </form>
+  );
+}
+
+/** Moving an order along. Cancelling is its own form, above. */
 export function StatusForm({
   orderId,
   status,
@@ -332,38 +392,9 @@ export function StatusForm({
     setOrderStatusAction,
     {},
   );
-  const { open: cancelling, answer, openPanel, closePanel } = useFormPanel(state);
 
   const index = ORDER_FLOW.indexOf(status);
   const next = index >= 0 && index < ORDER_FLOW.length - 1 ? ORDER_FLOW[index + 1] : null;
-
-  if (cancelling) {
-    return (
-      <form action={submit} className="space-y-3">
-        <input type="hidden" name="orderId" value={orderId} />
-        <input type="hidden" name="status" value="cancelled" />
-
-        <Field
-          label="Why is it cancelled?"
-          hint="Kept on the order, because work may already have been done."
-          error={answer.fieldErrors?.cancelReason}
-        >
-          <Input name="cancelReason" placeholder="e.g. team pulled out" required autoFocus />
-        </Field>
-
-        {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
-
-        <div className="flex flex-wrap gap-2">
-          <Button type="submit" variant="danger" disabled={pending}>
-            {pending ? "Saving..." : "Cancel this order"}
-          </Button>
-          <Button type="button" variant="quiet" onClick={closePanel}>
-            Keep it open
-          </Button>
-        </div>
-      </form>
-    );
-  }
 
   return (
     <div className="space-y-2">
@@ -391,13 +422,11 @@ export function StatusForm({
       </form>
 
       {status !== "cancelled" && status !== "released" ? (
-        <Button type="button" variant="quiet" onClick={openPanel}>
-          Cancel the order
-        </Button>
+        <CancelProjectForm orderId={orderId} />
       ) : null}
 
-      {answer.error ? <Notice tone="attention" title={answer.error} /> : null}
-      {answer.success ? <Notice tone="success" title={answer.success} /> : null}
+      {state.error ? <Notice tone="attention" title={state.error} /> : null}
+      {state.success ? <Notice tone="success" title={state.success} /> : null}
     </div>
   );
 }

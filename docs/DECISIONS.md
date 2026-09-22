@@ -1232,3 +1232,19 @@ to ask:
   screen read, so they cannot disagree. To close the gap again: drop that
   policy and the card disappears with it, because the screen asks the same
   function.
+- **22 September 2026 — a refusal carries the button that does the thing it
+  recommends.** You saw the delete card say "cancel it instead" and asked for
+  the cancel button to be there — which was right, and it is the project
+  calendar lesson again: a way in has to look like one, and a sentence naming
+  an action while leaving somebody to go and find it is not a way in.
+  `DeleteButton` now takes an `alternative`, shown only in the refusal. Two
+  consequences worth knowing. The cancel form became ONE component
+  (`CancelProjectForm`) used both under the status and beside the Delete card,
+  because two copies of it would be two places for the wording to drift — the
+  same reason every delete refusal lives in `src/lib/deletable.ts`. And the
+  refusal sentence gained the words **"while it is still open"**: one of the
+  three things that stops a delete is the project having been RELEASED, and a
+  released project cannot be cancelled either, so the old flat "cancel it
+  instead" was advice that could not be followed. The button is not offered
+  there at all. To give another kind the same treatment — Stop counting a
+  bill, say — pass `alternative` where its `DeleteButton` is rendered.

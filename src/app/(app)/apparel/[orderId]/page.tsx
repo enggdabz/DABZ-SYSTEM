@@ -37,6 +37,7 @@ import {
 import { deleteApparelOrderAction } from "../actions";
 import { EncodingTable } from "../EncodingTable";
 import {
+  CancelProjectForm,
   ItemFabricForm,
   OrderDetailsForm,
   PaymentForm,
@@ -603,6 +604,21 @@ export default async function ApparelOrderPage({
               idField="orderId"
               id={order.id}
               hasHistory={orderHasHistory}
+              /*
+                When it cannot be deleted, the refusal says to cancel it
+                instead - so the button that cancels it is right there. Not
+                offered on a released or already-cancelled project, where
+                cancelling is correctly impossible and a button that refuses
+                would be worse than none.
+              */
+              alternative={
+                order.status === "cancelled" || order.status === "released" ? null : (
+                  <CancelProjectForm
+                    orderId={order.id}
+                    openLabel="Cancel this project instead"
+                  />
+                )
+              }
               action={deleteApparelOrderAction}
               consequence={
                 detail.roster.length > 0 || totals.lines.length > 0

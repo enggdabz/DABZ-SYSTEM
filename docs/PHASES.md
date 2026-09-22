@@ -2492,6 +2492,15 @@ where nothing has happened.*
   **production mark** on any item, or the project having been **released**.
   Each one makes the card show the reason instead of the button. A missing
   button teaches nothing.
+- **And the reason comes with the button that acts on it.** When a project is
+  too far along to delete, the card offers **Cancel this project instead**
+  right there — telling somebody to cancel it while leaving them to go and
+  find the button that cancels it is the mistake the project calendar made
+  when its only way in was a line of grey text. It is not offered on a
+  released or already-cancelled project, where cancelling is correctly
+  impossible: a button that is not there beats one that refuses. The cancel
+  form is now ONE component used in both places, so the two cannot drift
+  apart on what they say.
 - **Cancelled is not one of them.** Cancelling records a decision about the
   work, not that money moved, and a project cancelled by mistake is exactly
   what this is for.
