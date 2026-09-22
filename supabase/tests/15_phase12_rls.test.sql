@@ -253,16 +253,24 @@ begin
   raise notice 'PASS: removing an item takes its benches with it';
 
   /*
-    The order itself stays. There is no delete policy on apparel_orders - an
-    order is cancelled with a reason, never erased, because the customer may
-    be holding the job order sheet - so tidying up after this test would mean
-    loosening the very rule the suite exists to hold.
+    UPDATED 22 September 2026, and the change is the point rather than a
+    convenience: `0021` gave `apparel_orders` a delete policy, so that a
+    project written by mistake can be removed instead of sitting on the list
+    as "cancelled" for ever.
+
+    It is a narrow policy - Owner/Admin, and only while NOTHING has happened:
+    no payment, no production mark, not released. This order qualifies now
+    precisely because the test above deleted its only item, which took its
+    bench marks with it. Before that line ran, this delete was refused.
+
+    That is what is asserted here. The full rule - what counts as history, and
+    that everybody else is refused - is proven in 18_delete_project_rls.
   */
   delete from public.apparel_orders where id = v_order_id;
-  if found then
-    raise exception 'FAIL: a job order was deleted - it should only ever be cancelled';
+  if not found then
+    raise exception 'FAIL: the owner could not delete a project nothing has happened to';
   end if;
-  raise notice 'PASS: the test job order cannot be deleted, only cancelled';
+  raise notice 'PASS: with its last item gone, the owner may delete the test project';
 end;
 $$;
 

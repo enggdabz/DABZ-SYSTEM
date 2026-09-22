@@ -77,6 +77,20 @@ receiving code.
   at it. They were the checks most worth automating: they are what stops a
   policy change quietly opening the books, and by hand they only ran when
   somebody remembered.
+- **A pull request with a merge conflict gets NO CI RUN AT ALL**, and that is
+  not the same as a failing one. GitHub cannot build the merge ref, so no
+  `pull_request` workflow is created: the pull request does not go red, it goes
+  QUIET. An empty check list reads exactly like "the run has not started yet",
+  and a green tick from an earlier commit can still be sitting beside it, so
+  "waiting for CI" and "conflicted" look identical from the outside. Read
+  `mergeable_state`, not the check list - and if there is no run against the
+  head commit, look for a conflict before waiting for one. Merge `main` in,
+  resolve it, push, and the run appears.
+  This is the same cause as the four-digit prefix rule above: the project now
+  routinely has more than one branch open, and `main` moves under a branch
+  while it is being worked on. **Before finishing any branch, fetch `main` and
+  check both** - the highest migration number on it, and whether it still
+  merges. It has cost two branches a cycle each.
 - **A new table or view must be added to `src/lib/schema-health.ts`** - and so
   must a **column added to a table an EARLIER migration created**
   (`REQUIRED_COLUMNS`, one per table per migration). A migration that adds only
@@ -356,8 +370,22 @@ round trip is the one thing that must be tried against a real project.
 - **An order may be released with money still owed.** A shop does let a regular
   take the jerseys, so the system says so and keeps the order on the list rather
   than refusing - an order that disappears is an order nobody chases.
-- **An order is cancelled with a reason, never deleted.** There is no delete
-  policy at all; the customer may be holding the sheet.
+- **An order is cancelled with a reason, not deleted** - once anything has
+  happened to it. The customer may be holding the sheet, so that rule stands
+  for every real job. `0021` opened one narrow gap in it, at the owner's
+  request (22 Sep 2026): a project written by MISTAKE - wrong team name,
+  duplicate, test entry - may be deleted, because "cancelled" is the right
+  answer for a job that fell through and an odd one for a typo five seconds
+  old, which would otherwise sit on the list for ever. The gap is the same
+  rule the rest of the catalogue follows (`0011`, `src/lib/deletable.ts`):
+  **delete only where nothing has happened.** Nothing has happened means no
+  payment (voided or not - its ledger entries cascade), no production mark on
+  any item, and not released. Cancelled is NOT history: cancelling records a
+  decision about the work, not that money moved. **Owner/Admin only** - a
+  staff member cancels, the same shape as voiding a sale. The whole project,
+  every person and every item, is written to the audit log BEFORE it goes,
+  because it all cascades away and that log is the only record afterwards.
+  `18_delete_project_rls.test.sql` holds the gap to that width.
 - The down payment percentage is **null until the owner sets one**. Spec 17.10
   offers "e.g. 50%", which is an example, not the owner saying so - a made-up
   policy would have staff turning away a customer who paid what the owner

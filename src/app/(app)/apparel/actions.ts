@@ -713,6 +713,134 @@ function auditShape(entry: {
   };
 }
 
+/**
+ * Deleting a whole project (owner's request, 22 September 2026).
+ *
+ * `0007` gave `apparel_orders` no delete policy at all, because an order is
+ * cancelled with a reason and never erased - the customer may be holding the
+ * job order sheet. That reason still holds for a real job. What it did not
+ * cover is the project written by MISTAKE: a wrong team name, a duplicate, a
+ * test entry, which sat on the list as "cancelled" for ever.
+ *
+ * So the gap is exactly the width of the mistake, and it is the rule the rest
+ * of the catalogue already follows: delete only where nothing has happened.
+ * `0021` is the boundary; this checks the same question first so the screen
+ * and the database cannot disagree, and writes the WHOLE project to the audit
+ * log before anything goes - every person and every item, because they cascade
+ * away with it and afterwards there is nothing left to reconstruct them from.
+ */
+export async function deleteApparelOrderAction(
+  _previous: ApparelState,
+  formData: FormData,
+): Promise<ApparelState> {
+  // Owner/Admin only. Deleting a whole project is not counter work - a staff
+  // member cancels it, the same shape as "staff add sales, Owner/Admin void".
+  const user = await requireOwnerOrAdmin();
+
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const detail = await getApparelOrder(orderId);
+  if (!detail) return { error: "That project no longer exists." };
+
+  const supabase = await createSupabaseServerClient();
+
+  const { data: hasHistory, error: historyError } = await supabase.rpc(
+    "apparel_order_has_history",
+    { p_order_id: orderId },
+  );
+
+  if (historyError) {
+    return {
+      error: isFunctionMissingFromApi(historyError)
+        ? historyCheckUnavailable("apparel_order_has_history")
+        : `Could not check what has happened to it: ${historyError.message}`,
+    };
+  }
+
+  const refusal = deleteRefusal("apparel project", hasHistory === true);
+  if (refusal) return { error: refusal };
+
+  /*
+    The whole project, written down BEFORE it goes: the order, every item and
+    every person on it. All of that cascades away with the order, so this is
+    the only record that will exist afterwards - the same rule as a deleted
+    product writing its bulk price rules.
+  */
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "delete",
+    entity: "apparel_order",
+    entityId: orderId,
+    summary: `Deleted apparel project ${detail.order.orderNumber}${
+      detail.order.teamName ? ` (${detail.order.teamName})` : ""
+    } - ${detail.roster.length} ${
+      detail.roster.length === 1 ? "person" : "people"
+    } and ${detail.lines.length} item${detail.lines.length === 1 ? "" : "s"}`,
+    before: {
+      order: {
+        order_number: detail.order.orderNumber,
+        ordered_on: detail.order.orderedOn,
+        team_name: detail.order.teamName,
+        status: detail.order.status,
+        promised_on: detail.order.promisedOn,
+        contact_person: detail.order.contactPerson,
+        contact_number: detail.order.contactNumber,
+        address: detail.order.address,
+        facebook_link: detail.order.facebookLink,
+        layout_note: detail.order.layoutNote,
+        note: detail.order.note,
+        cancel_reason: detail.order.cancelReason,
+      },
+      items: detail.lines.map((line) => ({
+        name: line.name,
+        uniform_type: line.uniformType,
+        custom_type_name: line.customTypeName,
+        fabric: line.fabric,
+        collar: line.collar,
+        unit_price_centavos: line.unitPriceCentavos,
+        quantity: line.quantity,
+        income_category: line.incomeCategory,
+      })),
+      people: detail.roster.map((row) => ({
+        name: row.playerName,
+        number: row.playerNumber,
+        type: uniformLabel(row.uniformType, row.customTypeName),
+        size: row.size,
+        short_size: row.shortSize,
+        short_name: row.shortName,
+        price_centavos: row.priceCentavos,
+        quantity: row.quantity,
+        note: row.note,
+      })),
+    },
+  });
+
+  // `.select()` so a delete the policy silently refused can be told apart from
+  // one that worked: a DELETE matching no policy removes nothing and raises
+  // nothing.
+  const { data: removed, error } = await supabase
+    .from("apparel_orders")
+    .delete()
+    .eq("id", orderId)
+    .select("id");
+
+  if (error) return { error: `Could not delete it: ${error.message}` };
+  if (!removed || removed.length === 0) {
+    return { error: deleteVanished("apparel project") };
+  }
+
+  revalidateOrder(orderId);
+  revalidatePath("/production");
+  revalidatePath(`/production/${orderId}`);
+  revalidatePath("/apparel/calendar");
+
+  return {
+    success: `Deleted ${detail.order.orderNumber}. Its ${detail.roster.length} ${
+      detail.roster.length === 1 ? "person" : "people"
+    } went with it, and the whole project is in Activity.`,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Money
 // ---------------------------------------------------------------------------

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
+import { DeleteButton } from "@/components/DeleteButton";
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import {
   ORDER_FLOW,
@@ -15,6 +16,7 @@ import { paymentKindLabel } from "@/lib/collections";
 import {
   getApparelOptions,
   getApparelOrder,
+  getApparelOrderHasHistory,
   getApparelProducts,
   getSizePrices,
   getVoidedPayments,
@@ -32,8 +34,10 @@ import {
   type UniformType,
 } from "@/lib/uniforms";
 
+import { deleteApparelOrderAction } from "../actions";
 import { EncodingTable } from "../EncodingTable";
 import {
+  CancelProjectForm,
   ItemFabricForm,
   OrderDetailsForm,
   PaymentForm,
@@ -62,17 +66,29 @@ export default async function ApparelOrderPage({
 
   const { orderId } = await params;
 
-  const [detail, products, options, sizes, customers, settings, voided, marks] =
-    await Promise.all([
-      getApparelOrder(orderId),
-      getApparelProducts(),
-      getApparelOptions(),
-      getSizePrices(),
-      getCustomers(),
-      getSettings(),
-      getVoidedPayments(orderId),
-      getProductionSteps(),
-    ]);
+  const [
+    detail,
+    products,
+    options,
+    sizes,
+    customers,
+    settings,
+    voided,
+    marks,
+    orderHasHistory,
+  ] = await Promise.all([
+    getApparelOrder(orderId),
+    getApparelProducts(),
+    getApparelOptions(),
+    getSizePrices(),
+    getCustomers(),
+    getSettings(),
+    getVoidedPayments(orderId),
+    getProductionSteps(),
+    // Null to anyone who is not Owner/Admin, and null when it could not be
+    // asked. Both mean "do not offer the button" - see below.
+    getApparelOrderHasHistory(orderId),
+  ]);
 
   if (!detail) notFound();
 
@@ -553,6 +569,70 @@ export default async function ApparelOrderPage({
           </div>
         ) : null}
       </Card>
+
+      {/* ---- Deleting the whole project ----------------------------------- */}
+      {/*
+        Last on the screen, and Owner/Admin only. A project written by mistake
+        has to be removable - "cancelled" is the right answer for a job that
+        fell through and an odd one for a typo five seconds old, which would
+        then sit on the list for ever. The rule is the one the rest of the
+        catalogue follows: delete only where nothing has happened. `0021` is
+        what actually enforces it.
+
+        The card is shown even when the project CANNOT be deleted, because
+        DeleteButton answers with the reason instead of the button. A missing
+        button teaches nothing; a sentence naming what stops it teaches the
+        rule once.
+      */}
+      {isOwnerOrAdmin(user) ? (
+        <Card
+          title="Delete this project"
+          description="Only while nothing has happened to it. Once money has been taken, a bench marked, or the jerseys released, it is cancelled with a reason instead."
+        >
+          {orderHasHistory === null ? (
+            <p className="text-sm text-attention">
+              <span aria-hidden="true">{"⚠"} </span>
+              Whether anything has happened to this project could not be
+              checked, so deleting it is not offered &mdash; the system will not
+              guess about money. Try again in a moment; if it keeps saying this,
+              run <span className="font-mono">npm run db:push</span>.
+            </p>
+          ) : (
+            <DeleteButton
+              kind="apparel project"
+              name={order.orderNumber}
+              idField="orderId"
+              id={order.id}
+              hasHistory={orderHasHistory}
+              /*
+                When it cannot be deleted, the refusal says to cancel it
+                instead - so the button that cancels it is right there. Not
+                offered on a released or already-cancelled project, where
+                cancelling is correctly impossible and a button that refuses
+                would be worse than none.
+              */
+              alternative={
+                order.status === "cancelled" || order.status === "released" ? null : (
+                  <CancelProjectForm
+                    orderId={order.id}
+                    openLabel="Cancel this project instead"
+                  />
+                )
+              }
+              action={deleteApparelOrderAction}
+              consequence={
+                detail.roster.length > 0 || totals.lines.length > 0
+                  ? `${detail.roster.length} ${
+                      detail.roster.length === 1 ? "person" : "people"
+                    } and ${totals.lines.length} item${
+                      totals.lines.length === 1 ? "" : "s"
+                    } go with it. The whole project is written to Activity first, and that is the only record of it afterwards.`
+                  : "Nothing is encoded on it, so nothing goes with it. It is written to Activity first all the same."
+              }
+            />
+          )}
+        </Card>
+      ) : null}
     </div>
   );
 }

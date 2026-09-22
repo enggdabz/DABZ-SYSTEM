@@ -106,6 +106,26 @@ export const getApparelProductsWithOrders = cache(
   },
 );
 
+/**
+ * Has anything happened to this project - a payment, a bench mark, a release?
+ *
+ * Null when the question could not be asked, which the helper also answers to
+ * anyone who is not Owner/Admin. The caller must treat null as "do not offer
+ * the button": the delete policy refuses anything it cannot vouch for, so an
+ * offered button would only produce a refusal.
+ */
+export async function getApparelOrderHasHistory(
+  orderId: string,
+): Promise<boolean | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("apparel_order_has_history", {
+    p_order_id: orderId,
+  });
+
+  if (error || data === null || data === undefined) return null;
+  return data === true;
+}
+
 export interface ApparelOption {
   id: string;
   kind: "fabric" | "collar";

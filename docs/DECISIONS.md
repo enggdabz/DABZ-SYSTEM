@@ -1208,3 +1208,43 @@ to ask:
   the button reads "Save first to print" and does nothing until it is true. To
   change it: the `changes > 0` branch in the action row of
   `src/app/(app)/apparel/EncodingTable.tsx`.
+
+- **22 September 2026 — a project may be deleted only while nothing has
+  happened to it.** You asked for a delete button on a project. The rule since
+  Phase 6 was that an order is cancelled and never deleted, because the
+  customer may be holding the job order sheet — and that reason has not gone
+  away. What it never covered is the project typed in by mistake, which under
+  that rule sat on the list as "cancelled" for ever. So rather than removing
+  the rule I narrowed it to the case it was written for, reusing the line the
+  rest of the catalogue already draws: **delete only where nothing has
+  happened.** Nothing has happened means no payment (voided or not — a void
+  leaves the ledger entries pointing at it, and they cascade), no production
+  mark on any item, and not released. **Cancelled is deliberately not on that
+  list**: cancelling records a decision about the work rather than that money
+  moved, and a project cancelled by mistake is one of the cases this exists
+  for. **Owner/Admin only**, because deleting a whole project is not counter
+  work — a staff member cancels, the same shape as "staff add sales; only
+  Owner/Admin void them". The people and the items cascade away with it, so
+  the action writes the whole project to the audit log BEFORE deleting, as a
+  deleted product already writes its bulk price rules. To change what counts
+  as history: `apparel_order_has_history` in
+  `0021_delete_a_project_nothing_happened.sql`, which both the policy and the
+  screen read, so they cannot disagree. To close the gap again: drop that
+  policy and the card disappears with it, because the screen asks the same
+  function.
+- **22 September 2026 — a refusal carries the button that does the thing it
+  recommends.** You saw the delete card say "cancel it instead" and asked for
+  the cancel button to be there — which was right, and it is the project
+  calendar lesson again: a way in has to look like one, and a sentence naming
+  an action while leaving somebody to go and find it is not a way in.
+  `DeleteButton` now takes an `alternative`, shown only in the refusal. Two
+  consequences worth knowing. The cancel form became ONE component
+  (`CancelProjectForm`) used both under the status and beside the Delete card,
+  because two copies of it would be two places for the wording to drift — the
+  same reason every delete refusal lives in `src/lib/deletable.ts`. And the
+  refusal sentence gained the words **"while it is still open"**: one of the
+  three things that stops a delete is the project having been RELEASED, and a
+  released project cannot be cancelled either, so the old flat "cancel it
+  instead" was advice that could not be followed. The button is not offered
+  there at all. To give another kind the same treatment — Stop counting a
+  bill, say — pass `alternative` where its `DeleteButton` is rendered.
