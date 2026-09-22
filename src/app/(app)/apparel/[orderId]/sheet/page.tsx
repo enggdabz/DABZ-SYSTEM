@@ -12,7 +12,7 @@ import { formatPesos } from "@/lib/money";
 import { formatCivilDate, parseISODate } from "@/lib/period";
 import { rowPrice, rowTotal } from "@/lib/uniforms";
 
-import { UniformSummaryGrids } from "../../UniformSummary";
+import { UniformSummaryGrids } from "@/components/UniformSummary";
 
 export const metadata = { title: "Job order sheet · Dabz System" };
 
