@@ -10,6 +10,7 @@ import {
 } from "@/lib/data/project-deletions";
 import { formatManilaDateTime } from "@/lib/datetime";
 import { isDatabaseBehind } from "@/lib/database-behind";
+import { formatPesos } from "@/lib/money";
 import { DELETION_STATUS_LABELS } from "@/lib/project-deletion";
 
 import { DecisionForm } from "./DecisionForm";
@@ -107,6 +108,7 @@ export default async function DeletionRequestsPage() {
                 </div>
                 <p className="text-xs text-muted">
                   Asked by {request.requestedByName} · {request.reason}
+                  {request.refundRequested ? " · refund asked for" : ""}
                 </p>
                 <p className="text-xs text-muted">
                   {request.reviewedAt
@@ -156,6 +158,22 @@ function RequestCard({ request }: { request: DeletionRequest }) {
             <dt className="text-xs text-muted">Reason</dt>
             <dd className="whitespace-pre-wrap">{request.reason}</dd>
           </div>
+          {request.refundRequested ? (
+            <div>
+              <dt className="text-xs text-muted">Refund</dt>
+              <dd className="font-medium">
+                <span aria-hidden="true">{"⚠"} </span>
+                {request.refundCentavos !== null
+                  ? `${formatPesos(request.refundCentavos)} to hand back`
+                  : "The payments"}
+                <span className="block text-xs font-normal text-muted">
+                  Approving voids the payment
+                  {request.refundCentavos !== null ? "s" : "s"} and takes it off
+                  today&rsquo;s takings. Rejecting refunds nothing.
+                </span>
+              </dd>
+            </div>
+          ) : null}
           <div>
             <Link
               href={`/projects/${request.projectId}`}
@@ -169,6 +187,11 @@ function RequestCard({ request }: { request: DeletionRequest }) {
         <DecisionForm
           requestId={request.id}
           projectNumber={request.projectNumber}
+          refundLabel={
+            request.refundRequested && request.refundCentavos !== null
+              ? formatPesos(request.refundCentavos)
+              : null
+          }
         />
       </div>
     </Card>

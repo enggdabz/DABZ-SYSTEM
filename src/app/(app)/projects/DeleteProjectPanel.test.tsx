@@ -39,6 +39,7 @@ const base = {
   isOwner: false,
   pending: null,
   pendingUnknown: false,
+  paidLabel: null,
 };
 
 const pending = {
@@ -47,6 +48,7 @@ const pending = {
   reason: "Duplicate entry",
   requestedOnLabel: "1 Oct 2026",
   canCancel: true,
+  refundLabel: null,
 };
 
 describe("DeleteProjectPanel", () => {
@@ -143,5 +145,56 @@ describe("DeleteProjectPanel", () => {
   it("shows counter staff nothing at all when nothing is pending", () => {
     const { container } = render(<DeleteProjectPanel {...base} mode="none" />);
     expect(container.innerHTML).toBe("");
+  });
+
+  describe("the refund question", () => {
+    it("is asked when money has been paid, with no choice ticked for you", async () => {
+      const user = userEvent.setup();
+      render(<DeleteProjectPanel {...base} isOwner mode="delete" paidLabel="₱2,000.00" />);
+
+      await user.click(screen.getByRole("button", { name: "Delete project" }));
+
+      const dialog = screen.getByRole("dialog");
+      const refund = within(dialog).getByRole("radio", { name: /Refund ₱2,000\.00/ }) as HTMLInputElement;
+      const keep = within(dialog).getByRole("radio", { name: /Keep the money/ }) as HTMLInputElement;
+      // Neither is the safe one to tick by accident, so neither is.
+      expect(refund.checked).toBe(false);
+      expect(keep.checked).toBe(false);
+      expect(refund.required).toBe(true);
+    });
+
+    it("is not asked when nothing has been paid - it just deletes", async () => {
+      const user = userEvent.setup();
+      render(<DeleteProjectPanel {...base} isOwner mode="delete" paidLabel={null} />);
+
+      await user.click(screen.getByRole("button", { name: "Delete project" }));
+
+      const dialog = screen.getByRole("dialog");
+      expect(within(dialog).queryByRole("radio")).toBeNull();
+      expect(within(dialog).getByRole("button", { name: "Delete project" })).toBeTruthy();
+    });
+
+    it("tells an admin that nothing is refunded until the owner approves", async () => {
+      const user = userEvent.setup();
+      render(<DeleteProjectPanel {...base} mode="request" paidLabel="₱2,000.00" />);
+
+      await user.click(screen.getByRole("button", { name: "Delete project" }));
+
+      expect(
+        within(screen.getByRole("dialog")).getByText(/nothing is refunded until the owner approves/i),
+      ).toBeTruthy();
+    });
+
+    it("says on a pending project that a refund was asked for", () => {
+      render(
+        <DeleteProjectPanel
+          {...base}
+          mode="request"
+          pending={{ ...pending, refundLabel: "₱2,000.00" }}
+        />,
+      );
+
+      expect(screen.getByText(/A refund of ₱2,000\.00 was asked for/)).toBeTruthy();
+    });
   });
 });

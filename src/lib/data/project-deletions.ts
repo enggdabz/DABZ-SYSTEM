@@ -13,14 +13,36 @@ import "server-only";
  */
 import { cache } from "react";
 
-import { throwIfBehind } from "@/lib/database-behind";
+import { DatabaseBehindError } from "@/lib/database-behind";
+import { outcomeFromError } from "@/lib/schema-health";
 import type { DeletionRequestStatus } from "@/lib/project-deletion";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const MIGRATION = "0023_project_deletion_requests";
+const REFUND_MIGRATION = "0025_project_deletion_refund";
+
+/**
+ * A missing TABLE means 0023 is behind; a missing COLUMN on a table that is
+ * there means 0025 is (that is the one that adds `refund_requested`). Naming
+ * the right one matters: the owner runs the command the notice names.
+ */
+function throwIfBehind(
+  error: { code?: string | null; message?: string | null } | null,
+): void {
+  if (error === null || outcomeFromError(error) !== "missing") return;
+  const code = (error.code ?? "").toUpperCase();
+  const columnMissing =
+    code === "42703" ||
+    code === "PGRST204" ||
+    /column .* does not exist|could not find the .*column/i.test(error.message ?? "");
+  throw new DatabaseBehindError(
+    columnMissing ? REFUND_MIGRATION : MIGRATION,
+    error.message ?? undefined,
+  );
+}
 
 const REQUEST_COLUMNS =
-  "id, project_id, requested_by, reason, status, reviewed_by, review_note, created_at, reviewed_at";
+  "id, project_id, requested_by, reason, status, reviewed_by, review_note, created_at, reviewed_at, refund_requested";
 const PROJECT_LABEL_COLUMNS = "id, project_number, customer_name, description, deleted_at";
 const PERSON_COLUMNS = "id, full_name";
 
@@ -34,6 +56,7 @@ interface RequestRow {
   review_note: string | null;
   created_at: string;
   reviewed_at: string | null;
+  refund_requested: boolean;
 }
 
 interface ProjectLabelRow {
@@ -63,6 +86,14 @@ export interface DeletionRequest {
   reviewNote: string | null;
   createdAt: string;
   reviewedAt: string | null;
+  /** The admin asked for the project's live payments to be refunded on approval. */
+  refundRequested: boolean;
+  /**
+   * What approving would refund RIGHT NOW: the live payments, which may be
+   * more than when the admin asked if a balance was paid since. Null unless a
+   * refund was asked for and the request is still pending.
+   */
+  refundCentavos: number | null;
 }
 
 /** A person's name from their id; a removed account reads as "Unknown". */
@@ -100,6 +131,22 @@ async function label(rows: RequestRow[]): Promise<DeletionRequest[]> {
     ((personRead.data ?? []) as PersonRow[]).map((row) => [row.id, row.full_name]),
   );
 
+  // What a pending refund would hand back today, asked of the database that
+  // works it out (`project_paid_centavos`) rather than added up here.
+  const refunds = new Map<string, number>();
+  await Promise.all(
+    rows
+      .filter((row) => row.refund_requested && row.status === "pending")
+      .map(async (row) => {
+        const { data } = await supabase.rpc("project_paid_centavos", {
+          p_project_id: row.project_id,
+        });
+        if (typeof data === "number" || typeof data === "string") {
+          refunds.set(row.id, Number(data));
+        }
+      }),
+  );
+
   return rows.map((row) => {
     const project = projects.get(row.project_id);
     return {
@@ -116,6 +163,8 @@ async function label(rows: RequestRow[]): Promise<DeletionRequest[]> {
       reviewNote: row.review_note,
       createdAt: row.created_at,
       reviewedAt: row.reviewed_at,
+      refundRequested: row.refund_requested,
+      refundCentavos: refunds.get(row.id) ?? null,
     };
   });
 }
@@ -143,8 +192,8 @@ export const getDeletionRequests = cache(
         .order("reviewed_at", { ascending: false })
         .limit(20),
     ]);
-    throwIfBehind(pendingRead.error, MIGRATION);
-    throwIfBehind(recentRead.error, MIGRATION);
+    throwIfBehind(pendingRead.error);
+    throwIfBehind(recentRead.error);
     if (pendingRead.error)
       throw new Error(`Could not read the requests: ${pendingRead.error.message}`);
     if (recentRead.error)
@@ -168,7 +217,7 @@ export async function getPendingRequestForProject(
     .eq("project_id", projectId)
     .eq("status", "pending")
     .maybeSingle();
-  throwIfBehind(error, MIGRATION);
+  throwIfBehind(error);
   if (error) throw new Error(`Could not read the request: ${error.message}`);
   if (!data) return null;
   return (await label([data as RequestRow]))[0] ?? null;
@@ -184,7 +233,7 @@ export async function getDeletionRequest(
     .select(REQUEST_COLUMNS)
     .eq("id", requestId)
     .maybeSingle();
-  throwIfBehind(error, MIGRATION);
+  throwIfBehind(error);
   if (error) throw new Error(`Could not read the request: ${error.message}`);
   if (!data) return null;
   return (await label([data as RequestRow]))[0] ?? null;
@@ -201,7 +250,7 @@ export const getPendingDeletionProjectIds = cache(async (): Promise<Set<string>>
     .from("project_deletion_requests")
     .select("project_id")
     .eq("status", "pending");
-  throwIfBehind(error, MIGRATION);
+  throwIfBehind(error);
   if (error) throw new Error(`Could not read the requests: ${error.message}`);
   return new Set(
     ((data ?? []) as { project_id: string }[]).map((row) => row.project_id),

@@ -7,6 +7,7 @@ import {
   deleteMode,
   isLive,
   outcomeMessage,
+  parseRefundChoice,
   pendingCountLabel,
   validateNote,
   validateReason,
@@ -110,5 +111,33 @@ describe("what is said afterwards", () => {
   it("reads the count in words", () => {
     expect(pendingCountLabel(1)).toBe("1 request waiting");
     expect(pendingCountLabel(3)).toBe("3 requests waiting");
+  });
+});
+
+describe("the refund choice", () => {
+  it("reads only the two answers the form can send", () => {
+    expect(parseRefundChoice("refund")).toBe("refund");
+    expect(parseRefundChoice("keep")).toBe("keep");
+  });
+
+  it("treats anything else as no answer - there is no default", () => {
+    expect(parseRefundChoice("")).toBeNull();
+    expect(parseRefundChoice("yes")).toBeNull();
+    expect(parseRefundChoice("REFUND")).toBeNull();
+  });
+
+  it("says how much was refunded when the owner deletes", () => {
+    expect(
+      outcomeMessage("deleted", "J-1", { refundedLabel: "₱2,000.00" }),
+    ).toBe("Project J-1 was deleted and ₱2,000.00 was refunded.");
+  });
+
+  it("says a refund was ASKED for, not made, when an admin requests", () => {
+    const message = outcomeMessage("requested", "J-1", {
+      refundAskedLabel: "₱2,000.00",
+    });
+    expect(message).toContain("₱2,000.00 refund");
+    expect(message).toContain("owner for approval");
+    expect(message).not.toMatch(/was refunded/);
   });
 });

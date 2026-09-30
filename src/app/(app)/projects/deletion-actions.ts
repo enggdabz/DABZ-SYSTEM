@@ -24,11 +24,15 @@ import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getDeletionRequest } from "@/lib/data/project-deletions";
 import { getProject } from "@/lib/data/projects";
 import { formatPesos } from "@/lib/money";
+import { isFunctionMissingFromApi } from "@/lib/postgrest";
+import { projectMoney, type Project } from "@/lib/projects";
 import {
+  REFUND_CHOICE_REQUIRED,
   canCancelDeletionRequest,
   canDecideDeletion,
   deleteMode,
   outcomeMessage,
+  parseRefundChoice,
   validateNote,
   validateReason,
 } from "@/lib/project-deletion";
@@ -56,6 +60,16 @@ function revalidateDeletionScreens(projectId?: string) {
   revalidatePath("/closing");
   // The sidebar's pending count and the bell live in the layout.
   revalidatePath("/", "layout");
+}
+
+/** The payments a refund would void, for the audit log: number and amount. */
+function livePayments(project: Project) {
+  return project.payments
+    .filter((payment) => !payment.voided)
+    .map((payment) => ({
+      sale_number: payment.saleNumber,
+      amount_centavos: payment.amountCentavos,
+    }));
 }
 
 /** The project as it stood, for the audit log's before column. */
@@ -94,20 +108,50 @@ export async function deleteProjectAction(
   const project = await getProject(projectId);
   if (!project) return { error: "That project could not be found." };
 
+  /*
+    The refund choice is only asked - and only means anything - when the project
+    has a live payment on it. The amount is worked out here from the project's
+    own sales, not read from the form; the database refunds whatever is live
+    when it runs, and refuses a refund of nothing.
+  */
+  const paid = projectMoney(project).paidCentavos;
+  let refund = false;
+  if (paid > 0) {
+    const choice = parseRefundChoice(String(formData.get("refund") ?? ""));
+    if (!choice) return { error: REFUND_CHOICE_REQUIRED };
+    refund = choice === "refund";
+  }
+
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase.rpc("delete_project", {
     p_project_id: projectId,
     p_reason: reason.trim(),
+    p_refund: refund,
   });
-  if (error) return { error: friendly(error.message) };
+  if (error) {
+    // Deployed before `npm run db:push` reached the database: say which
+    // migration, rather than a function name nobody can act on.
+    if (isFunctionMissingFromApi(error)) {
+      return {
+        error:
+          "The database is behind: 0025_project_deletion_refund has not been applied. Run npm run db:push, then try again.",
+      };
+    }
+    return { error: friendly(error.message) };
+  }
 
   const result = (Array.isArray(data) ? data[0] : data) as
-    | { outcome?: string; request_id?: string | null }
+    | {
+        outcome?: string;
+        request_id?: string | null;
+        refunded_centavos?: number | string | null;
+      }
     | null
     | undefined;
   if (result?.outcome !== "deleted" && result?.outcome !== "requested") {
     return { error: "That did not go through. Nothing was changed." };
   }
+  const refunded = Number(result.refunded_centavos ?? 0);
 
   if (result.outcome === "deleted") {
     await recordAudit({
@@ -116,10 +160,24 @@ export async function deleteProjectAction(
       action: "delete",
       entity: "projects",
       entityId: projectId,
-      summary: `Project ${project.number} for ${project.customerName} (${formatPesos(project.totalCentavos)}) deleted by the owner: ${reason.trim()}`,
+      summary: `Project ${project.number} for ${project.customerName} (${formatPesos(project.totalCentavos)}) deleted by the owner: ${reason.trim()}${
+        refunded > 0 ? `; ${formatPesos(refunded)} refunded` : ""
+      }`,
       before: snapshot(project),
-      after: { deleted: true, reason: reason.trim() },
+      after: { deleted: true, reason: reason.trim(), refunded_centavos: refunded },
     });
+    if (refunded > 0) {
+      await recordAudit({
+        actorId: user.id,
+        actorUsername: user.username,
+        action: "void",
+        entity: "projects",
+        entityId: projectId,
+        summary: `Refunded ${formatPesos(refunded)} on deleting project ${project.number}: the payments were voided and the money handed back`,
+        before: { payments: livePayments(project) },
+        after: { voided: true, reason: reason.trim() },
+      });
+    }
   } else {
     await recordAudit({
       actorId: user.id,
@@ -127,9 +185,11 @@ export async function deleteProjectAction(
       action: "request",
       entity: "project_deletion_requests",
       entityId: result.request_id ?? projectId,
-      summary: `Asked the owner to delete project ${project.number} for ${project.customerName}: ${reason.trim()}`,
+      summary: `Asked the owner to delete project ${project.number} for ${project.customerName}${
+        refund ? ` and refund ${formatPesos(paid)}` : ""
+      }: ${reason.trim()}`,
       before: snapshot(project),
-      after: { status: "pending", reason: reason.trim() },
+      after: { status: "pending", reason: reason.trim(), refund_requested: refund },
     });
   }
 
@@ -138,12 +198,18 @@ export async function deleteProjectAction(
   // The project is gone, so its own page is too: send the owner to the list
   // rather than leave them on a 404 for the thing they just did.
   if (result.outcome === "deleted") {
-    redirect(`/projects?deleted=${encodeURIComponent(project.number)}`);
+    redirect(
+      `/projects?deleted=${encodeURIComponent(project.number)}${
+        refunded > 0 ? `&refunded=${refunded}` : ""
+      }`,
+    );
   }
 
   return {
     outcome: result.outcome,
-    done: outcomeMessage(result.outcome, project.number),
+    done: outcomeMessage(result.outcome, project.number, {
+      refundAskedLabel: refund ? formatPesos(paid) : null,
+    }),
   };
 }
 
@@ -238,6 +304,17 @@ export async function decideDeletionAction(
   }
 
   const approve = decision === "approve";
+
+  // What approving will refund, read BEFORE it happens: afterwards the
+  // payments are voided and there is nothing left that says what they were.
+  const beforeApproval =
+    approve && request.refundRequested ? await getProject(request.projectId) : null;
+  const refundPayments = beforeApproval ? livePayments(beforeApproval) : [];
+  const refundCentavos = refundPayments.reduce(
+    (sum, payment) => sum + payment.amount_centavos,
+    0,
+  );
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.rpc("decide_project_deletion", {
     p_request_id: requestId,
@@ -269,11 +346,26 @@ export async function decideDeletionAction(
     });
   }
 
+  if (approve && refundCentavos > 0) {
+    await recordAudit({
+      actorId: user.id,
+      actorUsername: user.username,
+      action: "void",
+      entity: "projects",
+      entityId: request.projectId,
+      summary: `Refunded ${formatPesos(refundCentavos)} on deleting project ${request.projectNumber}: the payments were voided and the money handed back`,
+      before: { payments: refundPayments },
+      after: { voided: true, reason: request.reason },
+    });
+  }
+
   revalidateDeletionScreens(request.projectId);
   return {
     outcome: approve ? "approved" : "rejected",
     done: approve
-      ? `Project ${request.projectNumber} was deleted.`
+      ? refundCentavos > 0
+        ? `Project ${request.projectNumber} was deleted and ${formatPesos(refundCentavos)} was refunded.`
+        : `Project ${request.projectNumber} was deleted.`
       : `The request to delete project ${request.projectNumber} was rejected.`,
   };
 }

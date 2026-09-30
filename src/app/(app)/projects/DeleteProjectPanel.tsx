@@ -34,6 +34,8 @@ export interface PendingDeletionView {
   requestedOnLabel: string;
   /** This person is the requester, or the owner. */
   canCancel: boolean;
+  /** "₱1,300.00" when a refund was asked for; what approving would hand back now. */
+  refundLabel: string | null;
 }
 
 export function DeleteProjectPanel({
@@ -44,6 +46,7 @@ export function DeleteProjectPanel({
   pending,
   pendingUnknown,
   isOwner,
+  paidLabel,
 }: {
   projectId: string;
   projectNumber: string;
@@ -57,6 +60,11 @@ export function DeleteProjectPanel({
    */
   pendingUnknown: boolean;
   isOwner: boolean;
+  /**
+   * What the project has been paid, live ("₱2,000.00"), or null when nothing
+   * is. Decides whether the refund question is asked at all.
+   */
+  paidLabel: string | null;
 }) {
   const [asking, setAsking] = useState(false);
   const [deleteState, submitDelete, deleting] = useActionState<
@@ -77,6 +85,9 @@ export function DeleteProjectPanel({
               {pending.requestedByName} asked on {pending.requestedOnLabel}:{" "}
               &ldquo;{pending.reason}&rdquo;. Until the owner answers, the
               project cannot be edited or moved to another stage.
+              {pending.refundLabel
+                ? ` A refund of ${pending.refundLabel} was asked for; nothing is refunded until the owner approves.`
+                : ""}
             </p>
           ) : (
             <p>
@@ -150,6 +161,46 @@ export function DeleteProjectPanel({
                 : `Your request goes to the owner. The project stays as it is, but it cannot be edited or moved to another stage until the owner answers or you cancel the request.`}
             </p>
           </Notice>
+
+          {/*
+            Only when money has been taken. Two plain choices and NO default:
+            "refund" voids the customer's payment and "keep" leaves it in the
+            books, and neither is the safe one to tick by accident.
+          */}
+          {paidLabel ? (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium">
+                {paidLabel} has been paid on this project. What happens to it?
+              </legend>
+              <label className="flex items-start gap-2 rounded-control p-2 text-sm ring-1 ring-line">
+                <input
+                  type="radio"
+                  name="refund"
+                  value="refund"
+                  required
+                  className="mt-1"
+                />
+                <span>
+                  <span className="font-medium">Refund {paidLabel}</span>
+                  <span className="block text-xs text-muted">
+                    {owner
+                      ? "The payment is voided and the money is handed back. It comes off today's takings."
+                      : "Asked for now; nothing is refunded until the owner approves."}
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2 rounded-control p-2 text-sm ring-1 ring-line">
+                <input type="radio" name="refund" value="keep" className="mt-1" />
+                <span>
+                  <span className="font-medium">Keep the money</span>
+                  <span className="block text-xs text-muted">
+                    The payment stays in Sales and End of day, marked
+                    &ldquo;Project deleted&rdquo;.
+                  </span>
+                </span>
+              </label>
+            </fieldset>
+          ) : null}
 
           <Field label="Why is it being deleted?" hint="Required.">
             <Textarea

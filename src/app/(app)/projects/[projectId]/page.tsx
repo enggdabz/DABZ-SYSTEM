@@ -285,6 +285,9 @@ export default async function ProjectPage({
             customerName={project.customerName}
             mode={mode}
             isOwner={user.role === "owner"}
+            paidLabel={
+              money.paidCentavos > 0 ? formatPesos(money.paidCentavos) : null
+            }
             pendingUnknown={frozen && request === null}
             pending={
               request
@@ -298,6 +301,12 @@ export default async function ProjectPage({
                       userId: user.id,
                       requestedBy: request.requestedBy,
                     }),
+                    refundLabel:
+                      request.refundRequested && request.refundCentavos !== null
+                        ? formatPesos(request.refundCentavos)
+                        : request.refundRequested
+                          ? "the payments"
+                          : null,
                   }
                 : null
             }

@@ -109,6 +109,7 @@ export default async function ProjectsPage({
     month?: string;
     week?: string;
     deleted?: string;
+    refunded?: string;
   }>;
 }) {
   await connection();
@@ -128,6 +129,12 @@ export default async function ProjectsPage({
     month: params.month,
     week: params.week,
   };
+
+  // A whole number of centavos or nothing: it rides in the address, so it is
+  // read defensively and only ever shown, never acted on.
+  const refundedCentavos = /^\d{1,12}$/.test(params.refunded ?? "")
+    ? Number(params.refunded)
+    : 0;
 
   const today = manilaToday();
   let projects: Awaited<ReturnType<typeof getProjects>>;
@@ -212,10 +219,19 @@ export default async function ProjectsPage({
       </div>
 
       {params.deleted ? (
-        <Notice tone="success" title={`Project ${params.deleted} was deleted`}>
+        <Notice
+          tone="success"
+          title={
+            refundedCentavos > 0
+              ? `Project ${params.deleted} was deleted and ${formatPesos(refundedCentavos)} was refunded`
+              : `Project ${params.deleted} was deleted`
+          }
+        >
           <p>
-            It is off this list and the calendar. Any money it took is still in
-            Sales and End of day, marked &ldquo;Project deleted&rdquo;.
+            It is off this list and the calendar.{" "}
+            {refundedCentavos > 0
+              ? "The payments were voided and the money comes off today's takings; they stay in Sales, struck through and marked \u201CProject deleted\u201D."
+              : "Any money it took is still in Sales and End of day, marked \u201CProject deleted\u201D."}
           </p>
         </Notice>
       ) : null}

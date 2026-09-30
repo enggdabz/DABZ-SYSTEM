@@ -327,6 +327,16 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0023_project_deletion_requests",
     breaks: "deleting a project, and every screen that lists projects",
   },
+  {
+    /*
+      A column on a table 0023 created. Without it the Deletion requests page
+      cannot read a single request, and an admin's request cannot be saved.
+    */
+    name: "project_deletion_requests",
+    column: "refund_requested",
+    migration: "0025_project_deletion_refund",
+    breaks: "refunding a down payment when a project is deleted",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */

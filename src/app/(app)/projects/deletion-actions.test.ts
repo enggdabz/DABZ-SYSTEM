@@ -67,6 +67,27 @@ const project = {
   description: "Team jerseys",
   totalCentavos: 500000,
   status: "open",
+  // ₱2,000 taken as a down payment, one live and one already voided.
+  payments: [
+    {
+      saleId: "sale-1",
+      saleNumber: "S-261001-001",
+      saleDate: "2026-10-01",
+      kind: "down",
+      amountCentavos: 200000,
+      method: "cash",
+      voided: false,
+    },
+    {
+      saleId: "sale-2",
+      saleNumber: "S-261001-002",
+      saleDate: "2026-10-01",
+      kind: "balance",
+      amountCentavos: 50000,
+      method: "cash",
+      voided: true,
+    },
+  ],
 };
 
 const pendingRequest = {
@@ -78,6 +99,7 @@ const pendingRequest = {
   requestedByName: "Maria",
   reason: "Duplicate",
   status: "pending",
+  refundRequested: false,
 };
 
 function form(fields: Record<string, string>): FormData {
@@ -103,7 +125,7 @@ describe("delete project", () => {
 
     const result = await deleteProjectAction(
       {},
-      form({ projectId: PROJECT_ID, reason: "Wrong customer" }),
+      form({ projectId: PROJECT_ID, reason: "Wrong customer", refund: "keep" }),
     );
 
     expect(result.outcome).toBe("requested");
@@ -114,6 +136,7 @@ describe("delete project", () => {
     expect(rpc).toHaveBeenCalledWith("delete_project", {
       p_project_id: PROJECT_ID,
       p_reason: "Wrong customer",
+      p_refund: false,
     });
     expect(from).not.toHaveBeenCalled();
     expect(redirect).not.toHaveBeenCalled();
@@ -136,13 +159,14 @@ describe("delete project", () => {
     await expect(
       deleteProjectAction(
         {},
-        form({ projectId: PROJECT_ID, reason: "Test entry" }),
+        form({ projectId: PROJECT_ID, reason: "Test entry", refund: "keep" }),
       ),
     ).rejects.toThrow("NEXT_REDIRECT:/projects?deleted=J-261001-001");
 
     expect(rpc).toHaveBeenCalledWith("delete_project", {
       p_project_id: PROJECT_ID,
       p_reason: "Test entry",
+      p_refund: false,
     });
     expect(recordAudit).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -191,7 +215,7 @@ describe("delete project", () => {
 
     const result = await deleteProjectAction(
       {},
-      form({ projectId: PROJECT_ID, reason: "Again" }),
+      form({ projectId: PROJECT_ID, reason: "Again", refund: "keep" }),
     );
 
     expect(result.error).toBe(
@@ -206,10 +230,144 @@ describe("delete project", () => {
 
     const result = await deleteProjectAction(
       {},
-      form({ projectId: PROJECT_ID, reason: "Duplicate" }),
+      form({ projectId: PROJECT_ID, reason: "Duplicate", refund: "keep" }),
     );
 
     expect(result.error).toMatch(/Nothing was changed/);
+    expect(recordAudit).not.toHaveBeenCalled();
+  });
+});
+
+describe("the refund choice", () => {
+  it("must be made when the project has a live payment", async () => {
+    requireUser.mockResolvedValue(owner);
+
+    const result = await deleteProjectAction(
+      {},
+      form({ projectId: PROJECT_ID, reason: "Mistake" }),
+    );
+
+    expect(result.error).toMatch(/refund it or keep the money/);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("is not needed when nothing live has been paid", async () => {
+    requireUser.mockResolvedValue(admin);
+    getProject.mockResolvedValue({
+      ...project,
+      payments: project.payments.map((payment) => ({ ...payment, voided: true })),
+    });
+    rpc.mockResolvedValue({
+      data: [{ outcome: "requested", request_id: REQUEST_ID, refunded_centavos: 0 }],
+      error: null,
+    });
+
+    const result = await deleteProjectAction(
+      {},
+      form({ projectId: PROJECT_ID, reason: "Mistake" }),
+    );
+
+    expect(result.outcome).toBe("requested");
+    expect(rpc).toHaveBeenCalledWith("delete_project", {
+      p_project_id: PROJECT_ID,
+      p_reason: "Mistake",
+      p_refund: false,
+    });
+  });
+
+  it("ignores a refund tick when there is nothing to refund", async () => {
+    requireUser.mockResolvedValue(owner);
+    getProject.mockResolvedValue({
+      ...project,
+      payments: [],
+    });
+    rpc.mockResolvedValue({
+      data: [{ outcome: "deleted", refunded_centavos: 0 }],
+      error: null,
+    });
+
+    await expect(
+      deleteProjectAction(
+        {},
+        form({ projectId: PROJECT_ID, reason: "Test", refund: "refund" }),
+      ),
+    ).rejects.toThrow("NEXT_REDIRECT");
+
+    expect(rpc).toHaveBeenCalledWith("delete_project", {
+      p_project_id: PROJECT_ID,
+      p_reason: "Test",
+      p_refund: false,
+    });
+  });
+
+  it("the owner refunding sends the choice, logs the void, and says how much", async () => {
+    requireUser.mockResolvedValue(owner);
+    rpc.mockResolvedValue({
+      data: [{ outcome: "deleted", request_id: null, refunded_centavos: 200000 }],
+      error: null,
+    });
+
+    await expect(
+      deleteProjectAction(
+        {},
+        form({ projectId: PROJECT_ID, reason: "Changed their mind", refund: "refund" }),
+      ),
+    ).rejects.toThrow("NEXT_REDIRECT:/projects?deleted=J-261001-001&refunded=200000");
+
+    expect(rpc).toHaveBeenCalledWith("delete_project", {
+      p_project_id: PROJECT_ID,
+      p_reason: "Changed their mind",
+      p_refund: true,
+    });
+    const actions = recordAudit.mock.calls.map((call) => call[0].action);
+    expect(actions).toEqual(["delete", "void"]);
+    // Only the LIVE payment is named as refunded - the voided one was already
+    // handed back.
+    expect(recordAudit.mock.calls[1][0]).toMatchObject({
+      before: { payments: [{ sale_number: "S-261001-001", amount_centavos: 200000 }] },
+    });
+  });
+
+  it("an admin asking for a refund only asks - and says so in the log", async () => {
+    requireUser.mockResolvedValue(admin);
+    rpc.mockResolvedValue({
+      data: [{ outcome: "requested", request_id: REQUEST_ID, refunded_centavos: 0 }],
+      error: null,
+    });
+
+    const result = await deleteProjectAction(
+      {},
+      form({ projectId: PROJECT_ID, reason: "Wrong customer", refund: "refund" }),
+    );
+
+    expect(result.outcome).toBe("requested");
+    expect(result.done).toMatch(/refund/);
+    expect(rpc).toHaveBeenCalledWith("delete_project", {
+      p_project_id: PROJECT_ID,
+      p_reason: "Wrong customer",
+      p_refund: true,
+    });
+    // A request moves no money, so no "void" entry - only the request itself.
+    const actions = recordAudit.mock.calls.map((call) => call[0].action);
+    expect(actions).toEqual(["request"]);
+    expect(recordAudit.mock.calls[0][0]).toMatchObject({
+      after: { refund_requested: true },
+    });
+  });
+
+  it("says which migration is missing instead of a function name", async () => {
+    requireUser.mockResolvedValue(owner);
+    rpc.mockResolvedValue({
+      data: null,
+      error: { code: "PGRST202", message: "Could not find the function public.delete_project(p_project_id, p_reason, p_refund) in the schema cache" },
+    });
+
+    const result = await deleteProjectAction(
+      {},
+      form({ projectId: PROJECT_ID, reason: "Mistake", refund: "keep" }),
+    );
+
+    expect(result.error).toMatch(/0025_project_deletion_refund/);
     expect(recordAudit).not.toHaveBeenCalled();
   });
 });
@@ -268,6 +426,33 @@ describe("approve and reject", () => {
     });
     const actions = recordAudit.mock.calls.map((call) => call[0].action);
     expect(actions).toEqual(["approve", "delete"]);
+  });
+
+  it("approving a request that asked for a refund logs the void too", async () => {
+    requireUser.mockResolvedValue(owner);
+    getDeletionRequest.mockResolvedValue({ ...pendingRequest, refundRequested: true });
+
+    const result = await decideDeletionAction(
+      {},
+      form({ requestId: REQUEST_ID, decision: "approve" }),
+    );
+
+    expect(result.done).toMatch(/₱2,000\.00 was refunded/);
+    const actions = recordAudit.mock.calls.map((call) => call[0].action);
+    expect(actions).toEqual(["approve", "delete", "void"]);
+  });
+
+  it("a rejection refunds nothing, even when a refund was asked for", async () => {
+    requireUser.mockResolvedValue(owner);
+    getDeletionRequest.mockResolvedValue({ ...pendingRequest, refundRequested: true });
+
+    await decideDeletionAction(
+      {},
+      form({ requestId: REQUEST_ID, decision: "reject", note: "Keep the job" }),
+    );
+
+    const actions = recordAudit.mock.calls.map((call) => call[0].action);
+    expect(actions).toEqual(["reject"]);
   });
 
   it("a rejection is logged and deletes nothing", async () => {
