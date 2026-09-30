@@ -1337,3 +1337,16 @@ to ask:
       comes from `project_deletion_pending`, which answers only people who
       could read the project.
 
+- **30 September 2026 — "the database is behind" on the screen that fell over.**
+  Vercel deploys on merge but `npm run db:push` is a separate step, so between
+  the two every screen that reads what a migration added fails with "does not
+  exist" and production shows only "This page couldn't load". Projects, a
+  project's page and Deletion requests now catch that one case and show a notice
+  naming the migration and the command (`src/lib/database-behind.ts`,
+  `src/components/DatabaseBehind.tsx`). Only a missing table or column counts -
+  the same judgement as System check (`outcomeFromError`); a timeout or a bad
+  key is still thrown as the error it is, because a confident "apply the
+  migration" beside a database that is fine would be worse than the blank page.
+  To give another screen the notice: call `throwIfBehind(error, "<migration>")`
+  in its read and catch `isDatabaseBehind` in the page.
+

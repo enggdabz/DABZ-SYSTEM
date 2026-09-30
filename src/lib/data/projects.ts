@@ -21,7 +21,11 @@ import {
   type Project,
   type ProjectPayment,
 } from "@/lib/projects";
+import { throwIfBehind } from "@/lib/database-behind";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+/** The migration that added `deleted_at`, which every project read now asks for. */
+const SOFT_DELETE_MIGRATION = "0023_project_deletion_requests";
 
 const PROJECT_COLUMNS =
   "id, project_number, division, customer_name, contact, description, total_centavos, due_on, income_category, status, cancel_reason, deleted_at";
@@ -184,6 +188,7 @@ export const getProjects = cache(async (): Promise<Project[]> => {
     .is("deleted_at", null)
     .order("project_number", { ascending: false });
 
+  throwIfBehind(error, SOFT_DELETE_MIGRATION);
   if (error) throw new Error(`Could not read the projects: ${error.message}`);
   return assemble(supabase, (data ?? []) as ProjectRow[]);
 });
@@ -203,6 +208,7 @@ export async function getProject(id: string): Promise<Project | null> {
     .is("deleted_at", null)
     .maybeSingle();
 
+  throwIfBehind(error, SOFT_DELETE_MIGRATION);
   if (error) throw new Error(`Could not read the project: ${error.message}`);
   if (!data) return null;
   const project = (await assemble(supabase, [data as ProjectRow]))[0] ?? null;

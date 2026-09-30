@@ -6,6 +6,8 @@ import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/dal";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getPendingRequestForProject } from "@/lib/data/project-deletions";
+import { DatabaseBehind } from "@/components/DatabaseBehind";
+import { isDatabaseBehind } from "@/lib/database-behind";
 import { getProject } from "@/lib/data/projects";
 import { formatManilaDate } from "@/lib/datetime";
 import {
@@ -45,7 +47,30 @@ export default async function ProjectPage({
   const { projectId } = await params;
   if (!UUID.test(projectId)) notFound();
 
-  const project = await getProject(projectId);
+  let project: Awaited<ReturnType<typeof getProject>>;
+  let request: Awaited<ReturnType<typeof getPendingRequestForProject>> = null;
+  try {
+    project = await getProject(projectId);
+    // The request's details are Owner/Admin material; counter staff still get
+    // the badge, from `project_deletion_pending`, but not who asked or why.
+    if (project && isOwnerOrAdmin(user)) {
+      request = await getPendingRequestForProject(project.id);
+    }
+  } catch (error) {
+    // Deployed before `npm run db:push`: say so, instead of a blank error page.
+    if (isDatabaseBehind(error)) {
+      return (
+        <div className="space-y-6">
+          <h1 className="text-3xl font-semibold tracking-tight">Project</h1>
+          <DatabaseBehind
+            migration={error.migration}
+            canOpenSystemCheck={isOwnerOrAdmin(user)}
+          />
+        </div>
+      );
+    }
+    throw error;
+  }
   if (!project) notFound();
 
   const today = manilaToday();
@@ -56,11 +81,7 @@ export default async function ProjectPage({
   // only so the page stops offering what would be refused.
   const frozen = project.deletionPending === true;
   const mode = deleteMode(user.role);
-  // The request's details are Owner/Admin material; counter staff still get
-  // the badge, from `project_deletion_pending`, but not who asked or why.
-  const request = isOwnerOrAdmin(user)
-    ? await getPendingRequestForProject(project.id)
-    : null;
+
   const canTick = can(user, PROJECT_STEP_PERMISSION[project.division]);
   const payments = [...project.payments].sort((a, b) =>
     a.saleDate.localeCompare(b.saleDate),

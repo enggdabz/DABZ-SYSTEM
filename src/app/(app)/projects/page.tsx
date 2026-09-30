@@ -4,6 +4,8 @@ import { connection } from "next/server";
 import { Card, Notice, TAP_AREA, Tag, buttonClasses } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { DatabaseBehind } from "@/components/DatabaseBehind";
+import { isDatabaseBehind } from "@/lib/database-behind";
 import { getPendingDeletionProjectIds } from "@/lib/data/project-deletions";
 import { getProjects } from "@/lib/data/projects";
 import { formatPesos } from "@/lib/money";
@@ -128,16 +130,35 @@ export default async function ProjectsPage({
   };
 
   const today = manilaToday();
-  const [projects, settings, pendingDeletionIds] = await Promise.all([
-    getProjects(),
-    getSettings(),
-    // A deleted project is not in this list at all. One waiting for the
-    // owner's answer is, with a badge - the request table is Owner/Admin only,
-    // so for anyone else the badge is on the project's own page instead.
-    isOwnerOrAdmin(user)
-      ? getPendingDeletionProjectIds()
-      : Promise.resolve(new Set<string>()),
-  ]);
+  let projects: Awaited<ReturnType<typeof getProjects>>;
+  let settings: Awaited<ReturnType<typeof getSettings>>;
+  let pendingDeletionIds: Set<string>;
+  try {
+    [projects, settings, pendingDeletionIds] = await Promise.all([
+      getProjects(),
+      getSettings(),
+      // A deleted project is not in this list at all. One waiting for the
+      // owner's answer is, with a badge - the request table is Owner/Admin
+      // only, so for anyone else the badge is on the project's own page.
+      isOwnerOrAdmin(user)
+        ? getPendingDeletionProjectIds()
+        : Promise.resolve(new Set<string>()),
+    ]);
+  } catch (error) {
+    // Deployed before `npm run db:push`: say so, instead of a blank error page.
+    if (isDatabaseBehind(error)) {
+      return (
+        <div className="space-y-6">
+          <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
+          <DatabaseBehind
+            migration={error.migration}
+            canOpenSystemCheck={isOwnerOrAdmin(user)}
+          />
+        </div>
+      );
+    }
+    throw error;
+  }
   const all = projects.map((project) => ({
     ...project,
     deletionPending: pendingDeletionIds.has(project.id),
