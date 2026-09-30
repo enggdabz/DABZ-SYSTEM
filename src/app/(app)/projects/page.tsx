@@ -3,6 +3,8 @@ import { connection } from "next/server";
 
 import { Card, Notice, TAP_AREA, Tag, buttonClasses } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
+import { isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { getPendingDeletionProjectIds } from "@/lib/data/project-deletions";
 import { getProjects } from "@/lib/data/projects";
 import { formatPesos } from "@/lib/money";
 import {
@@ -104,12 +106,13 @@ export default async function ProjectsPage({
     view?: string;
     month?: string;
     week?: string;
+    deleted?: string;
   }>;
 }) {
   await connection();
   // Reading a project needs the same permission as reading the sales that paid
   // it - see 0022_projects.sql for why.
-  await requirePermission("add_sales");
+  const user = await requirePermission("add_sales");
 
   const params = await searchParams;
   const query: Query = {
@@ -125,7 +128,20 @@ export default async function ProjectsPage({
   };
 
   const today = manilaToday();
-  const [all, settings] = await Promise.all([getProjects(), getSettings()]);
+  const [projects, settings, pendingDeletionIds] = await Promise.all([
+    getProjects(),
+    getSettings(),
+    // A deleted project is not in this list at all. One waiting for the
+    // owner's answer is, with a badge - the request table is Owner/Admin only,
+    // so for anyone else the badge is on the project's own page instead.
+    isOwnerOrAdmin(user)
+      ? getPendingDeletionProjectIds()
+      : Promise.resolve(new Set<string>()),
+  ]);
+  const all = projects.map((project) => ({
+    ...project,
+    deletionPending: pendingDeletionIds.has(project.id),
+  }));
   const weekStartsOn = settings.weekStartsOn;
 
   const open = all.filter(isOpenProject);
@@ -173,6 +189,15 @@ export default async function ProjectsPage({
           New project at the Counter
         </Link>
       </div>
+
+      {params.deleted ? (
+        <Notice tone="success" title={`Project ${params.deleted} was deleted`}>
+          <p>
+            It is off this list and the calendar. Any money it took is still in
+            Sales and End of day, marked &ldquo;Project deleted&rdquo;.
+          </p>
+        </Notice>
+      ) : null}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-card bg-surface p-5 ring-1 ring-line/60">

@@ -8,12 +8,15 @@ import type {
   CollectionsBreakdown,
   DivisionBreakdown as DivisionBreakdownRow,
 } from "@/lib/collections";
+import { getCollectionsForDay } from "@/lib/data/collections";
 import { getBills } from "@/lib/data/money";
+import { getDeletedProjectSaleIds } from "@/lib/data/project-deletions";
 import { getDayClosing } from "@/lib/data/pos";
 import { getEstimatedMonthlyPayroll } from "@/lib/data/staff";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS, type MoneySource } from "@/lib/ledger";
 import { formatPesos } from "@/lib/money";
 import { formatCivilDate, manilaToday } from "@/lib/period";
+import { PROJECT_DELETED_TAG } from "@/lib/project-deletion";
 import { computeDailyTarget } from "@/lib/target";
 
 import { ClosingForm } from "./ClosingForm";
@@ -40,6 +43,26 @@ export default async function ClosingPage() {
     ]);
 
   const { breakdown, partial: breakdownPartial } = dayBreakdown;
+
+  /*
+    Today's payments that belong to a project which has since been deleted.
+    They are already inside every figure on this screen - deleting a project
+    never moves money - so this only says so, and where to go if the money was
+    handed back.
+  */
+  const todaysFeed = await getCollectionsForDay(today);
+  const deletedProjectSaleIds = await getDeletedProjectSaleIds(
+    todaysFeed.rows
+      .filter((row) => row.kind === "counter_sale" && row.voidedAt === null)
+      .map((row) => row.id),
+  );
+  const deletedProjectPayments = todaysFeed.rows.filter((row) =>
+    deletedProjectSaleIds.has(row.id),
+  );
+  const deletedProjectCentavos = deletedProjectPayments.reduce(
+    (sum, row) => sum + row.amountCentavos,
+    0,
+  );
 
   const target = computeDailyTarget({
     monthlyBillsCentavos: totalMonthlyBills(bills),
@@ -94,6 +117,32 @@ export default async function ClosingPage() {
               </>
             )}
           </p>
+        </Notice>
+      ) : null}
+
+      {deletedProjectPayments.length > 0 ? (
+        <Notice
+          tone="attention"
+          title={`${deletedProjectPayments.length} ${
+            deletedProjectPayments.length === 1 ? "payment" : "payments"
+          } today ${
+            deletedProjectPayments.length === 1 ? "is" : "are"
+          } marked "${PROJECT_DELETED_TAG}"`}
+        >
+          <p>
+            {formatPesos(deletedProjectCentavos)} came in against a project that
+            has since been deleted. It is still counted in every figure below,
+            because the money was taken. If it was handed back, void the sale on
+            the Sales screen.
+          </p>
+          <ul className="mt-2 list-disc pl-5">
+            {deletedProjectPayments.map((row) => (
+              <li key={row.id}>
+                {row.reference} · {formatPesos(row.amountCentavos)}
+                {row.customerName ? ` · ${row.customerName}` : ""}
+              </li>
+            ))}
+          </ul>
         </Notice>
       ) : null}
 

@@ -7,7 +7,9 @@ import { AutoLogout } from "@/components/AutoLogout";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { visibleSections } from "@/lib/auth/navigation";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { getMyNotifications } from "@/lib/data/app-notifications";
 import { getExpensePresets } from "@/lib/data/expenses";
+import { countPendingDeletionRequests } from "@/lib/data/project-deletions";
 import { getBillsDueSoon } from "@/lib/data/reminder";
 import { describeApprovalRule } from "@/lib/expenses";
 import { formatPesos } from "@/lib/money";
@@ -45,7 +47,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     layout, so a slow layout still blocks the navigation. That is why the frame
     has to be quick rather than merely have something to show.
   */
-  const [settings, billsDueSoon, expensePresets] = await Promise.all([
+  const [
+    settings,
+    billsDueSoon,
+    expensePresets,
+    notifications,
+    pendingDeletions,
+  ] = await Promise.all([
     getSettings(),
     // Staff never see the bills at all (spec 4.3), so the reminder is not even
     // fetched for them - the database would refuse it anyway.
@@ -54,7 +62,12 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     // wherever the person is standing - under ten seconds is the whole point
     // (spec 11). Only fetched for those who may use it.
     can(user, "record_expenses") ? getExpensePresets() : Promise.resolve(null),
+    getMyNotifications(),
+    // The Deletion requests link is the owner's alone, so nobody else needs
+    // the count.
+    user.role === "owner" ? countPendingDeletionRequests() : Promise.resolve(0),
   ]);
+  const sectionBadges = { "/projects/deletion-requests": pendingDeletions };
 
   // Staff may be left signed in all day; owner and admin never are (spec 4.1,
   // revised - see docs/DECISIONS.md).
@@ -66,12 +79,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
       against it rather than under it.
     */
     <div className="flex min-h-dvh flex-1">
-      <AppSidebar sections={visibleSections(user)} />
+      <AppSidebar sections={visibleSections(user)} badges={sectionBadges} />
 
       <div className="flex min-w-0 flex-1 flex-col">
       <AppTopBar
         user={user}
         billsDueSoon={billsDueSoon}
+        notifications={notifications}
+        sectionBadges={sectionBadges}
         expensePresets={expensePresets}
         expenseApprovalHint={describeApprovalRule({
           isOwnerOrAdmin: isOwnerOrAdmin(user),

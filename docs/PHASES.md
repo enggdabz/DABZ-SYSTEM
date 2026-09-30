@@ -2609,6 +2609,53 @@ than because deleting was impossible.
 
 ---
 
+## Phase 15b — Delete a project with the owner's approval ✅
+
+**What you asked for, 30 September 2026**
+
+> An admin can click "Delete project" on a project, but it is not removed: it
+> creates a request the owner must approve. The owner can delete immediately.
+> Soft delete; the Counter sales and down payments stay in Sales and End of
+> day, marked "project deleted".
+
+**Built**
+
+- **Delete project** on a project's page. It opens a dialog that asks for a
+  reason. For the owner it deletes now; for an admin it sends a request.
+- **While a request waits** the project shows *Deletion pending owner
+  approval*, the button becomes **Cancel request**, and the project cannot be
+  edited, ticked, released or cancelled. A balance payment is still taken.
+- **Deletion requests** (sidebar, owner only, with a count badge): project,
+  customer, who asked, why, when - with Approve and Reject and an optional note.
+  Approving soft-deletes the project.
+- **A bell** in the top bar for in-app messages: the owner is told of a new
+  request, the admin of the answer.
+- **Sales and End of day** keep the money and tag it *Project deleted*.
+- **Everything is enforced in the database** (`delete_project`,
+  `cancel_project_deletion`, `decide_project_deletion`, and triggers that
+  freeze a pending or deleted project) and written to Activity.
+
+**How it is verified**
+
+| What | How |
+|---|---|
+| Admin cannot delete, owner can, approval soft-deletes, rejection leaves the project alone, non-owner cannot approve, money unchanged | `npm run test:rls` (`20_project_deletion_rls.test.sql`) |
+| The actions call the right function and refuse the wrong person | `npm test` (`deletion-actions.test.ts`, `project-deletion.test.ts`) |
+| The dialog, the badge, Cancel request | `npm test` (`DeleteProjectPanel.test.tsx`) |
+| The tables and column reach the real database | System check (`schema-health.ts`) |
+
+**How to check it**
+
+1. `npm run db:push` to apply `0023_project_deletion_requests.sql`.
+2. Sign in as an admin, open a project, **Delete project**, give a reason. The
+   project stays, with the badge, and its step buttons are gone.
+3. Sign in as the owner: the bell has a message and **Deletion requests** has a
+   1. Reject it with a note, then ask again as the admin and Approve. The
+   project leaves Projects and the calendar; its down payment is still on Sales,
+   tagged *Project deleted*.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

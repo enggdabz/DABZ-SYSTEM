@@ -181,6 +181,16 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0020_phase14_online_orders",
     breaks: "the online shop, its orders, the production board and the order calendar"
   })),
+  ...["project_deletion_requests"].map((name) => ({
+    name,
+    migration: "0023_project_deletion_requests",
+    breaks: "asking the owner to delete a project, and the Deletion requests page",
+  })),
+  ...["app_notifications"].map((name) => ({
+    name,
+    migration: "0023_project_deletion_requests",
+    breaks: "the bell in the top bar",
+  })),
 ];
 
 /*
@@ -286,6 +296,18 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     column: "messenger_psid",
     migration: "0020_phase14_online_orders",
     breaks: "linking a customer to their Messenger chat later on",
+  },
+  {
+    /*
+      A column on a table 0022 created, so no relation probe sees it missing.
+      Without it EVERY project read fails (the list filters on it), which would
+      look like the shop having no projects rather than a database that is
+      behind. `deleted_by` arrives in the same migration, so one entry covers it.
+    */
+    name: "projects",
+    column: "deleted_at",
+    migration: "0023_project_deletion_requests",
+    breaks: "deleting a project, and every screen that lists projects",
   },
 ];
 

@@ -4,9 +4,15 @@ import { connection } from "next/server";
 
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/dal";
-import { can } from "@/lib/auth/permissions";
+import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
+import { getPendingRequestForProject } from "@/lib/data/project-deletions";
 import { getProject } from "@/lib/data/projects";
 import { formatManilaDate } from "@/lib/datetime";
+import {
+  PENDING_BADGE,
+  canCancelDeletionRequest,
+  deleteMode,
+} from "@/lib/project-deletion";
 import { formatPesos } from "@/lib/money";
 import { manilaToday } from "@/lib/period";
 import {
@@ -20,6 +26,7 @@ import {
 } from "@/lib/projects";
 
 import { BalanceForm } from "../BalanceForm";
+import { DeleteProjectPanel } from "../DeleteProjectPanel";
 import { DueNote } from "../ProjectParts";
 import { ProjectMoves } from "../ProjectMoves";
 
@@ -43,6 +50,17 @@ export default async function ProjectPage({
 
   const today = manilaToday();
   const money = projectMoney(project);
+
+  // A request waiting on the owner freezes the project: no edits and no stage
+  // changes. The database refuses them as well - see 0023's triggers - this is
+  // only so the page stops offering what would be refused.
+  const frozen = project.deletionPending === true;
+  const mode = deleteMode(user.role);
+  // The request's details are Owner/Admin material; counter staff still get
+  // the badge, from `project_deletion_pending`, but not who asked or why.
+  const request = isOwnerOrAdmin(user)
+    ? await getPendingRequestForProject(project.id)
+    : null;
   const canTick = can(user, PROJECT_STEP_PERMISSION[project.division]);
   const payments = [...project.payments].sort((a, b) =>
     a.saleDate.localeCompare(b.saleDate),
@@ -62,6 +80,11 @@ export default async function ProjectPage({
             <Tag tone={project.status === "open" ? "neutral" : "accent"}>
               {productionLabel(project)}
             </Tag>
+            {frozen ? (
+              <Tag tone="attention">
+                {"⚠"} {PENDING_BADGE}
+              </Tag>
+            ) : null}
             <Tag tone={money.fullyPaid ? "success" : "attention"}>
               {money.fullyPaid ? "✓ " : "⚠ "}
               {paymentLabel(money, formatPesos)}
@@ -198,8 +221,46 @@ export default async function ProjectPage({
           doneSteps={project.steps}
           status={project.status}
           canTick={canTick}
+          frozen={frozen}
         />
       </Card>
+
+      {mode !== "none" || frozen ? (
+        <Card
+          title="Delete this project"
+          description={
+            mode === "delete"
+              ? "Removes it from the lists and the calendar. Money already taken stays in Sales and End of day."
+              : mode === "request"
+                ? "An admin sends a request; the owner approves it before anything is deleted."
+                : undefined
+          }
+        >
+          <DeleteProjectPanel
+            projectId={project.id}
+            projectNumber={project.number}
+            customerName={project.customerName}
+            mode={mode}
+            isOwner={user.role === "owner"}
+            pendingUnknown={frozen && request === null}
+            pending={
+              request
+                ? {
+                    requestId: request.id,
+                    requestedByName: request.requestedByName,
+                    reason: request.reason,
+                    requestedOnLabel: formatManilaDate(request.createdAt),
+                    canCancel: canCancelDeletionRequest({
+                      role: user.role,
+                      userId: user.id,
+                      requestedBy: request.requestedBy,
+                    }),
+                  }
+                : null
+            }
+          />
+        </Card>
+      ) : null}
     </div>
   );
 }

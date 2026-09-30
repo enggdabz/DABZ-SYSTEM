@@ -409,6 +409,29 @@ round trip is the one thing that must be tried against a real project.
 - **The calendar sits a project on its due date, unmoved.** Do not copy the
   Apparel calendar's day-early / carry-forward rules here without being asked.
 
+## Project deletion rules (Phase 15b)
+
+- **The owner deletes; an admin only asks.** `delete_project` looks at the
+  caller's role INSIDE the database: owner soft-deletes, admin creates a
+  `project_deletion_requests` row, anybody else is refused.
+  `decide_project_deletion` checks `is_owner()` itself. A Server Action is a
+  public endpoint, so `src/lib/project-deletion.ts` and the actions only choose
+  which sentence to show - never who is allowed.
+- **A delete is soft** (`deleted_at`, `deleted_by`) and never touches money. The
+  project's payments are real `sales` rows, so Sales, End of day, Reports and
+  the ledger keep counting them; Sales and End of day tag them "Project
+  deleted". Do not "clean up" the payments of a deleted project.
+- **A pending or deleted project is frozen by TRIGGERS** on `projects` and
+  `project_steps`, not by a check in each function - so a function added later
+  cannot forget the rule. A deleted project also takes no payments; a pending
+  one still does.
+- **No write policy on `project_deletion_requests` or `app_notifications`.**
+  Every write is a `SECURITY DEFINER` function; `notify_user` is revoked from
+  everybody signed in, because it takes a user id. `20_project_deletion_rls.test.sql`
+  fails if a write policy appears.
+- **Every step is audited** with the words `request`, `approve`, `reject`,
+  `cancel` (the log's `action` check was widened in `0023`).
+
 ## Repair rules (built in Phase 7)
 
 - **There is no password field, anywhere.** Spec 9.3 says the shop does not

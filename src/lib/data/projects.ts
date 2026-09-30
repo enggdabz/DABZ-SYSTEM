@@ -24,7 +24,7 @@ import {
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const PROJECT_COLUMNS =
-  "id, project_number, division, customer_name, contact, description, total_centavos, due_on, income_category, status, cancel_reason";
+  "id, project_number, division, customer_name, contact, description, total_centavos, due_on, income_category, status, cancel_reason, deleted_at";
 const LINK_COLUMNS = "project_id, sale_id, kind";
 const SALE_COLUMNS =
   "id, sale_number, sale_date, total_centavos, payment_method, voided_at";
@@ -42,6 +42,7 @@ interface ProjectRow {
   income_category: string;
   status: Project["status"];
   cancel_reason: string | null;
+  deleted_at: string | null;
 }
 
 interface LinkRow {
@@ -157,6 +158,7 @@ async function assemble(
       incomeCategory: row.income_category,
       status: row.status,
       cancelReason: row.cancel_reason,
+      deletedAt: row.deleted_at,
       payments,
       steps: steps
         .filter((entry) => entry.project_id === row.id)
@@ -167,30 +169,49 @@ async function assemble(
 }
 
 /**
- * Every project, newest number first. A failed read throws rather than
- * returning an empty list: "no projects" and "could not ask" are not the same
- * answer, and the first is the one that gets believed.
+ * Every project that has not been deleted, newest number first. A failed read
+ * throws rather than returning an empty list: "no projects" and "could not
+ * ask" are not the same answer, and the first is the one that gets believed.
+ *
+ * A deleted project is left out here and, for staff, by the read policy too.
+ * The money it took is not left out of anything: that lives in Sales.
  */
 export const getProjects = cache(async (): Promise<Project[]> => {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("projects")
     .select(PROJECT_COLUMNS)
+    .is("deleted_at", null)
     .order("project_number", { ascending: false });
 
   if (error) throw new Error(`Could not read the projects: ${error.message}`);
   return assemble(supabase, (data ?? []) as ProjectRow[]);
 });
 
+/**
+ * One project, or null when it does not exist OR has been deleted - a deleted
+ * project is gone as far as every screen and action is concerned. It also says
+ * whether a deletion is waiting on it (`deletionPending`), which is what the
+ * badge shows and what freezes the project's controls.
+ */
 export async function getProject(id: string): Promise<Project | null> {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("projects")
     .select(PROJECT_COLUMNS)
     .eq("id", id)
+    .is("deleted_at", null)
     .maybeSingle();
 
   if (error) throw new Error(`Could not read the project: ${error.message}`);
   if (!data) return null;
-  return (await assemble(supabase, [data as ProjectRow]))[0] ?? null;
+  const project = (await assemble(supabase, [data as ProjectRow]))[0] ?? null;
+  if (!project) return null;
+
+  // Anything but `true` is "no": the helper answers null to a person who could
+  // not have read the project, and that is the safe direction.
+  const { data: pending } = await supabase.rpc("project_deletion_pending", {
+    p_project_id: id,
+  });
+  return { ...project, deletionPending: pending === true };
 }
