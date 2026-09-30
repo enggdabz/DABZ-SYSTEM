@@ -21,7 +21,10 @@ import {
   type SalesDay,
 } from "@/lib/collections";
 import { getCollectionsForDay } from "@/lib/data/collections";
-import { getDeletedProjectSaleIds } from "@/lib/data/project-deletions";
+import {
+  getDeletedApparelPaymentIds,
+  getDeletedProjectSaleIds,
+} from "@/lib/data/project-deletions";
 import { getVoidRequests } from "@/lib/data/pos";
 import { formatManilaDateTime, formatManilaTime } from "@/lib/datetime";
 import { DIVISION_IDS, type DivisionId } from "@/lib/divisions";
@@ -85,9 +88,15 @@ export default async function SalesPage({
     where it was - in the day's total, in End of day and in the ledger. It is
     only LABELLED, so nobody wonders where a down payment came from.
   */
-  const deletedProjectSaleIds = await getDeletedProjectSaleIds(
-    rows.filter((row) => row.kind === "counter_sale").map((row) => row.id),
-  );
+  const [deletedCounterIds, deletedApparelIds] = await Promise.all([
+    getDeletedProjectSaleIds(
+      rows.filter((row) => row.kind === "counter_sale").map((row) => row.id),
+    ),
+    getDeletedApparelPaymentIds(
+      rows.filter((row) => row.kind === "apparel_payment").map((row) => row.id),
+    ),
+  ]);
+  const deletedProjectSaleIds = new Set([...deletedCounterIds, ...deletedApparelIds]);
   const readWarning = partialReadWarning(read);
   /*
     The feed view was missing, so the day was rebuilt from the three tables
@@ -523,8 +532,22 @@ function CollectionLine({
         </div>
 
         <div className="flex flex-col items-end gap-2">
-          <Link href={row.href} className={`text-sm underline ${TAP_AREA}`}>
-            {row.kind === "counter_sale" ? "Receipt" : "Open"}
+          {/*
+            A deleted apparel project's own page is gone, so its payment's link
+            goes to the receipt instead - the customer may still be holding it.
+          */}
+          <Link
+            href={
+              projectDeleted && row.kind === "apparel_payment"
+                ? `${row.href}/payment/${row.id}/receipt`
+                : row.href
+            }
+            className={`text-sm underline ${TAP_AREA}`}
+          >
+            {row.kind === "counter_sale" ||
+            (projectDeleted && row.kind === "apparel_payment")
+              ? "Receipt"
+              : "Open"}
           </Link>
           {/*
             Only a counter sale has a void REQUEST. Apparel and DabzTech

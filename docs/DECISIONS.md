@@ -1444,3 +1444,42 @@ to ask:
      choice means giving them a soft delete first: the apparel list, calendar,
      production report and online orders all read them.
 
+- **30 September 2026 — the refund option for apparel projects: assumptions
+  made.** You asked for the same refund choice on apparel projects. Migration
+  `0026_apparel_project_delete_refund.sql`. Counter projects were done first
+  (0025); this is the second step.
+  1. **A second way out, not a loosening of `0021`.** The plain delete (Owner or
+     Admin, hard delete) is still only for a project nothing has happened to,
+     and a payment - voided or not - still stops it, because a hard delete would
+     take the payment's ledger entries with it. What is new is a SOFT delete
+     (`apparel_orders.deleted_at`) for a project that has had money and nothing
+     else, so nothing is removed.
+  2. **Owner only.** Deleting a project that has had money taken is the kind of
+     change you asked to approve (0023), and apparel projects have no request
+     flow yet. So an admin is told "only the owner can delete it - ask the owner,
+     or cancel it instead", and is offered nothing that would be refused. To give
+     admins a request flow like Counter projects have, `project_deletion_requests`
+     would need to point at either kind of project, and the freeze would need
+     triggers on the apparel tables. Say if you want that next.
+  3. **Same choice, same wording, no default.** Asked only when a payment is
+     live: refund voids every live payment with `void_apparel_payment` (the void
+     that already exists, whose ledger entries go with it), in the same
+     transaction as the delete; keep leaves them live. A refund of nothing is
+     refused. It refunds everything paid so far, as on Counter projects.
+  4. **Still "cancel it instead":** a project that has been released, and one
+     with a bench marked. Those are records of the shop floor and of the customer
+     having the jerseys, not of money, and this change is about money. The
+     database refuses both; the screen stops offering them.
+  5. **Deleted projects leave the list, the calendar, Home and the production
+     report** because `getApparelOrders` filters them once. If the database has
+     not had 0026 yet, that read falls back to every project rather than an empty
+     list. The read policy on `apparel_orders` is deliberately NOT narrowed: the
+     collections feed joins it, and hiding a deleted project would drop that
+     person's payments from the day.
+  6. **Sales and End of day tag the payments "Project deleted"**, and link a
+     deleted project's payment to its receipt (the project's own page is gone).
+     A receipt for a deleted project still prints - the customer may be holding
+     it and the money it records is still in the books.
+  7. **A deleted project takes no more payments**, by a trigger on
+     `apparel_payments` and one on `apparel_orders`.
+

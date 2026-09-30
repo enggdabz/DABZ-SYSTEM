@@ -337,6 +337,17 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0025_project_deletion_refund",
     breaks: "refunding a down payment when a project is deleted",
   },
+  {
+    /*
+      A column on a table 0007 created. Without it the apparel list still reads
+      (it falls back to every project), but deleting a project that has had
+      money taken cannot be done, and the owner would not be told why.
+    */
+    name: "apparel_orders",
+    column: "deleted_at",
+    migration: "0026_apparel_project_delete_refund",
+    breaks: "deleting an apparel project that has had money taken, with a refund",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */

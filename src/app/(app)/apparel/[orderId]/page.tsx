@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { DeleteButton } from "@/components/DeleteButton";
+import { apparelDeleteOffer } from "@/lib/apparel-delete";
 import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
 import {
   ORDER_FLOW,
@@ -36,6 +37,7 @@ import {
 
 import { deleteApparelOrderAction } from "../actions";
 import { EncodingTable } from "../EncodingTable";
+import { DeleteApparelProjectPanel } from "./DeleteApparelProjectPanel";
 import {
   CancelProjectForm,
   ItemFabricForm,
@@ -102,6 +104,21 @@ export default async function ApparelOrderPage({
   });
 
   const stepIndex = ORDER_FLOW.indexOf(order.status);
+
+  /*
+    Which delete this project is offered. A project that has had money and
+    nothing else gets the owner's refund dialog (0026); everything else is the
+    0021 card exactly as before.
+  */
+  const lineIds = new Set(detail.lines.map((line) => line.id));
+  const deleteOffer = apparelDeleteOffer({
+    hasHistory: orderHasHistory,
+    status: order.status,
+    hasPayments: detail.payments.length > 0 || voided.length > 0,
+    hasBenchMarks: marks.steps.some((step) => lineIds.has(step.lineId)),
+    marksKnown: !marks.failed && !marks.tableMissing,
+    isOwner: user.role === "owner",
+  });
 
   /*
     Where the shop floor says the work has got to, which is a different
@@ -587,7 +604,11 @@ export default async function ApparelOrderPage({
       {isOwnerOrAdmin(user) ? (
         <Card
           title="Delete this project"
-          description="Only while nothing has happened to it. Once money has been taken, a bench marked, or the jerseys released, it is cancelled with a reason instead."
+          description={
+            deleteOffer === "with_money"
+              ? "Removes it from the lists and the calendar. The owner chooses whether money already taken is refunded or kept. A bench marked, or the jerseys released, is still cancelled with a reason instead."
+              : "Only while nothing has happened to it. Once money has been taken, a bench marked, or the jerseys released, it is cancelled with a reason instead."
+          }
         >
           {orderHasHistory === null ? (
             <p className="text-sm text-attention">
@@ -597,6 +618,42 @@ export default async function ApparelOrderPage({
               guess about money. Try again in a moment; if it keeps saying this,
               run <span className="font-mono">npm run db:push</span>.
             </p>
+          ) : deleteOffer === "with_money" ? (
+            /*
+              Money has been taken and nothing else has happened. The plain card
+              below could only say "cancel it instead"; the owner gets a soft
+              delete with the refund question (0026), and the cancel button
+              stays available beside it.
+            */
+            <div className="space-y-3">
+              <DeleteApparelProjectPanel
+                orderId={order.id}
+                orderNumber={order.orderNumber}
+                paidLabel={
+                  totals.paidCentavos > 0 ? formatPesos(totals.paidCentavos) : null
+                }
+              />
+              {order.status !== "cancelled" ? (
+                <CancelProjectForm
+                  orderId={order.id}
+                  openLabel="Cancel this project instead"
+                />
+              ) : null}
+            </div>
+          ) : deleteOffer === "ask_owner" ? (
+            <div className="space-y-3">
+              <p className="text-sm text-muted">
+                <span aria-hidden="true">{"ℹ"} </span>
+                Money has been taken on this project, so only the owner can
+                delete it. Ask the owner, or cancel it with a reason instead.
+              </p>
+              {order.status !== "cancelled" ? (
+                <CancelProjectForm
+                  orderId={order.id}
+                  openLabel="Cancel this project instead"
+                />
+              ) : null}
+            </div>
           ) : (
             <DeleteButton
               kind="apparel project"

@@ -10,6 +10,7 @@
  * and are voided rather than deleted.
  */
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import {
   ORDER_STATUSES,
@@ -35,6 +36,11 @@ import {
 } from "@/lib/deletable";
 import { getApparelOrder } from "@/lib/data/apparel";
 import { MONEY_SOURCES } from "@/lib/ledger";
+import {
+  REFUND_CHOICE_REQUIRED,
+  parseRefundChoice,
+  validateReason,
+} from "@/lib/project-deletion";
 import { formatPesos, parsePesos } from "@/lib/money";
 import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { civilDateToISO, manilaToday } from "@/lib/period";
@@ -839,6 +845,139 @@ export async function deleteApparelOrderAction(
       detail.roster.length === 1 ? "person" : "people"
     } went with it, and the whole project is in Activity.`,
   };
+}
+
+/**
+ * Deleting an apparel project that has had MONEY taken, with the refund choice
+ * (`0026`). The hard delete above still refuses it - a payment's ledger entries
+ * would cascade away with the order - so this is the second way out: a soft
+ * delete that keeps every record, and voids the live payments first if the
+ * owner says the money is being handed back.
+ *
+ * OWNER ONLY, and that is decided by `delete_apparel_project`, not here: this
+ * checks first so an admin reads a sentence rather than a database error. The
+ * refund is the ordinary `void_apparel_payment`, so there is still no new way
+ * for money to reach the ledger.
+ */
+export async function deleteApparelProjectWithMoneyAction(
+  _previous: ApparelState,
+  formData: FormData,
+): Promise<ApparelState> {
+  const user = await requireOwnerOrAdmin();
+
+  if (user.role !== "owner") {
+    return {
+      error:
+        "Only the owner can delete a project that has had money taken. Ask the owner, or cancel it instead.",
+    };
+  }
+
+  const orderId = String(formData.get("orderId") ?? "").trim();
+  const reason = String(formData.get("reason") ?? "");
+  const problem = validateReason(reason);
+  if (problem) return { error: problem };
+
+  const detail = await getApparelOrder(orderId);
+  if (!detail) return { error: "That project no longer exists." };
+
+  // What is live to refund, worked out here from the project's own payments -
+  // not read from the form. The database refunds whatever is live when it runs
+  // and refuses a refund of nothing.
+  const livePaid = detail.payments.reduce(
+    (sum, payment) => sum + payment.amountCentavos,
+    0,
+  );
+  let refund = false;
+  if (livePaid > 0) {
+    const choice = parseRefundChoice(String(formData.get("refund") ?? ""));
+    if (!choice) return { error: REFUND_CHOICE_REQUIRED };
+    refund = choice === "refund";
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase.rpc("delete_apparel_project", {
+    p_order_id: orderId,
+    p_reason: reason.trim(),
+    p_refund: refund,
+  });
+
+  if (error) {
+    // Deployed before `npm run db:push` reached the database.
+    if (isFunctionMissingFromApi(error)) {
+      return {
+        error:
+          "The database is behind: 0026_apparel_project_delete_refund has not been applied. Run npm run db:push, then try again.",
+      };
+    }
+    return { error: error.message.replace(/^.*?ERROR:\s*/, "") };
+  }
+
+  const result = (Array.isArray(data) ? data[0] : data) as
+    | { refunded_centavos?: number | string | null }
+    | null
+    | undefined;
+  if (!result) return { error: "That did not go through. Nothing was changed." };
+  const refunded = Number(result.refunded_centavos ?? 0);
+
+  const label = `${detail.order.orderNumber}${
+    detail.order.teamName ? ` (${detail.order.teamName})` : ""
+  }`;
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "delete",
+    entity: "apparel_order",
+    entityId: orderId,
+    summary: `Deleted apparel project ${label} (${formatPesos(detail.totals.totalCentavos)}) after money was taken: ${reason.trim()}${
+      refunded > 0 ? `; ${formatPesos(refunded)} refunded` : ""
+    }`,
+    before: {
+      order_number: detail.order.orderNumber,
+      team_name: detail.order.teamName,
+      status: detail.order.status,
+      total_centavos: detail.totals.totalCentavos,
+      live_payments: detail.payments.map((payment) => ({
+        amount_centavos: payment.amountCentavos,
+        paid_on: payment.paidOn,
+      })),
+    },
+    after: { deleted: true, reason: reason.trim(), refunded_centavos: refunded },
+  });
+  if (refunded > 0) {
+    await recordAudit({
+      actorId: user.id,
+      actorUsername: user.username,
+      action: "void",
+      entity: "apparel_order",
+      entityId: orderId,
+      summary: `Refunded ${formatPesos(refunded)} on deleting apparel project ${label}: the payments were voided and the money handed back`,
+      before: {
+        payments: detail.payments.map((payment) => ({
+          amount_centavos: payment.amountCentavos,
+          paid_on: payment.paidOn,
+        })),
+      },
+      after: { voided: true, reason: reason.trim() },
+    });
+  }
+
+  revalidateOrder(orderId);
+  revalidatePath("/apparel");
+  revalidatePath("/production");
+  revalidatePath(`/production/${orderId}`);
+  revalidatePath("/apparel/calendar");
+  revalidatePath("/sales");
+  revalidatePath("/closing");
+  revalidatePath("/overview");
+
+  // The project is gone, so its own page is too: back to the list, with what
+  // happened said out loud.
+  redirect(
+    `/apparel?deleted=${encodeURIComponent(detail.order.orderNumber)}${
+      refunded > 0 ? `&refunded=${refunded}` : ""
+    }`,
+  );
 }
 
 // ---------------------------------------------------------------------------

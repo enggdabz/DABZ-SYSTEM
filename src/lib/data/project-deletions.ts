@@ -300,3 +300,26 @@ export async function getDeletedProjectSaleIds(
   }
   return found;
 }
+
+/**
+ * The same question for APPAREL payments: which of these belong to a project
+ * that has since been deleted (0026). Sales and End of day tag them "Project
+ * deleted" beside the Counter ones. A failed or missing answer leaves the tag
+ * off - the row is still shown and still counted either way.
+ */
+export async function getDeletedApparelPaymentIds(
+  paymentIds: readonly string[],
+): Promise<Set<string>> {
+  if (paymentIds.length === 0) return new Set();
+  const supabase = await createSupabaseServerClient();
+  const found = new Set<string>();
+
+  for (let index = 0; index < paymentIds.length; index += 200) {
+    const { data, error } = await supabase.rpc("deleted_apparel_payment_ids", {
+      p_payment_ids: paymentIds.slice(index, index + 200),
+    });
+    if (error) return found;
+    for (const id of (data ?? []) as string[]) found.add(id);
+  }
+  return found;
+}

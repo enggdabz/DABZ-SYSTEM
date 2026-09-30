@@ -436,6 +436,14 @@ round trip is the one thing that must be tried against a real project.
   delete, and nobody signed in can call it. The choice is asked only when
   something live is paid, has NO default, and an admin's request moves no
   money - the owner's approval does, refunding what is live at that moment.
+- **Apparel projects have the same refund choice, OWNER ONLY** (`0026`).
+  `delete_apparel_project` is a soft delete that voids live payments with
+  `void_apparel_payment` first if asked. It does NOT loosen `0021`: the hard
+  delete still refuses any project with a payment, voided or not. A released
+  project and one with a bench marked stay "cancel it instead". Do not narrow the
+  read policy on `apparel_orders` to hide deleted projects - the collections feed
+  joins it, so a person's payments would vanish from the day. Filter in
+  `getApparelOrders` instead, which already does.
 
 ## Repair rules (built in Phase 7)
 

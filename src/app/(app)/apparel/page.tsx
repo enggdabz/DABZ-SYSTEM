@@ -119,8 +119,19 @@ function calendarLine(summary: CalendarSummary): string {
   return `${parts.join(" \u00b7 ")}`;
 }
 
-export default async function ApparelPage() {
+export default async function ApparelPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ deleted?: string; refunded?: string }>;
+}) {
   await connection();
+
+  const params = await searchParams;
+  // A whole number of centavos or nothing: it rides in the address, so it is
+  // read defensively and only ever shown, never acted on.
+  const refundedCentavos = /^\d{1,12}$/.test(params.refunded ?? "")
+    ? Number(params.refunded)
+    : 0;
 
   const user = await requirePermission("apparel_job_orders");
   const canSetPrices = isOwnerOrAdmin(user);
@@ -167,6 +178,24 @@ export default async function ApparelPage() {
 
   return (
     <div className="space-y-8">
+      {params.deleted ? (
+        <Notice
+          tone="success"
+          title={
+            refundedCentavos > 0
+              ? `Project ${params.deleted} was deleted and ${formatPesos(refundedCentavos)} was refunded`
+              : `Project ${params.deleted} was deleted`
+          }
+        >
+          <p>
+            It is off this list and the calendar.{" "}
+            {refundedCentavos > 0
+              ? "The payments were voided and the money comes off today's takings; they stay in Sales, struck through and marked \u201CProject deleted\u201D."
+              : "Any money it took is still in Sales and End of day, marked \u201CProject deleted\u201D."}
+          </p>
+        </Notice>
+      ) : null}
+
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Dabz Apparel</h1>

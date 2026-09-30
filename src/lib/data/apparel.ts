@@ -336,26 +336,50 @@ function toPayment(row: Record<string, unknown>): OrderPayment {
  * multiply the payments by the roster rows and the totals would be nonsense.
  */
 export const getApparelOrders = cache(
-  async (options?: { limit?: number }): Promise<ApparelOrderDetail[]> => {
+  async (options?: {
+    limit?: number;
+    /**
+     * Include a project that was deleted (0026). Only a printed receipt wants
+     * this: the customer may still be holding it, and the money it records is
+     * still in the books. Every list and page leaves deleted projects out.
+     */
+    includeDeleted?: boolean;
+  }): Promise<ApparelOrderDetail[]> => {
     const supabase = await createSupabaseServerClient();
     const today = civilDateToISO(manilaToday());
 
     const limit = options?.limit ?? 200;
 
-    const { data: orderRows, error } = await readPast13(
-      () =>
-        supabase
-          .from("apparel_orders")
-          .select(ORDER_COLUMNS)
-          .order("ordered_on", { ascending: false })
-          .limit(limit),
-      () =>
-        supabase
-          .from("apparel_orders")
-          .select(ORDER_COLUMNS_BEFORE_13)
-          .order("ordered_on", { ascending: false })
-          .limit(limit),
-    );
+    /*
+      Newest read first, and each falls back one migration when the database
+      has not had it yet - the same tolerance `readPast13` gives 0019, and for
+      the same reason: the app deploys the moment a branch merges and
+      `npm run db:push` is run by hand afterwards, so for a while the code is
+      ahead of the database.
+
+      A deleted project (0026) is left out here, which is what takes it off the
+      list, the calendar, Home and the production report in one place. Without
+      0026 there is nothing deleted to leave out, so the second read is simply
+      every project, exactly as before - never an empty list.
+    */
+    const readOrders = (columns: string, live: boolean) => () => {
+      const query = supabase.from("apparel_orders").select(columns);
+      return (live ? query.is("deleted_at", null) : query)
+        .order("ordered_on", { ascending: false })
+        .limit(limit);
+    };
+    let read: Read & { data: unknown[] | null } = await readOrders(
+      ORDER_COLUMNS,
+      options?.includeDeleted !== true,
+    )();
+    for (const next of [
+      readOrders(ORDER_COLUMNS, false),
+      readOrders(ORDER_COLUMNS_BEFORE_13, false),
+    ]) {
+      if (!read.error || !isColumnMissingFromApi(read.error)) break;
+      read = await next();
+    }
+    const { data: orderRows, error } = read;
 
     if (error || !orderRows || orderRows.length === 0) return [];
 
@@ -454,8 +478,11 @@ export function toCalendarOrder(detail: ApparelOrderDetail): CalendarOrder {
 
 export async function getApparelOrder(
   orderId: string,
+  options?: { includeDeleted?: boolean },
 ): Promise<ApparelOrderDetail | null> {
-  const orders = await getApparelOrders();
+  const orders = await getApparelOrders(
+    options?.includeDeleted ? { includeDeleted: true } : undefined,
+  );
   return orders.find((entry) => entry.order.id === orderId) ?? null;
 }
 

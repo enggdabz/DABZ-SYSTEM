@@ -68,7 +68,9 @@ export async function getApparelPaymentReceipt(
   orderId: string,
   paymentId: string,
 ): Promise<PaymentReceipt | null> {
-  const detail = await getApparelOrder(orderId);
+  // Deleted projects included: a receipt is a record of money taken, and the
+  // customer may be holding it long after the project left the list.
+  const detail = await getApparelOrder(orderId, { includeDeleted: true });
   if (!detail) return null;
 
   const supabase = await createSupabaseServerClient();

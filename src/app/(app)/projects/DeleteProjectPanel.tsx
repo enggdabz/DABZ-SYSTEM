@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 
 import { Modal } from "@/components/Modal";
+import { RefundChoiceFields } from "@/components/RefundChoiceFields";
 import { Button, Field, Notice, TAP_AREA, Textarea } from "@/components/ui";
 import {
   PENDING_BADGE,
@@ -162,44 +163,9 @@ export function DeleteProjectPanel({
             </p>
           </Notice>
 
-          {/*
-            Only when money has been taken. Two plain choices and NO default:
-            "refund" voids the customer's payment and "keep" leaves it in the
-            books, and neither is the safe one to tick by accident.
-          */}
+          {/* Only when money has been taken; see RefundChoiceFields. */}
           {paidLabel ? (
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">
-                {paidLabel} has been paid on this project. What happens to it?
-              </legend>
-              <label className="flex items-start gap-2 rounded-control p-2 text-sm ring-1 ring-line">
-                <input
-                  type="radio"
-                  name="refund"
-                  value="refund"
-                  required
-                  className="mt-1"
-                />
-                <span>
-                  <span className="font-medium">Refund {paidLabel}</span>
-                  <span className="block text-xs text-muted">
-                    {owner
-                      ? "The payment is voided and the money is handed back. It comes off today's takings."
-                      : "Asked for now; nothing is refunded until the owner approves."}
-                  </span>
-                </span>
-              </label>
-              <label className="flex items-start gap-2 rounded-control p-2 text-sm ring-1 ring-line">
-                <input type="radio" name="refund" value="keep" className="mt-1" />
-                <span>
-                  <span className="font-medium">Keep the money</span>
-                  <span className="block text-xs text-muted">
-                    The payment stays in Sales and End of day, marked
-                    &ldquo;Project deleted&rdquo;.
-                  </span>
-                </span>
-              </label>
-            </fieldset>
+            <RefundChoiceFields paidLabel={paidLabel} refundsNow={owner} />
           ) : null}
 
           <Field label="Why is it being deleted?" hint="Required.">

@@ -10,7 +10,10 @@ import type {
 } from "@/lib/collections";
 import { getCollectionsForDay } from "@/lib/data/collections";
 import { getBills } from "@/lib/data/money";
-import { getDeletedProjectSaleIds } from "@/lib/data/project-deletions";
+import {
+  getDeletedApparelPaymentIds,
+  getDeletedProjectSaleIds,
+} from "@/lib/data/project-deletions";
 import { getDayClosing } from "@/lib/data/pos";
 import { getEstimatedMonthlyPayroll } from "@/lib/data/staff";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS, type MoneySource } from "@/lib/ledger";
@@ -51,11 +54,16 @@ export default async function ClosingPage() {
     handed back.
   */
   const todaysFeed = await getCollectionsForDay(today);
-  const deletedProjectSaleIds = await getDeletedProjectSaleIds(
-    todaysFeed.rows
-      .filter((row) => row.kind === "counter_sale" && row.voidedAt === null)
-      .map((row) => row.id),
-  );
+  const live = todaysFeed.rows.filter((row) => row.voidedAt === null);
+  const [deletedCounterIds, deletedApparelIds] = await Promise.all([
+    getDeletedProjectSaleIds(
+      live.filter((row) => row.kind === "counter_sale").map((row) => row.id),
+    ),
+    getDeletedApparelPaymentIds(
+      live.filter((row) => row.kind === "apparel_payment").map((row) => row.id),
+    ),
+  ]);
+  const deletedProjectSaleIds = new Set([...deletedCounterIds, ...deletedApparelIds]);
   const deletedProjectPayments = todaysFeed.rows.filter((row) =>
     deletedProjectSaleIds.has(row.id),
   );
