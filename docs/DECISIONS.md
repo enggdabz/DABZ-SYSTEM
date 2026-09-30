@@ -1350,3 +1350,63 @@ to ask:
   To give another screen the notice: call `throwIfBehind(error, "<migration>")`
   in its read and catch `isDatabaseBehind` in the page.
 
+
+- **30 September 2026 — the Counter's Project tab, second pass: assumptions
+  made.** You asked for the tab to work like a regular sale paid in parts, with
+  a printed receipt, job details per type and a "Find project" search. These
+  were decided and are open to change.
+  1. **You pick a TYPE, not a division.** Tarpaulin, Apparel, Printing, Repair.
+     The division, the ledger category and the one-line description all follow
+     from it, so the Division and Kind of job boxes are gone. The whole list -
+     types, their fields, how each is worded on the receipt, which category it
+     is filed under - is one config, `src/lib/project-types.ts`. Adding a field
+     is an edit there and nowhere else.
+  2. **Some of your list is narrower than you may expect, because the ledger
+     categories are fixed by a database constraint.** Repair offers Laptop,
+     Desktop and Printer only (a phone has no category to be filed under);
+     Printing offers the print categories the books already have, with "Other
+     printing" for the rest and the details in Specs. To add a device or an
+     item, add the category in a migration first, then the option in the config.
+  3. **The apparel size breakdown must add up to the pieces**, checked three
+     times: on the screen (a live "3 short"), in the Server Action, and in the
+     database (`project_details_problem`, migration 0024). Sizes are the shop's
+     existing ladder, XS to 5XL.
+  4. **The job is stored as data (`projects.details`)**, and `projects.description`
+     is still filled in, as the same words on one line, so the list, the
+     calendar and every older screen keep working. A project started before
+     0024 has no details and shows its plain description.
+  5. **`sales.project_id` and `sales.payment_kind` exist and are written, but
+     nothing reads them yet, on purpose.** `project_payments` is still what the
+     balance is worked out from, and every receipt and the Sales screen already
+     read `sales`: a select naming a column a database has not got yet would
+     take every regular sale's receipt down with it. The receipt asks
+     `project_payments` instead. The RLS suite asserts the two never disagree,
+     in both directions. `payment_kind` is `downpayment`, `full` or `balance`.
+     To read them later, add them to the shared sale query once 0024 is
+     everywhere.
+  6. **One receipt, not two.** A project payment prints on
+     `/sales/[saleId]/receipt`. It adds the header (PROJECT DOWNPAYMENT for a
+     down payment, PROJECT PAYMENT for any other), the project number and type,
+     the job as lines, then Total price, PAID NOW, Paid so far (when there were
+     earlier payments) and Balance, and FULLY PAID at zero. **Paid so far and
+     Balance are as at THAT payment**, not today, so a reprint reads exactly
+     like the slip the customer holds. A regular sale prints as before.
+  7. **"Prints immediately" is the same as a regular sale**: after Complete, a
+     button opens the receipt page and you print from there (the width comes
+     from Settings). It does not open the print dialog by itself, because a
+     regular sale does not either. If you want it to for projects only, it is a
+     small change on the receipt page.
+  8. **All four ways of paying are kept** (Cash, GCash, Maya, Bank), as on a
+     regular sale, and the Downpayment / Full payment choice stays. A down
+     payment still needs a due date, since that is what puts it on the calendar.
+  9. **Find project lists only projects that can take a payment** - not
+     cancelled, with a balance. Search matches the customer or the project
+     number (dashes optional). Picking one shows the job read-only and asks for
+     the amount and the way of paying only; the server works out the balance
+     itself and refuses more than it. A half-typed new project is kept, hidden,
+     while a found project is being paid.
+  10. **The Counter page reads the project list separately and tolerates it
+      failing**, so a problem with projects can never stop a regular sale. The
+      Project tab then says the list could not be loaded.
+  11. **The button is "Complete sale & print", stuck to the bottom of the
+      screen at every width**, so it can be reached without scrolling.

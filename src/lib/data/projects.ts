@@ -16,6 +16,7 @@ import "server-only";
  */
 import { cache } from "react";
 
+import { readProjectDetails } from "@/lib/project-types";
 import {
   isProjectDivision,
   type Project,
@@ -28,10 +29,10 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 const SOFT_DELETE_MIGRATION = "0023_project_deletion_requests";
 
 const PROJECT_COLUMNS =
-  "id, project_number, division, customer_name, contact, description, total_centavos, due_on, income_category, status, cancel_reason, deleted_at";
+  "id, project_number, division, customer_name, contact, description, details, total_centavos, due_on, income_category, status, cancel_reason, deleted_at";
 const LINK_COLUMNS = "project_id, sale_id, kind";
 const SALE_COLUMNS =
-  "id, sale_number, sale_date, total_centavos, payment_method, voided_at";
+  "id, sale_number, sale_date, occurred_at, total_centavos, payment_method, voided_at";
 const STEP_COLUMNS = "project_id, step";
 
 interface ProjectRow {
@@ -41,6 +42,7 @@ interface ProjectRow {
   customer_name: string;
   contact: string | null;
   description: string;
+  details: unknown;
   total_centavos: number;
   due_on: string | null;
   income_category: string;
@@ -59,6 +61,7 @@ interface SaleRow {
   id: string;
   sale_number: string;
   sale_date: string;
+  occurred_at: string;
   total_centavos: number;
   payment_method: string;
   voided_at: string | null;
@@ -143,6 +146,7 @@ async function assemble(
         saleId: sale.id,
         saleNumber: sale.sale_number,
         saleDate: sale.sale_date,
+        occurredAt: sale.occurred_at,
         kind: link.kind,
         amountCentavos: Number(sale.total_centavos),
         method: sale.payment_method,
@@ -157,6 +161,7 @@ async function assemble(
       customerName: row.customer_name,
       contact: row.contact,
       description: row.description,
+      details: readProjectDetails(row.details),
       totalCentavos: Number(row.total_centavos),
       dueOn: row.due_on,
       incomeCategory: row.income_category,
@@ -220,4 +225,32 @@ export async function getProject(id: string): Promise<Project | null> {
     p_project_id: id,
   });
   return { ...project, deletionPending: pending === true };
+}
+
+/**
+ * The project a sale paid, or null for a regular sale - which is what a
+ * receipt asks to decide whether it is a project's.
+ *
+ * It looks in `project_payments` rather than at the new columns on `sales` on
+ * purpose. Every receipt in the shop goes through this question, and a query
+ * that names a column a database does not have yet fails the whole receipt -
+ * a regular sale's included. `project_payments` has existed since 0022.
+ *
+ * A person without `add_sales` gets null (the policies return nothing), so
+ * they see the plain receipt rather than an error.
+ */
+export async function getProjectForSale(
+  saleId: string,
+): Promise<Project | null> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("project_payments")
+    .select("project_id")
+    .eq("sale_id", saleId)
+    .maybeSingle();
+
+  // A missing table is a database that is behind, and a regular sale's
+  // receipt must not fall over because of it.
+  if (error || !data) return null;
+  return getProject((data as { project_id: string }).project_id);
 }

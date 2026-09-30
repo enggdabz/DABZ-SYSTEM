@@ -64,6 +64,9 @@ quiet "$HERE/../migrations/0021_delete_a_project_nothing_happened.sql"
 quiet "$HERE/../migrations/0022_projects.sql"
 # 0023 is deleting a project with the owner's approval - 20 tests it.
 quiet "$HERE/../migrations/0023_project_deletion_requests.sql"
+# 0024 gives a project its details and marks a sale as a project payment - 19
+# tests it too.
+quiet "$HERE/../migrations/0024_project_details_and_sale_link.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to

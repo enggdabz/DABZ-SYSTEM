@@ -5,6 +5,8 @@ import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getPayableJobs } from "@/lib/data/collections";
 import { getCustomers, getProducts } from "@/lib/data/pos";
+import { getProjects } from "@/lib/data/projects";
+import { payableProjects, type FindableProject } from "@/lib/project-find";
 
 import { PosScreen } from "./PosScreen";
 import { CounterMode } from "./CounterMode";
@@ -38,6 +40,21 @@ export default async function PosPage() {
       unclaimedAfterDays: settings.unclaimedUnitDays,
     }),
   ]);
+
+  /*
+    "Find project" needs the projects that can still take a payment. It is read
+    on its own and allowed to fail: this page is also the REGULAR sale, and a
+    problem with projects - a database still waiting for its latest migration,
+    say - must not stop somebody ringing up a photocopy. The Project tab says
+    it could not load the list; starting a new project does not need it.
+  */
+  let openProjects: FindableProject[] = [];
+  let projectsUnavailable = false;
+  try {
+    openProjects = payableProjects(await getProjects());
+  } catch {
+    projectsUnavailable = true;
+  }
 
   const unpriced = products.filter((product) => product.priceCentavos === null);
 
@@ -132,6 +149,8 @@ export default async function PosPage() {
               contactNumber: customer.contactNumber,
             }))}
             downPaymentPercent={settings.apparelDownPaymentPercent}
+            openProjects={openProjects}
+            projectsUnavailable={projectsUnavailable}
           />
         }
       />

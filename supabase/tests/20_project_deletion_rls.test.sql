@@ -38,19 +38,22 @@ begin
   select * into r from public.create_project(
     date '2026-10-01', 'apparel', null, 'Coach Ramon', null, 'Team jerseys',
     500000, date '2026-10-20', 'sublimation_jerseys',
-    'down', 200000, 'cash', null, 200000, 0);
+    'down', 200000, 'cash', null, 200000, 0,
+    '{"type":"apparel","values":{"uniformKind":"sublimation_jersey","pieces":10},"sizes":{"M":10}}'::jsonb);
   insert into t_ids values ('p1', r.project_id, r.sale_id);
 
   select * into r from public.create_project(
     date '2026-10-01', 'printshoppe', null, 'Tita Baby', null, 'Tarpaulin',
     100000, date '2026-10-10', 'tarpaulin',
-    'down', 40000, 'cash', null, 40000, 0);
+    'down', 40000, 'cash', null, 40000, 0,
+    '{"type":"tarpaulin","values":{"widthFeet":3,"heightFeet":5,"quantity":1}}'::jsonb);
   insert into t_ids values ('p2', r.project_id, r.sale_id);
 
   select * into r from public.create_project(
     date '2026-10-01', 'printshoppe', null, 'Mang Jose', null, 'Stickers',
     60000, date '2026-10-12', 'stickers',
-    'down', 20000, 'cash', null, 20000, 0);
+    'down', 20000, 'cash', null, 20000, 0,
+    '{"type":"printing","values":{"item":"stickers","quantity":50,"specs":"Round"}}'::jsonb);
   insert into t_ids values ('p3', r.project_id, r.sale_id);
 end;
 $$;

@@ -36,6 +36,7 @@ import {
   type WeekStart,
 } from "./period";
 import { sumCentavos, type Centavos } from "./money";
+import type { ProjectDetails } from "./project-types";
 
 // ---------------------------------------------------------------------------
 // Divisions, in the owner's words
@@ -186,6 +187,8 @@ export interface ProjectPayment {
   saleId: string;
   saleNumber: string;
   saleDate: string;
+  /** The moment it was rung up, so a receipt can say what was owed THEN. */
+  occurredAt: string;
   kind: ProjectPaymentKind;
   /** The sale's own total - never a copy held on the project. */
   amountCentavos: Centavos;
@@ -200,6 +203,8 @@ export interface Project {
   customerName: string;
   contact: string | null;
   description: string;
+  /** The job as structured data. Null on a project started before 0024. */
+  details: ProjectDetails | null;
   totalCentavos: Centavos;
   /** A date with no time, "2026-10-05". Null only for an undated full payment. */
   dueOn: string | null;
@@ -244,6 +249,65 @@ export function projectMoney(
   );
   const balanceCentavos = Math.max(0, project.totalCentavos - paidCentavos);
   return { paidCentavos, balanceCentavos, fullyPaid: balanceCentavos === 0 };
+}
+
+// ---------------------------------------------------------------------------
+// What a receipt says
+// ---------------------------------------------------------------------------
+
+export interface ProjectReceiptFigures {
+  totalCentavos: Centavos;
+  /** This payment alone. */
+  paidNowCentavos: Centavos;
+  /** Every live payment up to and including this one. */
+  paidSoFarCentavos: Centavos;
+  balanceCentavos: Centavos;
+  kind: ProjectPaymentKind;
+}
+
+/**
+ * The figures printed on ONE payment's receipt: what the project stood at when
+ * that payment was taken, not what it stands at today.
+ *
+ * A reprint has to read exactly like the slip the customer already holds - a
+ * later payment must not quietly change the balance on an earlier receipt. So
+ * only payments taken at or before this one count, and a payment that was
+ * later voided is left out of the earlier ones' history (the money was handed
+ * back), while the receipt of the voided payment itself still shows what it
+ * said. Null when the sale is not one of the project's payments.
+ */
+export function projectReceiptFigures(
+  project: Pick<Project, "totalCentavos" | "payments">,
+  saleId: string,
+): ProjectReceiptFigures | null {
+  const thisPayment = project.payments.find((entry) => entry.saleId === saleId);
+  if (!thisPayment) return null;
+
+  const upToHere = project.payments.filter(
+    (entry) =>
+      entry.saleId === saleId ||
+      (!entry.voided &&
+        (entry.occurredAt < thisPayment.occurredAt ||
+          // Same instant: the sale number is the tie-break, as it is on the till.
+          (entry.occurredAt === thisPayment.occurredAt &&
+            entry.saleNumber < thisPayment.saleNumber))),
+  );
+  const paidSoFarCentavos = sumCentavos(
+    upToHere.map((entry) => entry.amountCentavos),
+  );
+
+  return {
+    totalCentavos: project.totalCentavos,
+    paidNowCentavos: thisPayment.amountCentavos,
+    paidSoFarCentavos,
+    balanceCentavos: Math.max(0, project.totalCentavos - paidSoFarCentavos),
+    kind: thisPayment.kind,
+  };
+}
+
+/** The header printed on a project receipt. */
+export function projectReceiptTitle(kind: ProjectPaymentKind): string {
+  return kind === "down" ? "PROJECT DOWNPAYMENT" : "PROJECT PAYMENT";
 }
 
 // ---------------------------------------------------------------------------

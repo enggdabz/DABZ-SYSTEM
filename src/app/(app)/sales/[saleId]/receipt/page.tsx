@@ -6,8 +6,11 @@ import { TAP_AREA } from "@/components/ui";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { DIVISIONS } from "@/lib/divisions";
 import { getCustomers, getSaleById, getSaleLines } from "@/lib/data/pos";
+import { getProjectForSale } from "@/lib/data/projects";
 import { formatManilaDateTime } from "@/lib/datetime";
 import { formatPesos } from "@/lib/money";
+import { toFindable } from "@/lib/project-find";
+import { projectReceiptFigures, projectReceiptTitle } from "@/lib/projects";
 import { RECEIPT_WIDTH_MM } from "@/lib/settings";
 
 export const metadata = { title: "Receipt · Dabz System" };
@@ -28,6 +31,12 @@ const PAYMENT_LABELS: Record<string, string> = {
  *
  * Every figure is added up from the lines printed on it, never worked backwards
  * from a stored total, so a customer can check it by hand.
+ *
+ * A project's payment (Counter -> Project) prints on THIS receipt, not a second
+ * one: the same paper, the same width, the same lines. It adds a header, the
+ * project and its job, and says what the payment left owing - see the
+ * `figures` blocks below. A regular sale has no project, so none of that
+ * appears and it prints exactly as it always did.
  */
 export default async function ReceiptPage({
   params,
@@ -44,10 +53,16 @@ export default async function ReceiptPage({
   // sale is not this person's to know about.
   if (!sale) notFound();
 
-  const [lines, customers] = await Promise.all([
+  const [lines, customers, project] = await Promise.all([
     getSaleLines(saleId),
     sale.customerId ? getCustomers() : Promise.resolve([]),
+    getProjectForSale(saleId),
   ]);
+
+  // What the project stood at when THIS payment was taken, so a reprint reads
+  // the same as the slip the customer already holds.
+  const figures = project ? projectReceiptFigures(project, saleId) : null;
+  const job = project ? toFindable(project) : null;
 
   const customer = customers.find((entry) => entry.id === sale.customerId);
   const widthMm = RECEIPT_WIDTH_MM[settings.receiptPaper];
@@ -84,6 +99,11 @@ export default async function ReceiptPage({
           {tagline ? (
             <p className="text-[10px] font-medium">&ldquo;{tagline}&rdquo;</p>
           ) : null}
+          {figures ? (
+            <p className="mt-2 border-y border-black py-1 text-sm font-bold">
+              {projectReceiptTitle(figures.kind)}
+            </p>
+          ) : null}
           {sale.voidedAt ? (
             <p className="mt-2 border border-black py-1 text-sm font-bold">
               VOIDED
@@ -94,8 +114,25 @@ export default async function ReceiptPage({
         <div className="mt-3 border-t border-dashed border-black/40 pt-2 text-[11px]">
           <p className="font-semibold">{sale.saleNumber}</p>
           <p>{formatManilaDateTime(sale.occurredAt)}</p>
-          {customer ? <p>Customer: {customer.name}</p> : <p>Walk-in</p>}
+          {job ? (
+            <p>Customer: {job.customerName}</p>
+          ) : customer ? (
+            <p>Customer: {customer.name}</p>
+          ) : (
+            <p>Walk-in</p>
+          )}
         </div>
+
+        {job ? (
+          <div className="mt-2 border-t border-dashed border-black/40 pt-2 text-[11px]">
+            <p className="font-semibold">
+              Project {job.number} &middot; {job.typeLabel}
+            </p>
+            {job.lines.map((line, index) => (
+              <p key={index}>{line}</p>
+            ))}
+          </div>
+        ) : null}
 
         <table className="mt-3 w-full border-t border-dashed border-black/40 pt-2 text-[11px]">
           <tbody>
@@ -116,20 +153,48 @@ export default async function ReceiptPage({
         </table>
 
         <div className="mt-2 space-y-0.5 border-t border-dashed border-black/40 pt-2 text-[11px]">
-          <Row label="Subtotal" value={formatPesos(subtotal)} />
-          {sale.discountCentavos > 0 ? (
-            <Row
-              label={
-                sale.discountKind === "percent" && sale.discountPercent !== null
-                  ? `Discount (${sale.discountPercent}%)`
-                  : "Discount"
-              }
-              value={`−${formatPesos(sale.discountCentavos)}`}
-            />
-          ) : null}
-          <div className="border-t border-black pt-1">
-            <Row label="TOTAL" value={formatPesos(total)} bold />
-          </div>
+          {figures ? (
+            // A project payment says what was agreed, what this payment was,
+            // and what is still owed. The sale itself is only the payment.
+            <>
+              <Row label="Total price" value={formatPesos(figures.totalCentavos)} />
+              <div className="border-t border-black pt-1">
+                <Row label="PAID NOW" value={formatPesos(total)} bold />
+              </div>
+              {figures.paidSoFarCentavos !== figures.paidNowCentavos ? (
+                <Row
+                  label="Paid so far"
+                  value={formatPesos(figures.paidSoFarCentavos)}
+                />
+              ) : null}
+              <Row
+                label="Balance"
+                value={formatPesos(figures.balanceCentavos)}
+                bold
+              />
+              {figures.balanceCentavos === 0 ? (
+                <p className="pt-1 text-center font-bold">FULLY PAID</p>
+              ) : null}
+            </>
+          ) : (
+            <>
+              <Row label="Subtotal" value={formatPesos(subtotal)} />
+              {sale.discountCentavos > 0 ? (
+                <Row
+                  label={
+                    sale.discountKind === "percent" &&
+                    sale.discountPercent !== null
+                      ? `Discount (${sale.discountPercent}%)`
+                      : "Discount"
+                  }
+                  value={`−${formatPesos(sale.discountCentavos)}`}
+                />
+              ) : null}
+              <div className="border-t border-black pt-1">
+                <Row label="TOTAL" value={formatPesos(total)} bold />
+              </div>
+            </>
+          )}
           {/* For cash, the two rows below already say so; repeating "Cash" as
               the method line just reads as a mistake on the slip. */}
           {sale.moneyGivenCentavos !== null ? (
