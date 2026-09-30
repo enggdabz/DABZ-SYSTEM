@@ -1285,6 +1285,57 @@ to ask:
   9. **The down payment policy is only a warning**, using the existing
      Settings percentage; with none set it says nothing.
 
+- **30 September 2026 — deleting a project with the owner's approval:
+  assumptions made.** You asked me to go with my defaults, so these are decided
+  and open to change. The migration is `0023_project_deletion_requests.sql`.
+  1. **"Project" here means the Phase 15 Counter projects** (`/projects`), not
+     apparel job orders. Those keep their own `0021` rule (delete only where
+     nothing has happened). To give them the same approval flow later, the
+     pattern is: a request table, a `SECURITY DEFINER` function that looks at
+     the caller's role, and a soft-delete column.
+  2. **A delete is soft.** `projects.deleted_at` / `deleted_by`; the row, its
+     payments and its steps stay. The list, the calendar and the balance tiles
+     no longer show it, and staff cannot read it at all (the read policy).
+     This is a change from `0021`'s "delete only where nothing has happened",
+     and it is safe for the reason that rule existed: no money record is
+     removed, so nothing can be left describing a project that is not there.
+  3. **The money stays.** A project's down payment is a real sale, so Sales,
+     End of day, the collections feed, Reports and the ledger keep counting it
+     - the drawer still adds up. Sales tags it "Project deleted" and End of day
+     lists today's ones. If the money was handed back, void the sale, as for any
+     other refund. To make Reports drop it instead, that is a decision about
+     the books, not a filter to add quietly.
+  4. **Who may do what.** Owner: deletes at once (a reason is still required,
+     so the audit log always says why). Admin: `delete_project` creates a
+     request and nothing else. Staff: refused. Approve and reject: owner only,
+     enforced by `is_owner()` inside `decide_project_deletion`, so an admin -
+     even the one who asked - cannot. An owner deleting directly settles any
+     request that was waiting.
+  5. **One pending request per project** (a partial unique index). After a
+     rejection or a withdrawal an admin may ask again. Only the requester, or
+     the owner, can withdraw a request.
+  6. **A pending project is frozen by a trigger**, not by checks scattered
+     through the functions: no column can change and no step can be ticked or
+     taken back, whoever writes it. **A balance payment is still accepted**
+     while a request waits - refusing a customer's money is worse than a
+     balance that moves. A deleted project takes no payments.
+  7. **Any status can be deleted**, including released and cancelled.
+  8. **Notifications are a small `app_notifications` table** and a bell in the
+     top bar. Written only by the deletion functions (`notify_user` is not
+     callable by anybody signed in), read only by their own person, marked read
+     when the bell is opened. No email, SMS or push. The owner is told when a
+     request arrives; the admin when it is approved, rejected, or withdrawn by
+     the owner.
+  9. **The audit log gained four words** - `request`, `approve`, `reject`,
+     `cancel` - so the log reads as what happened rather than as "changed". An
+     approval writes two entries: the approval, and the project's deletion.
+  10. **No restore.** A soft-deleted project can be brought back by clearing
+      `deleted_at` in the database; there is no button, because nobody asked.
+      Say if you want one - it would be another owner-only function.
+  11. **Counter staff see the pending badge on the project's own page but not
+      on the list**, because the requests table is Owner/Admin only. The badge
+      comes from `project_deletion_pending`, which answers only people who
+      could read the project.
 
 - **30 September 2026 — the Counter's Project tab, second pass: assumptions
   made.** You asked for the tab to work like a regular sale paid in parts, with

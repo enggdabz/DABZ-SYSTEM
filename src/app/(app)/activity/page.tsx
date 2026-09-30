@@ -22,6 +22,10 @@ const ACTION_LABELS: Record<string, string> = {
   permission_revoke: "Took away permissions",
   activate: "Reactivated",
   deactivate: "Deactivated",
+  request: "Asked for approval",
+  approve: "Approved",
+  reject: "Rejected",
+  cancel: "Withdrew a request",
 };
 
 const OUTCOME_LABELS: Record<string, string> = {

@@ -20,6 +20,7 @@ export function ProjectMoves({
   doneSteps,
   status,
   canTick,
+  frozen = false,
 }: {
   projectId: string;
   steps: readonly string[];
@@ -27,6 +28,12 @@ export function ProjectMoves({
   status: "open" | "released" | "cancelled";
   /** Whether this person may tick this division's steps. */
   canTick: boolean;
+  /**
+   * A deletion is waiting for the owner. The stage cannot change and the
+   * project cannot be released or cancelled until it is answered; the
+   * database refuses all of it, this only stops offering it.
+   */
+  frozen?: boolean;
 }) {
   const [state, act, pending] = useActionState<ProjectMoveState, FormData>(
     projectMoveAction,
@@ -37,6 +44,8 @@ export function ProjectMoves({
   const lastDone =
     [...steps].reverse().find((step) => doneSteps.includes(step)) ?? null;
   const open = status === "open";
+  // Steps can still be READ when frozen; they just cannot be changed.
+  const editable = open && !frozen;
 
   return (
     <div className="space-y-4">
@@ -54,7 +63,7 @@ export function ProjectMoves({
             <li
               key={step}
               className={`flex flex-wrap items-center justify-between gap-3 rounded-control px-3 py-2 ring-1 ${
-                isCurrent && open
+                isCurrent && editable
                   ? "bg-surface-sunken ring-accent/40"
                   : "ring-line/60"
               }`}
@@ -74,7 +83,7 @@ export function ProjectMoves({
                 {done ? <span className="sr-only">done</span> : null}
               </span>
 
-              {isCurrent && open && canTick ? (
+              {isCurrent && editable && canTick ? (
                 <form action={act}>
                   <input type="hidden" name="projectId" value={projectId} />
                   <input type="hidden" name="move" value="step" />
@@ -89,7 +98,7 @@ export function ProjectMoves({
         })}
       </ol>
 
-      {!canTick && open ? (
+      {!canTick && editable ? (
         <p className="text-xs text-muted">
           <span aria-hidden="true">{"ℹ"} </span>
           Steps for this division are ticked by whoever has its permission.
@@ -97,7 +106,7 @@ export function ProjectMoves({
       ) : null}
 
       <div className="flex flex-wrap items-center gap-3">
-        {open && canTick && lastDone ? (
+        {editable && canTick && lastDone ? (
           <form action={act}>
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="move" value="undo" />
@@ -107,7 +116,7 @@ export function ProjectMoves({
           </form>
         ) : null}
 
-        {open && current === null ? (
+        {editable && current === null ? (
           <form action={act}>
             <input type="hidden" name="projectId" value={projectId} />
             <input type="hidden" name="move" value="release" />
@@ -118,7 +127,15 @@ export function ProjectMoves({
         ) : null}
       </div>
 
-      {open ? (
+      {frozen ? (
+        <p className="text-xs text-muted">
+          <span aria-hidden="true">{"⚠"} </span>
+          Steps, release and cancelling are switched off while the deletion
+          waits for the owner.
+        </p>
+      ) : null}
+
+      {editable ? (
         <Disclosure label="Cancel this project">
           <form action={act} className="max-w-md space-y-3">
             <input type="hidden" name="projectId" value={projectId} />

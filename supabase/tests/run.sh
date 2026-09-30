@@ -62,6 +62,8 @@ quiet "$HERE/../migrations/0020_phase14_online_orders.sql"
 quiet "$HERE/../migrations/0021_delete_a_project_nothing_happened.sql"
 # 0022 is project sales - 19 tests it.
 quiet "$HERE/../migrations/0022_projects.sql"
+# 0023 is deleting a project with the owner's approval - 20 tests it.
+quiet "$HERE/../migrations/0023_project_deletion_requests.sql"
 # 0024 gives a project its details and marks a sale as a project payment - 19
 # tests it too.
 quiet "$HERE/../migrations/0024_project_details_and_sale_link.sql"
@@ -88,3 +90,4 @@ run "$HERE/16_phase13_rls.test.sql"
 run "$HERE/17_online_orders_rls.test.sql"
 run "$HERE/18_delete_project_rls.test.sql"
 run "$HERE/19_projects_rls.test.sql"
+run "$HERE/20_project_deletion_rls.test.sql"

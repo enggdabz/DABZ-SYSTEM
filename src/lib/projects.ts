@@ -211,6 +211,17 @@ export interface Project {
   incomeCategory: string;
   status: ProjectStatus;
   cancelReason: string | null;
+  /**
+   * Set when the project has been soft-deleted. The reads leave those out, so
+   * this is null on everything a screen is given; it is here so a caller that
+   * does hold one can ask `isLive` rather than guess.
+   */
+  deletedAt?: string | null;
+  /**
+   * A deletion request is waiting for the owner. The project is frozen: no
+   * edits and no stage changes, until the request is decided or withdrawn.
+   */
+  deletionPending?: boolean;
   payments: readonly ProjectPayment[];
   /** Steps marked done, in any order. */
   steps: readonly string[];

@@ -28,6 +28,8 @@ export interface NavSection {
   permission?: Permission;
   /** Owner and Admin only, never grantable to staff (spec 4.3). */
   ownerOrAdminOnly?: boolean;
+  /** The Owner alone - not an Admin. The one place an Admin's rank stops. */
+  ownerOnly?: boolean;
   /** Which build phase delivers it. */
   phase: number;
   comingSoon?: boolean;
@@ -78,6 +80,19 @@ export const NAV_SECTIONS: NavSection[] = [
     that is where a project starts and where its balance is paid.
   */
   { href: "/projects", label: "Projects", permission: "add_sales", group: "Daily", phase: 15 },
+  /*
+    Where the owner answers an admin's request to delete a project. Owner only:
+    approving is the one thing an admin cannot do, so the link is not shown to
+    one. (Hiding it is a courtesy - the page, the action and the database each
+    refuse anyone else.)
+  */
+  {
+    href: "/projects/deletion-requests",
+    label: "Deletion requests",
+    ownerOnly: true,
+    group: "Daily",
+    phase: 15,
+  },
 
   /*
     The online shop's orders (Phase 14). They are Dabz Apparel's work too, so
@@ -137,6 +152,7 @@ export const NAV_SECTIONS: NavSection[] = [
 
 export function visibleSections(actor: Actor | null): NavSection[] {
   return NAV_SECTIONS.filter((section) => {
+    if (section.ownerOnly) return actor?.status === "active" && actor.role === "owner";
     if (section.ownerOrAdminOnly) return isOwnerOrAdmin(actor);
     if (section.permission) return can(actor, section.permission);
     // No requirement: anyone signed in may open it.

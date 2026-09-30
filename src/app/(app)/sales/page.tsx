@@ -21,6 +21,7 @@ import {
   type SalesDay,
 } from "@/lib/collections";
 import { getCollectionsForDay } from "@/lib/data/collections";
+import { getDeletedProjectSaleIds } from "@/lib/data/project-deletions";
 import { getVoidRequests } from "@/lib/data/pos";
 import { formatManilaDateTime, formatManilaTime } from "@/lib/datetime";
 import { DIVISION_IDS, type DivisionId } from "@/lib/divisions";
@@ -32,6 +33,8 @@ import {
   formatCivilDate,
   manilaToday,
 } from "@/lib/period";
+
+import { PROJECT_DELETED_TAG } from "@/lib/project-deletion";
 
 import { DecideVoidForm, RequestVoidForm } from "./SalesForms";
 
@@ -77,6 +80,14 @@ export default async function SalesPage({
   ]);
 
   const rows = read.rows;
+  /*
+    Money taken against a project that has since been deleted stays exactly
+    where it was - in the day's total, in End of day and in the ledger. It is
+    only LABELLED, so nobody wonders where a down payment came from.
+  */
+  const deletedProjectSaleIds = await getDeletedProjectSaleIds(
+    rows.filter((row) => row.kind === "counter_sale").map((row) => row.id),
+  );
   const readWarning = partialReadWarning(read);
   /*
     The feed view was missing, so the day was rebuilt from the three tables
@@ -424,6 +435,7 @@ export default async function SalesPage({
                     request.saleId === row.id && request.status === "pending",
                 )}
                 canDecide={canDecide}
+                projectDeleted={deletedProjectSaleIds.has(row.id)}
               />
             ))}
           </ul>
@@ -449,10 +461,13 @@ function CollectionLine({
   row,
   voidRequested,
   canDecide,
+  projectDeleted,
 }: {
   row: CollectionRow;
   voidRequested: boolean;
   canDecide: boolean;
+  /** The sale paid a project that was later deleted. Still counted. */
+  projectDeleted: boolean;
 }) {
   const voided = row.voidedAt !== null;
   /*
@@ -486,6 +501,9 @@ function CollectionLine({
                 : MONEY_SOURCE_LABELS[row.source]}
             </Tag>
             {voided ? <Tag tone="attention">{"⚠"} Voided</Tag> : null}
+            {projectDeleted ? (
+              <Tag tone="attention">{"⚠"} {PROJECT_DELETED_TAG}</Tag>
+            ) : null}
             {voidRequested && !voided ? (
               <Tag tone="attention">Void requested</Tag>
             ) : null}

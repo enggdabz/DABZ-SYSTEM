@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Tag, TAP_AREA } from "@/components/ui";
 import { formatPesos } from "@/lib/money";
+import { PENDING_BADGE } from "@/lib/project-deletion";
 import {
   PROJECT_DIVISION_SHORT,
   daysUntilDue,
@@ -77,6 +78,9 @@ export function ProjectRow({
             {project.customerName}
           </Link>
           <DivisionTag project={project} />
+          {project.deletionPending ? (
+            <Tag tone="attention">{"⚠"} {PENDING_BADGE}</Tag>
+          ) : null}
         </div>
         <p className="mt-0.5 text-sm">{project.description}</p>
         <p className="mt-0.5 text-xs text-muted">

@@ -41,14 +41,19 @@ function currentHref(pathname: string, sections: NavSection[]): string | null {
   );
 }
 
+/** Section href -> a count worth drawing beside it (pending requests). */
+export type SectionBadges = Record<string, number>;
+
 function SectionLinks({
   sections,
   pathname,
   onNavigate,
+  badges = {},
 }: {
   sections: NavSection[];
   pathname: string;
   onNavigate?: () => void;
+  badges?: SectionBadges;
 }) {
   const here = currentHref(pathname, sections);
 
@@ -82,6 +87,16 @@ function SectionLinks({
                   }`}
                 >
                   {section.label}
+                  {badges[section.href] > 0 ? (
+                    /*
+                      A number AND a word for a screen reader: the count alone
+                      is colour and a digit, which says nothing to one.
+                    */
+                    <span className="ml-2 inline-flex min-w-5 items-center justify-center rounded-full bg-gold px-1.5 text-[11px] font-semibold leading-5 text-on-gold">
+                      {badges[section.href]}
+                      <span className="sr-only"> waiting</span>
+                    </span>
+                  ) : null}
                   {section.comingSoon ? (
                     <span className="ml-1.5 text-[10px] text-white/25">
                       Phase {section.phase}
@@ -98,7 +113,13 @@ function SectionLinks({
 }
 
 /** The permanent rail, from `lg` up. */
-export function AppSidebar({ sections }: { sections: NavSection[] }) {
+export function AppSidebar({
+  sections,
+  badges,
+}: {
+  sections: NavSection[];
+  badges?: SectionBadges;
+}) {
   const pathname = usePathname();
 
   return (
@@ -110,7 +131,7 @@ export function AppSidebar({ sections }: { sections: NavSection[] }) {
         <Link href="/overview" className="px-6 py-5 text-sidebar-ink">
           <Wordmark />
         </Link>
-        <SectionLinks sections={sections} pathname={pathname} />
+        <SectionLinks sections={sections} pathname={pathname} badges={badges} />
       </div>
     </aside>
   );
@@ -124,7 +145,13 @@ export function AppSidebar({ sections }: { sections: NavSection[] }) {
  * measure itself against the bar rather than the screen, which is the bug that
  * put the bill reminder off the top of the page.
  */
-export function AppSidebarButton({ sections }: { sections: NavSection[] }) {
+export function AppSidebarButton({
+  sections,
+  badges,
+}: {
+  sections: NavSection[];
+  badges?: SectionBadges;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -160,6 +187,7 @@ export function AppSidebarButton({ sections }: { sections: NavSection[] }) {
                 sections={sections}
                 pathname={pathname}
                 onNavigate={() => setOpen(false)}
+                badges={badges}
               />
             </div>
           </div>,
