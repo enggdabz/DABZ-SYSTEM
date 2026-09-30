@@ -1,0 +1,31 @@
+/*
+  The storefront's own ground.
+
+  The rest of the system follows the theme switch and defaults to dark, which
+  is right for the counter and wrong for a shop window: a customer arriving
+  from Facebook should see white, black, red and gold, the brand, not
+  whichever theme somebody left on the staff tablet.
+
+  So `.store` re-declares the semantic tokens with their light values. The
+  tokens are read as `var(--surface)` at the element (Tailwind's `@theme
+  inline`), which means everything inside inherits these instead - no
+  component needs to know, and nothing here is a hex value in a component.
+  The red, the gold and the header black are the system's own tokens, untouched.
+*/
+.store {
+  --page: #ffffff;
+  --surface: #ffffff;
+  --surface-sunken: #f5f5f7;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --line: #d2d2d7;
+  --tile: #f5f5f7;
+  --seg: #ececee;
+  --success: #187c3c;
+  --gold: #ebb417;
+  --attention: #92500a;
+  --attention-bg: #fdf3e3;
+  color-scheme: light;
+  background: var(--page);
+  color: var(--ink);
+}

@@ -23,6 +23,17 @@ export const PUBLIC_PATHS = [
   // rate-limited in the Server Actions rather than guarded here.
   "/shop",
   /*
+    The Dabz Apparel store (docs/store/progress.md): the storefront, its
+    product pages and, as they are built, checkout, tracking and the privacy
+    and terms pages Facebook Login requires. Same reasoning as `/shop`: every
+    page is for somebody who is nobody, and the writes behind them are
+    validated and rate-limited in the Server Actions rather than guarded here.
+
+    The store's ADMIN is not here on purpose. It lives at /admin/store, behind
+    the ordinary sign-in.
+  */
+  "/store",
+  /*
     The route handlers. Both of them are crons that check a shared secret
     themselves and fail shut without one, so the proxy has nothing to add -
     and a redirect to a login page is a useless answer to a machine, which

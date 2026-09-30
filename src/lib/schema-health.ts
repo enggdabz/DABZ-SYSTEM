@@ -176,6 +176,23 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0020_phase14_online_orders",
     breaks: "the online shop, its orders, the production board and the order calendar"
   })),
+  ...[
+    "store_banners",
+    "store_bulk_tiers",
+    "store_categories",
+    "store_product_photos",
+    "store_products",
+    "store_settings",
+    "store_size_charts",
+    "store_size_prices",
+    "store_stock_movements",
+    "store_variant_availability",
+    "store_variants",
+  ].map((name) => ({
+    name,
+    migration: "0025_store_catalogue",
+    breaks: "the online store's catalogue - every product, category and banner on /store",
+  })),
 ];
 
 /*

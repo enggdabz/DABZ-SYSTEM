@@ -676,3 +676,11 @@ The module has its own specification: read `docs/spec.md`, then
   refusals are written for a person and are worth passing through; a constraint
   or column name is a description of the database handed to somebody who cannot
   see it. Anything else gets the ordinary sentence.
+
+## The Dabz Apparel online store (`/store`)
+
+A separate module from the Phase 14 shop, built in steps while other work was
+under way. Before touching `/store`, `/admin/store`, `src/lib/store/`,
+`src/lib/data/store.ts` or any `store_*` table, read `docs/store/progress.md`
+(what is built, what is next) and `docs/store/decisions.md` (the rules it was
+built under, and what is waiting on the owner).

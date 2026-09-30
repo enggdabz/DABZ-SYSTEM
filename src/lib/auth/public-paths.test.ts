@@ -28,6 +28,17 @@ describe("isPublicPath", () => {
     }
   });
 
+  it("lets a customer reach the store, but never its admin", () => {
+    for (const path of ["/store", "/store/c/shirts", "/store/p/plain-shirt", "/store/search"]) {
+      expect(isPublicPath(path), path).toBe(true);
+    }
+    // The store's own admin sits behind the ordinary sign-in.
+    expect(isPublicPath("/admin/store")).toBe(false);
+    expect(isPublicPath("/admin/store/products")).toBe(false);
+    // Only the store's prefix, not anything that merely starts with it.
+    expect(isPublicPath("/storefront-secrets")).toBe(false);
+  });
+
   it("lets a cron reach its own route", () => {
     // Both route handlers check a shared secret themselves and fail shut
     // without one. A redirect is a useless answer to a machine.
