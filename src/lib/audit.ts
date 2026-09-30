@@ -25,7 +25,12 @@ export type AuditAction =
   | "permission_grant"
   | "permission_revoke"
   | "activate"
-  | "deactivate";
+  | "deactivate"
+  // A project deletion asked for, answered, or withdrawn (0023).
+  | "request"
+  | "approve"
+  | "reject"
+  | "cancel";
 
 export interface AuditEntry {
   actorId: string | null;

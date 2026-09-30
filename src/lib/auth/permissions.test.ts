@@ -145,6 +145,16 @@ describe("visibleSections", () => {
     expect(visibleSections(admin).map((s) => s.href)).toContain("/production");
   });
 
+  it("shows Deletion requests to the owner alone", () => {
+    // Approving a deletion is the one thing an admin cannot do, so the link is
+    // not offered to one. Hiding it is a courtesy; the page, the action and the
+    // database each refuse anybody else.
+    const href = "/projects/deletion-requests";
+    expect(visibleSections(owner).map((s) => s.href)).toContain(href);
+    expect(visibleSections(admin).map((s) => s.href)).not.toContain(href);
+    expect(visibleSections(staff).map((s) => s.href)).not.toContain(href);
+  });
+
   it("shows a deactivated account and a visitor nothing at all", () => {
     expect(visibleSections(deactivated)).toEqual([]);
     expect(visibleSections(null)).toEqual([]);

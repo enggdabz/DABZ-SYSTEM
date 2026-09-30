@@ -1,7 +1,8 @@
 import Link from "next/link";
 
-import { AppSidebarButton } from "./AppSidebar";
+import { AppSidebarButton, type SectionBadges } from "./AppSidebar";
 import { BillsDueSoon, type DueSoonBill } from "./BillsDueSoon";
+import { NotificationBell, type BellNotification } from "./NotificationBell";
 import { QuickExpense } from "./QuickExpense";
 import { ThemeToggle } from "./ThemeToggle";
 import { SwitchUserButton } from "./SwitchUserButton";
@@ -25,6 +26,8 @@ export function AppTopBar({
   billsDueSoon = [],
   expensePresets,
   expenseApprovalHint,
+  notifications = [],
+  sectionBadges,
 }: {
   user: SignedInUser;
   /** Empty for staff, who never see the bills (spec 4.3). */
@@ -36,6 +39,10 @@ export function AppTopBar({
    */
   expensePresets?: ExpensePreset[] | null;
   expenseApprovalHint?: string | null;
+  /** This person's own in-app messages, newest first. */
+  notifications?: BellNotification[];
+  /** Counts to draw beside sidebar links, by href. */
+  sectionBadges?: SectionBadges;
 }) {
   const sections = visibleSections(user);
 
@@ -47,7 +54,7 @@ export function AppTopBar({
       <div className="mx-auto max-w-6xl px-4 sm:px-6">
         <div className="flex min-h-16 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2">
           <div className="flex min-w-0 items-center gap-2">
-            <AppSidebarButton sections={sections} />
+            <AppSidebarButton sections={sections} badges={sectionBadges} />
             {/*
               The wordmark is in the sidebar from `lg` up, so showing it here
               too would print it twice on the same screen.
@@ -65,6 +72,7 @@ export function AppTopBar({
               />
             ) : null}
             {billsDueSoon.length > 0 ? <BillsDueSoon bills={billsDueSoon} /> : null}
+            <NotificationBell notifications={notifications} />
             <span className="hidden text-right text-xs leading-tight sm:block">
               <span className="block font-medium">{user.fullName}</span>
               <span className="block text-white/50 capitalize">{user.role}</span>

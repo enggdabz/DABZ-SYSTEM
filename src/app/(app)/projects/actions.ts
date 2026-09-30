@@ -336,6 +336,14 @@ export async function projectMoveAction(
 
   const project = await getProject(projectId);
   if (!project) return { error: "That project could not be found." };
+  // Frozen while the owner decides. The triggers in 0023 refuse it as well;
+  // this is so the person reads a sentence rather than a database error.
+  if (project.deletionPending) {
+    return {
+      error:
+        "Deletion of this project is waiting for the owner's approval, so it cannot be changed. Cancel the request first.",
+    };
+  }
 
   const supabase = await createSupabaseServerClient();
   let summary: string;
