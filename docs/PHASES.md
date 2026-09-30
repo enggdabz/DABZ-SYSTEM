@@ -20,6 +20,7 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — confirmed 21 Sep 2026** |
 | 11 | Notifications: the shop's warnings on your phone | ✅ **Done — waiting on owner to confirm** |
 | 12 | Production report: where each item on a project has got to (the owner's request, not section 16) | ✅ **Done — waiting on owner to confirm** |
+| 15 | Project sales: a Counter "Project" option, a Projects screen with a calendar, balances and production steps (the owner's request, 30 Sep 2026) | ✅ **Done — waiting on owner to confirm** |
 | — | Later: Messenger API, Meta Ads tracking, chatbot | Not in first build |
 
 **"Confirmed" means the owner has used the phase and says it works.** It is not
@@ -2535,6 +2536,76 @@ suite asserted a job order could never be deleted; it now asserts the new rule,
 because the project it uses has had its only item removed and so qualifies.
 Phase 13's still refuses — but for a stated reason now, its bench marks, rather
 than because deleting was impossible.
+
+---
+
+## Phase 15 — Project sales ✅
+
+**What you asked for, 30 September 2026**
+
+> A "Project sale" that links the Counter to Projects and a Projects Calendar:
+> a Regular sale / Project selector, a Division dropdown, customer, job
+> description, total price, down or full payment, amount paid now, an
+> auto-computed balance and a due date; each project on the calendar on its due
+> date; only what was paid today counted as a sale; the balance paid later as a
+> new sale; production steps per division; and a Projects screen with filters
+> and a month/week calendar.
+
+**Built**
+
+- **Counter → Project.** A switch at the top of the Counter: *Regular sale* or
+  *Project*. Both halves stay mounted, so looking at Project never loses a
+  half-built cart. Project asks for a division (Apparel, Repair, Printing), the
+  kind of job (which is how the money is filed in the books), customer name and
+  contact, job description, total price, payment type, amount paid now, the
+  balance (worked out on screen), a due date and how the customer is paying.
+- **Only what was paid today is a sale.** `create_project` writes the project
+  and then calls `complete_sale` for the amount paid now, in one transaction.
+  End of day, Sales, the collections feed and the ledger count it with no
+  change. The balance is never a sale.
+- **Projects** (sidebar, under Daily). Filters for division, unpaid balance,
+  due this week and overdue, and three views on the same page: list, month and
+  week. Every open project with a due date is on the calendar on that date -
+  down payment or full - showing customer, division, balance due and status.
+  Overdue is listed above the calendar with a ⚠, and is not moved.
+- **Opening a project** (from the list or the calendar): totals, payments (each
+  with its receipt), the balance form, and the production steps.
+- **Paying the balance** posts a new sale for that day (`record_project_balance`
+  → `complete_sale`). More than the balance is refused; less is an installment.
+  When the balance reaches zero the project reads **Fully paid**.
+- **Production steps**, per division, ticked in order (only the current step has
+  a button): Apparel - design, pattern, print, heat press, tabas, sewing,
+  quality checking, packaging, ready to ship. Repair - received, diagnosing,
+  repairing, testing, ready for pickup. Printing - design, print, finishing,
+  ready for pickup. The last one ticked lets the project be **released**.
+
+**The decisions inside it** (all in `docs/DECISIONS.md`)
+
+- Money reaches the ledger through `complete_sale` only; no fourth route.
+- Balance, "fully paid" and production status are never stored - a voided
+  payment puts the balance back by itself.
+- Projects are separate from apparel job orders and repair tickets.
+- The calendar shows the due date itself (no day-early rule, no carry-forward).
+
+**How it is verified**
+
+| What | How |
+|---|---|
+| Balance, steps, filters, calendar, validation, policy warning | `npm test` (`projects.test.ts`, `ProjectSaleForm.test.tsx`) |
+| RLS, money, void, step order, permissions | `npm run test:rls` (`19_projects_rls.test.sql`) |
+| Columns the app asks for exist | `npm run check:schema` |
+| Layout at 390 / 768 / 1024 / 1440 | headless browser on the project components with sample data: no sideways scroll, no tap target under 24px. **The full pages behind sign-in were not opened** - Supabase Auth cannot run here - so try them once against the real project. |
+
+**How to check it**
+
+1. `npm run db:push` to apply `0022_projects.sql`.
+2. Counter → **Project** → Printing / Tarpaulin, total 2000, Downpayment 500,
+   a due date next week. Today's sales gain 500, not 2000.
+3. **Projects**: the project is in the list and on its due date in Month and
+   Week, balance 1,500.
+4. Open it → **Record payment** 1,500. It reads **Fully paid**, and a second
+   sale for 1,500 is on today's Sales.
+5. Void that payment on Sales: the balance returns to 1,500 by itself.
 
 ---
 
