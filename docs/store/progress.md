@@ -26,7 +26,7 @@ customer must only ever be sent to one of them.
 ## Step 1 — what exists
 
 **Database** (`supabase/migrations/0025_store_catalogue.sql`, tested by
-`supabase/tests/19_store_catalogue_rls.test.sql`): `store_settings`,
+`supabase/tests/20_store_catalogue_rls.test.sql`): `store_settings`,
 `store_categories` (the five the owner named), `store_size_charts`,
 `store_products`, `store_product_photos`, `store_variants`,
 `store_size_prices`, `store_bulk_tiers`, `store_stock_movements`,

@@ -152,6 +152,11 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0018_phase12_production",
     breaks: "the production report - where each item on a project has got to",
   })),
+  ...["projects", "project_payments", "project_steps"].map((name) => ({
+    name,
+    migration: "0022_projects",
+    breaks: "project sales - the Projects screen, its calendar and the Counter's Project option",
+  })),
   ...[
     "online_categories",
     "online_design_products",
