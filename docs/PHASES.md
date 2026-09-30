@@ -20,7 +20,7 @@ Each phase ends with: what was built, how to run it, how to test it.
 | 10 | One counter: all three divisions in one list, and any payment taken from the counter | ✅ **Done — confirmed 21 Sep 2026** |
 | 11 | Notifications: the shop's warnings on your phone | ✅ **Done — waiting on owner to confirm** |
 | 12 | Production report: where each item on a project has got to (the owner's request, not section 16) | ✅ **Done — waiting on owner to confirm** |
-| 15 | Project sales: a Counter "Project" option, a Projects screen with a calendar, balances and production steps (the owner's request, 30 Sep 2026) | ✅ **Done — waiting on owner to confirm** |
+| 15 | Project sales: a Counter "Project" option, a Projects screen with a calendar, balances and production steps (the owner's request, 30 Sep 2026) | ✅ **Done — confirmed 30 Sep 2026** |
 | — | Later: Messenger API, Meta Ads tracking, chatbot | Not in first build |
 
 **"Confirmed" means the owner has used the phase and says it works.** It is not
