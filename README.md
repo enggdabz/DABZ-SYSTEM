@@ -159,9 +159,9 @@ src/
     login/            Sign in, and the sign-out action
     setup/            First-time setup: creates the owner account, once
     change-password/  Choosing a new password
-    (public)/         The shop's page at "/" - no sign-in, and the one
-                      form a stranger may send into the system
-    (shop)/           The online shop at "/shop" - the catalogue, the design
+    (public)/         The page about the whole shop at "/about" - no sign-in,
+                      and the one form a stranger may send into the system
+    (shop)/           The online shop - the catalogue at "/", the design
                       gallery, a product page, the order, the checkout, the
                       receipt and track-my-order. No sign-in, and the other
                       three things a stranger may cause to happen

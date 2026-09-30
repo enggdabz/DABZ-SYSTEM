@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import { isPublicPath } from "./public-paths";
 
 describe("isPublicPath", () => {
-  it("lets a customer reach the shop's public page", () => {
+  it("lets a customer reach the homepage and the page about the shop", () => {
+    // The catalogue took the root on 22 September 2026 and the Phase 9 page
+    // about the whole shop moved to `/about`. Both are for a customer who is
+    // nobody, so both have to be open.
     expect(isPublicPath("/")).toBe(true);
+    expect(isPublicPath("/about")).toBe(true);
   });
 
   it("lets a customer reach every page of the online shop", () => {
@@ -61,5 +65,6 @@ describe("isPublicPath", () => {
     expect(isPublicPath("/shopfront")).toBe(false);
     expect(isPublicPath("/logins")).toBe(false);
     expect(isPublicPath("/apidocs")).toBe(false);
+    expect(isPublicPath("/aboutus")).toBe(false);
   });
 });

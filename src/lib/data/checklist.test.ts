@@ -26,8 +26,8 @@ import { describe, expect, it } from "vitest";
  * they will look.
  */
 const CUSTOMER_PAGES = [
-  join(process.cwd(), "src/app/(public)/page.tsx"),
-  join(process.cwd(), "src/app/(shop)/shop/page.tsx"),
+  join(process.cwd(), "src/app/(public)/about/page.tsx"),
+  join(process.cwd(), "src/app/(shop)/page.tsx"),
   join(process.cwd(), "src/app/(shop)/shop/order/details/page.tsx"),
   join(process.cwd(), "src/app/(shop)/shop/order/received/[token]/page.tsx"),
 ];

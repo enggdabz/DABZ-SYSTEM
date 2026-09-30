@@ -8,7 +8,7 @@ import { DIVISIONS, DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos } from "@/lib/money";
 import { settingsFromRow, type SettingsRow } from "@/lib/settings";
 
-import { EnquiryForm } from "./EnquiryForm";
+import { EnquiryForm } from "../EnquiryForm";
 
 export const metadata: Metadata = {
   title: "Dabz Printshoppe · Printing, jerseys and repairs in San Carlos City",
@@ -17,18 +17,24 @@ export const metadata: Metadata = {
 };
 
 /**
- * The shop's public page (Phase 9).
+ * The page about the whole shop (Phase 9).
  *
- * The page a customer lands on from Facebook. It is built from the SAME price
- * lists the counter uses, so it cannot quietly go out of date the way a
- * hand-written page does - change a price on the Products screen and this page
- * changes with it.
+ * It lived at `/` until 22 September 2026, when the owner asked for the online
+ * catalogue to be the homepage. It is the same page, at `/about`: what moved
+ * is which of the two a customer meets first. The reasoning is in
+ * `docs/DECISIONS.md` - the shop's products are the one thing on this site a
+ * customer can finish by themselves, and everything here ends in a message
+ * somebody has to answer.
+ *
+ * It is built from the SAME price lists the counter uses, so it cannot quietly
+ * go out of date the way a hand-written page does - change a price on the
+ * Products screen and this page changes with it.
  *
  * Everything the owner has not filled in is LEFT OUT rather than filled with a
  * placeholder. A made-up address on a page a real person might drive to is a
  * different order of mistake from a made-up figure on an internal screen.
  */
-export default async function PublicHomePage() {
+export default async function AboutPage() {
   await connection();
 
   const [divisions, settingsRow] = await Promise.all([
@@ -52,9 +58,21 @@ export default async function PublicHomePage() {
           Our page is being updated. Please message us on Facebook or drop by
           the shop.
         </p>
-        <Link href="/login" className={`mt-8 inline-block text-sm underline ${TAP_AREA}`}>
-          Staff sign in
-        </Link>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4 text-sm">
+          {/*
+            Offered only while the shop is actually open. With both switches
+            off the homepage sends a customer here, so a link back to it would
+            be a round trip to the same sentence.
+          */}
+          {settings.onlineShopEnabled ? (
+            <Link href="/" className={`underline ${TAP_AREA}`}>
+              Order jerseys online
+            </Link>
+          ) : null}
+          <Link href="/login" className={`underline ${TAP_AREA}`}>
+            Staff sign in
+          </Link>
+        </div>
       </section>
     );
   }
@@ -90,13 +108,14 @@ export default async function PublicHomePage() {
 
         <div className="mt-8 flex flex-wrap gap-3">
           {/*
-            The way into the online shop (Phase 14). First, and shaped like the
-            main action, because it is the one thing on this page a customer
-            can finish by themselves - everything else here ends in a message
-            somebody has to answer.
+            The way back to the online shop (Phase 14). First, and shaped like
+            the main action, because it is the one thing on this page a
+            customer can finish by themselves - everything else here ends in a
+            message somebody has to answer. Since the shop became the homepage
+            this is also the way back to where they came in.
           */}
           <Link
-            href="/shop"
+            href="/"
             className="rounded-control bg-accent px-5 py-3 text-sm font-medium text-on-accent hover:opacity-90"
           >
             Order jerseys online

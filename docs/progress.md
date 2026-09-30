@@ -60,8 +60,8 @@ The code is deployed the moment the branch merges; the database is not.
 
 | Open | You should see |
 | --- | --- |
-| `/` | An "Order jerseys online" button, first on the page |
-| `/shop` | The hero, the three steps, the designs strip, and the products with search, category chips and a sort |
+| `/` | The hero, the three steps, the designs strip, and the products with search, category chips and a sort. This is the homepage since 22 September 2026; `/shop` still answers and redirects here |
+| `/about` | The Phase 9 page about the whole shop — the three divisions, their price lists, where to find you and the enquiry form — with "Order online" back to the shop |
 | `/shop/products/<slug>` | The price, the options, the design picker, and either a team roster, a box per size, or one quantity — with the pieces and the running price adding up as you type |
 | `/shop/order` | Your lines, the size summary, and a total that says "₱2,700 + quote" when part of the order has no price yet |
 | `/shop/order/details` | The address asked for only if you chose delivery, and a date box that will not offer a date the shop would refuse |
@@ -101,7 +101,9 @@ in.** It only redirects once Supabase is configured, so a page missing from
 sends every customer to a staff login screen on the day it goes live. That
 file now has its own tests, and the behaviour was confirmed against a stand-in
 Supabase answering 401: every `/shop` page 200, `/overview` and
-`/online-orders` redirected to the login screen.
+`/online-orders` redirected to the login screen. `/about` joined that list on
+22 September 2026, when the catalogue took the homepage and the Phase 9 page
+moved there — a page left off `public-paths.ts` is silent and total.
 
 **What was checked in a browser**, because no unit test can see a pixel:
 every customer-facing page at 390, 768, 1024 and 1440 px in both themes — no

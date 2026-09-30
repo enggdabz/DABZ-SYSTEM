@@ -37,7 +37,7 @@ export interface OnlineDesignState {
 function revalidateShop() {
   revalidatePath("/online-orders/designs");
   revalidatePath("/online-orders/products");
-  revalidatePath("/shop");
+  revalidatePath("/"); // the catalogue is the homepage now
   revalidatePath("/shop/designs");
 }
 

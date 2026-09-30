@@ -27,7 +27,7 @@ export function ShopClosed() {
         <Link href="/shop/track" className={`underline ${TAP_AREA}`}>
           Track an order you already placed
         </Link>
-        <Link href="/" className={`underline ${TAP_AREA}`}>
+        <Link href="/about" className={`underline ${TAP_AREA}`}>
           Everything else we do
         </Link>
       </div>

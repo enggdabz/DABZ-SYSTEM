@@ -2404,7 +2404,7 @@ check it in a browser).
 
 | Where | What |
 |---|---|
-| `/shop` | The customer's shop: search, categories, sorting, a product page that asks for a roster or a size tally, the jersey design gallery, an order, a checkout and a receipt with a Messenger button |
+| `/` | The customer's shop: search, categories, sorting, a product page that asks for a roster or a size tally, the jersey design gallery, an order, a checkout and a receipt with a Messenger button. It was at `/shop` until 22 September 2026, when it became the homepage — see the write-up below |
 | `/shop/track` | Track my order, with the order number **and** the mobile it was placed with |
 | `/online-orders` | The orders, five tiles and a row of filters |
 | `/online-orders/[number]` | One order: items, roster, the message to paste into Messenger, the history, the moves, the steps, the money, the customer |
@@ -2421,7 +2421,9 @@ each one back)
   exist here and mean other things.
 - Settings are columns on `app_settings`, not a key/value table, so the
   behind-a-migration rule and the column probes can both see them.
-- The shop is at `/shop`, because `/` is already the shop's public page.
+- The shop was at `/shop`, because `/` was the shop's public page. That was
+  turned round on 22 September 2026 at the owner's request: the catalogue is
+  the homepage and the public page is `/about`.
 - The module's screens are sections of the existing app behind the existing
   sidebar, with their own tab bar, rather than a second `/admin` area.
 - **Nothing is seeded but structure** — the five categories and the eight
@@ -2535,6 +2537,77 @@ suite asserted a job order could never be deleted; it now asserts the new rule,
 because the project it uses has had its only item removed and so qualifies.
 Phase 13's still refuses — but for a stated reason now, its bench marks, rather
 than because deleting was impossible.
+
+---
+
+## 22 September 2026 — the online shop is the homepage
+
+**What you asked for**
+
+> "build the online products website as the homepage"
+
+**What was there before**
+
+Two customer-facing pages, in the wrong order for what you wanted. `/` was the
+Phase 9 page about the whole shop — the three divisions, their price lists,
+where to find you and the enquiry form — and the online catalogue sat behind an
+**Order jerseys online** button on it. A customer arriving from a Facebook post
+about jerseys was one tap further from ordering than they needed to be.
+
+**Built**
+
+- **The catalogue is `/`.** The hero, the three steps, the designs strip and
+  every product with its search, its category chips and its sort — all of it is
+  now the first thing a customer sees.
+- **The Phase 9 page is `/about`, unchanged.** Nothing was deleted or rewritten:
+  it is the same page, still built from the same price lists the counter uses,
+  at a new address. It is one tap away from the top of every shop page
+  (**What we do**), from every footer (**Everything else we do**) and from the
+  closed-shop notice.
+- **`/shop` still works.** Every link already handed out — a Facebook post, a
+  Messenger reply, a printed receipt, a QR code on a tarpaulin — lands on the
+  homepage instead of a "not found". The redirect is deliberately the
+  temporary kind: the permanent kind is cached by a customer's own phone more
+  or less for ever, and this is a decision you may want to look at again.
+- **Only the catalogue moved.** A product page, the designs, the order, the
+  checkout, the receipt and track-my-order are at exactly the addresses they
+  were. `/products` at the root is already the Counter's own product screen,
+  and two pages cannot share an address.
+- **The front door answers "Show the online shop" differently from every other
+  page.** Switched off, the rest of the shop shows a short "we are not taking
+  online orders" notice. A homepage that says only that would leave a customer
+  with no address, no opening hours, no price lists and nothing to ask — so the
+  front door sends them to `/about` instead, which is what stood there before.
+- **The proxy lets a customer into `/about`.** A page left off that list works
+  perfectly on a machine with no Supabase credentials and sends every customer
+  to a staff login screen on the day it goes live. It cost this system a
+  browser check once already; it now costs a test.
+
+**How to check it**
+
+1. Open `/` signed out. The products are the page, not a button on it.
+2. Open `/shop`. You land on `/` — as does every old link you have given out.
+3. Tap **What we do** at the top, or **Everything else we do** at the bottom.
+   That is the page that used to be the homepage, with its price lists and the
+   enquiry form, and **Order online** brings you back.
+4. Turn **Settings → Show the online shop** off and open `/` again: you get the
+   page about the shop rather than a dead end. Turn it back on.
+5. Sign in. You still land on **Overview**, and nothing in the rail points at
+   the customer's pages.
+
+| What | How | Result |
+|---|---|---|
+| The guards that hold the two addresses together: the proxy's list, the off switch, and the To fill in screen agreeing with what the pages print | `npm test` | 1115 tests |
+| Nothing in the database moved, and nothing in its rules did either | `npm run test:rls` | all passing |
+| Every table and column the app asks for | `npm run check:schema` | 292 table references, 1318 column references |
+| Types, code style, production build | `npm run typecheck`, `npm run lint`, `npm run build` | clean |
+
+Checked in a browser, because no unit test can see a pixel: the homepage and
+`/about` at 390, 768, 1024 and 1440 px in both themes, with no sideways scroll
+anywhere. One thing was found that way and fixed — the page about the shop now
+has four things in its top bar rather than three, and at 390px the last of them
+folded its own words in half. Both customer navigation bars wrap as a whole
+instead.
 
 ---
 

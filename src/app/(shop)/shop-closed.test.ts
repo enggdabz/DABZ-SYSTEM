@@ -21,12 +21,27 @@ import { describe, expect, it } from "vitest";
  * open while the shop is shut: somebody who already ordered is owed their
  * order however long it stays that way. They are listed by name below, so
  * adding a third exemption is a decision somebody makes on purpose.
+ *
+ * ONE PAGE ANSWERS THE SWITCH DIFFERENTLY, and it still has to answer it. The
+ * catalogue became the homepage on 22 September 2026, and "we are not taking
+ * online orders" is not a whole homepage: it leaves a customer with no
+ * address, no opening hours, no price lists and nothing to ask. So the front
+ * door sends them to the page about the rest of the shop instead. That is a
+ * different answer, not a missing one, so it is checked here by name.
  */
 
 const SHOP = join(process.cwd(), "src", "app", "(shop)");
 
 /** Pages that must still work with the shop switched off. */
 const STAYS_OPEN = ["shop/track/page.tsx", "shop/order/received/[token]/page.tsx"];
+
+/**
+ * Pages that answer the switch some other way, and every word that proves it.
+ * A page here is NOT exempt - it is held to its own answer instead.
+ */
+const ANSWERS_DIFFERENTLY: Record<string, string[]> = {
+  "page.tsx": ["onlineShopEnabled", 'redirect("/about")'],
+};
 
 function pages(dir: string): string[] {
   const found: string[] = [];
@@ -51,10 +66,21 @@ describe("the online shop's off switch", () => {
   it("is checked by every page a customer could order from", () => {
     const missing = found
       .filter((page) => !STAYS_OPEN.includes(page.name))
+      .filter((page) => !(page.name in ANSWERS_DIFFERENTLY))
       .filter((page) => !page.source.includes("ShopClosed"))
       .map((page) => page.name);
 
     expect(missing).toEqual([]);
+  });
+
+  it("is checked by the homepage, which sends the customer to /about instead", () => {
+    for (const [name, proof] of Object.entries(ANSWERS_DIFFERENTLY)) {
+      const page = found.find((candidate) => candidate.name === name);
+      expect(page, `${name} has moved - update ANSWERS_DIFFERENTLY`).toBeDefined();
+      for (const word of proof) {
+        expect(page?.source, `${name} must still contain ${word}`).toContain(word);
+      }
+    }
   });
 
   it("leaves tracking and receipts open", () => {

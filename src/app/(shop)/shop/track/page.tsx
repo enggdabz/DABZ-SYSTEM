@@ -18,7 +18,7 @@ export default async function TrackPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-8 px-4 py-10 sm:px-6">
       <div>
-        <Link href="/shop" className={`text-sm text-accent underline ${TAP_AREA}`}>
+        <Link href="/" className={`text-sm text-accent underline ${TAP_AREA}`}>
           <span aria-hidden="true">{"‹"}</span> Back to the shop
         </Link>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Track my order</h1>

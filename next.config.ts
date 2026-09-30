@@ -50,6 +50,29 @@ const nextConfig: NextConfig = {
   },
 
   /*
+    `/shop` is where the online catalogue lived until 22 September 2026, when
+    the owner asked for it to be the homepage. Every link already handed out -
+    a Facebook post, a Messenger reply, a printed receipt, a QR code on a
+    tarpaulin - points at the old address, so it still answers.
+
+    ONLY the catalogue moved. `/shop/products/...`, `/shop/designs`,
+    `/shop/order` and `/shop/track` are all where they were: a `source` of
+    "/shop" matches that one path exactly and nothing under it. Moving those to
+    the root as well would have collided with the staff screen at `/products`,
+    which is a different list for a different person.
+
+    Temporary (307) rather than permanent, deliberately. A permanent redirect
+    is cached by the customer's own browser more or less for ever, and this is
+    a decision about the shape of the site that the owner may want to look at
+    again - see `docs/DECISIONS.md`. The cost is a little search-engine credit
+    left on the old address; the cost of the other choice is a customer whose
+    phone will not let go of it.
+  */
+  async redirects() {
+    return [{ source: "/shop", destination: "/", permanent: false }];
+  },
+
+  /*
     Product photos and jersey mockups live in Supabase Storage, so next/image
     has to be told that host is allowed to serve them.
 

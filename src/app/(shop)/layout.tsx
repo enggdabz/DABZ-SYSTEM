@@ -13,9 +13,11 @@ import { ShopHeader } from "./ShopHeader";
  * account and nothing to sign out of. What they get is the shop's name, the
  * way to the designs, and their own order.
  *
- * It is also not the Phase 9 public page's frame. That one is the whole shop -
- * three divisions, their price lists and an enquiry form - and this one is
- * Dabz Apparel's counter. The link back to it is in the footer.
+ * Since the catalogue became the homepage (22 September 2026) this is the
+ * frame a customer arriving from Facebook meets first. The Phase 9 page about
+ * the whole shop - three divisions, their price lists and an enquiry form -
+ * keeps its own frame at `/about`, and the links to it are in this header and
+ * this footer.
  */
 export default function ShopLayout({ children }: { children: ReactNode }) {
   return (
@@ -39,7 +41,7 @@ export default function ShopLayout({ children }: { children: ReactNode }) {
             <Link href="/shop/track" className={`underline ${TAP_AREA}`}>
               Track my order
             </Link>
-            <Link href="/" className={`underline ${TAP_AREA}`}>
+            <Link href="/about" className={`underline ${TAP_AREA}`}>
               Everything else we do
             </Link>
             <ThemeToggle />

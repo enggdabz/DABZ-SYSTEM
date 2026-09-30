@@ -454,11 +454,24 @@ round trip is the one thing that must be tried against a real project.
 
 ## Public page rules (built in Phase 9)
 
-- **`/` is the shop's public page; the owner's home is `/overview`.** Anything
-  that used to send a person to `/` sends them to `/overview` instead:
-  `revalidatePath`, the post-sign-in redirect, the `denied=1` redirect in
-  `dal.ts`, and the Home entry in `navigation.ts`. The one thing that still
-  points at `/` is the customer-facing wordmark in `src/app/(public)/layout.tsx`.
+- **`/` is the ONLINE CATALOGUE; the page about the whole shop is `/about`; the
+  owner's home is `/overview`.** The catalogue took the root on 22 September
+  2026 at the owner's request. Nothing a signed-in person does sends them to
+  `/`: `revalidatePath`, the post-sign-in redirect, the `denied=1` redirect in
+  `dal.ts` and the Home entry in `navigation.ts` all point at `/overview`. Both
+  customer addresses are in `PUBLIC_PATHS`, and both would send every customer
+  arriving from Facebook to a login screen if either were left out.
+  `/shop` is redirected to `/` in `next.config.ts` - temporarily, not
+  permanently, because a 308 lives in a customer's browser for ever - and only
+  `/shop` itself moved: `/shop/products/...`, `/shop/designs`, `/shop/order`
+  and `/shop/track` are where they were, because `/products` at the root is
+  already the Counter's own screen.
+- **The front door answers the off switch by sending the customer to `/about`,
+  not by showing `ShopClosed`.** Every other shop page shows the closed notice;
+  a homepage that says only "we are not taking online orders" leaves a customer
+  with no address, no hours, no price lists and nothing to ask.
+  `shop-closed.test.ts` holds the front door to that answer by name, so it is a
+  different answer rather than a forgotten one.
 - **The public page never prints what the owner has not said.** Address, phone,
   opening hours, Facebook page and Messenger name are settings that start null,
   and the page leaves out whatever is missing. A made-up figure on an internal

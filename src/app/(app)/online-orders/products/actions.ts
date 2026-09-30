@@ -42,7 +42,7 @@ const MAX_IMAGES = 8;
 function revalidateShop() {
   revalidatePath("/online-orders/products");
   revalidatePath("/online-orders/designs");
-  revalidatePath("/shop");
+  revalidatePath("/"); // the catalogue is the homepage now
   revalidatePath("/shop/designs");
 }
 
