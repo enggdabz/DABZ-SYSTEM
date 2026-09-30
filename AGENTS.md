@@ -391,6 +391,24 @@ round trip is the one thing that must be tried against a real project.
   policy would have staff turning away a customer who paid what the owner
   actually wanted.
 
+## Project sale rules (built in Phase 15)
+
+- **A project's payment IS a sale.** `create_project` and
+  `record_project_balance` call `complete_sale`; nothing else writes project
+  money. There are still exactly three ways money reaches the ledger.
+- **The balance, "fully paid" and the production status are never stored.**
+  Balance = total minus live linked sales (`projectMoney()` in
+  `src/lib/projects.ts`); a voided sale puts it back. `19_projects_rls.test.sql`
+  fails if a balance/paid/stage column appears.
+- **No project table has a write policy.** Every write is a `SECURITY DEFINER`
+  function that checks the caller. Reading needs `add_sales`, because the
+  payments live in `sales`.
+- **The step lists live in two places** (`src/lib/projects.ts` and
+  `project_steps_for` in `0022`); `projects.test.ts` reads the migration and
+  fails if they disagree, and the same for the income categories per division.
+- **The calendar sits a project on its due date, unmoved.** Do not copy the
+  Apparel calendar's day-early / carry-forward rules here without being asked.
+
 ## Repair rules (built in Phase 7)
 
 - **There is no password field, anywhere.** Spec 9.3 says the shop does not

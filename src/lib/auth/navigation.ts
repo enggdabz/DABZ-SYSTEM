@@ -73,6 +73,13 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 
   /*
+    Projects taken at the Counter (Phase 15): a job with a due date and a
+    balance, in any of the three divisions. Same door as the Counter, because
+    that is where a project starts and where its balance is paid.
+  */
+  { href: "/projects", label: "Projects", permission: "add_sales", group: "Daily", phase: 15 },
+
+  /*
     The online shop's orders (Phase 14). They are Dabz Apparel's work too, so
     the permission is the same one that opens the job orders - a person
     trusted with those is the person who runs these.

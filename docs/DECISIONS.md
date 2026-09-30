@@ -1248,3 +1248,40 @@ to ask:
   instead" was advice that could not be followed. The button is not offered
   there at all. To give another kind the same treatment — Stop counting a
   bill, say — pass `alternative` where its `DeleteButton` is rendered.
+
+- **30 September 2026 — project sales (Phase 15): assumptions made.** You asked
+  me to go with my recommendations, so these were decided and are open to
+  change.
+  1. **A project's payment is a real sale.** `create_project` and
+     `record_project_balance` call `complete_sale`, so there are still exactly
+     three ways money reaches the ledger. The link is `project_payments`
+     (project ↔ sale); the amount is the sale's own total and is not copied.
+  2. **The balance is never stored.** Total minus live linked sales, so a
+     voided payment raises it again. There is a test that fails if a balance,
+     paid or stage column appears.
+  3. **Separate from job orders and tickets.** A counter project is the light
+     record made at the till; an apparel job order (roster, encoding) and a
+     repair ticket keep their own payment paths. The cost is that one apparel
+     job could be entered twice. To join them later, add a nullable
+     `apparel_order_id` / `repair_ticket_id` to `projects`.
+  4. **The calendar shows the due date itself.** The Apparel calendar's
+     day-early and carry-forward rules are not applied. To change it, adjust
+     `groupByDueDate` in `src/lib/projects.ts`.
+  5. **Apparel steps are the nine you listed** (no colour test / fabric
+     cutting; "tabas" instead), separate from Phase 12's ten benches, which
+     are untouched.
+  6. **A down payment must have a due date** (otherwise it could never reach
+     the calendar) and must be more than 0 and less than the total. A full
+     payment must equal the total; its due date is optional, and an undated one
+     is listed under the calendar rather than given a date.
+  7. **Permissions.** Reading and starting a project, taking its balance,
+     releasing and cancelling need `add_sales` (payments live in `sales`, so a
+     reader without it would see the whole price as owing). Ticking a step also
+     needs the division's permission - `apparel_job_orders`, `dabztech_tickets`,
+     or just `add_sales` for Printing. Owner and Admin pass all of them.
+  8. **A released project with a balance stays on the list**, as an apparel
+     order does; a fully paid released one drops off. Cancelling does not
+     refund: money taken stays in the books until the owner voids that sale.
+  9. **The down payment policy is only a warning**, using the existing
+     Settings percentage; with none set it says nothing.
+
