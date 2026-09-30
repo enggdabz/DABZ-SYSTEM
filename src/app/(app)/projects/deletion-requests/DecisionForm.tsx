@@ -16,9 +16,12 @@ import {
 export function DecisionForm({
   requestId,
   projectNumber,
+  refundLabel,
 }: {
   requestId: string;
   projectNumber: string;
+  /** What approving will also refund, or null when no refund was asked for. */
+  refundLabel: string | null;
 }) {
   const [state, act, pending] = useActionState<DeletionState, FormData>(
     decideDeletionAction,
@@ -40,7 +43,7 @@ export function DecisionForm({
           disabled={pending}
           aria-label={`Approve deleting project ${projectNumber}`}
         >
-          Approve and delete
+          {refundLabel ? `Approve, refund ${refundLabel} and delete` : "Approve and delete"}
         </Button>
         <Button
           type="submit"

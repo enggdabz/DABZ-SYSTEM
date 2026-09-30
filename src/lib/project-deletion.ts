@@ -79,13 +79,38 @@ export function validateNote(note: string): string | null {
     : null;
 }
 
+/**
+ * The refund choice, as the form sends it. Only asked when something is paid:
+ * a project with nothing paid has nothing to refund, so nothing to choose.
+ *
+ * There is deliberately NO default. A default of "refund" voids a customer's
+ * payment on a stray tap, and a default of "keep" leaves money in the books
+ * that the person believed they had handed back. Either way the person has to
+ * say which.
+ */
+export type RefundChoice = "refund" | "keep";
+
+export function parseRefundChoice(value: string): RefundChoice | null {
+  return value === "refund" || value === "keep" ? value : null;
+}
+
+/** The sentence when the choice is missing from a project that has money on it. */
+export const REFUND_CHOICE_REQUIRED =
+  "This project has a payment on it. Choose whether to refund it or keep the money.";
+
 /** The sentence a screen shows once the database has answered. */
 export function outcomeMessage(
   outcome: "deleted" | "requested",
   projectNumber: string,
+  options: { refundedLabel?: string | null; refundAskedLabel?: string | null } = {},
 ): string {
-  return outcome === "deleted"
-    ? `Project ${projectNumber} was deleted.`
+  if (outcome === "deleted") {
+    return options.refundedLabel
+      ? `Project ${projectNumber} was deleted and ${options.refundedLabel} was refunded.`
+      : `Project ${projectNumber} was deleted.`;
+  }
+  return options.refundAskedLabel
+    ? `Deletion of project ${projectNumber}, with a ${options.refundAskedLabel} refund, has been sent to the owner for approval.`
     : `Deletion of project ${projectNumber} has been sent to the owner for approval.`;
 }
 

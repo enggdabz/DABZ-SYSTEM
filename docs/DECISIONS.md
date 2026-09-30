@@ -1410,3 +1410,37 @@ to ask:
       Project tab then says the list could not be loaded.
   11. **The button is "Complete sale & print", stuck to the bottom of the
       screen at every width**, so it can be reached without scrolling.
+
+- **30 September 2026 — refund the down payment when a Counter project is
+  deleted: assumptions made.** You asked for a refund option when the project
+  has a down payment, and a plain delete when it has none. Migration
+  `0025_project_deletion_refund.sql`. Counter projects first, as you chose;
+  apparel projects are not touched.
+  1. **A refund is a void.** Every live payment on the project is voided with
+     `void_sale`: the sale stays, marked, its ledger entries are voided with it,
+     and it comes off the day's takings. No new kind of money row, so there are
+     still three ways money reaches the ledger. The audit log gets a `void` entry
+     naming the sales.
+  2. **It is a choice with no default**, asked only when something live is paid.
+     Refund voids the payment; Keep leaves it in Sales as `0023` did. Nothing
+     ticked means the form will not send, and the server refuses a missing
+     choice. A project with nothing paid just deletes. A refund of nothing is
+     refused by the database.
+  3. **It refunds everything paid so far, not only the down payment** - a
+     balance paid later is money the customer handed over too. The dialog shows
+     the total. To refund only the down payment, `refund_project_payments` is
+     where to filter on `project_payments.kind`.
+  4. **An admin's request carries the choice; the owner's approval carries it
+     out.** A request moves no money. The amount is worked out at approval, so a
+     balance paid while the request waited is refunded too, and a payment
+     handed back by hand in the meantime is not voided twice. Rejecting refunds
+     nothing.
+  5. **Sales still shows a refunded payment**, struck through as voided and
+     tagged "Project deleted".
+  6. **`refund_project_payments` cannot be called by anybody signed in.** It
+     voids sales and takes only a project id.
+  7. **Apparel projects still follow `0021`** (no delete once money is taken,
+     voided or not, because their payments cascade). Giving them the same refund
+     choice means giving them a soft delete first: the apparel list, calendar,
+     production report and online orders all read them.
+

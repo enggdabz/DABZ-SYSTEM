@@ -431,6 +431,11 @@ round trip is the one thing that must be tried against a real project.
   fails if a write policy appears.
 - **Every step is audited** with the words `request`, `approve`, `reject`,
   `cancel` (the log's `action` check was widened in `0023`).
+- **A refund is a VOID, never a new money row** (`0025`). `refund_project_payments`
+  calls `void_sale` on every live payment, in the same transaction as the
+  delete, and nobody signed in can call it. The choice is asked only when
+  something live is paid, has NO default, and an admin's request moves no
+  money - the owner's approval does, refunding what is live at that moment.
 
 ## Repair rules (built in Phase 7)
 

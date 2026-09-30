@@ -67,6 +67,8 @@ quiet "$HERE/../migrations/0023_project_deletion_requests.sql"
 # 0024 gives a project its details and marks a sale as a project payment - 19
 # tests it too.
 quiet "$HERE/../migrations/0024_project_details_and_sale_link.sql"
+# 0025 is the refund choice when a project is deleted - 21 tests it.
+quiet "$HERE/../migrations/0025_project_deletion_refund.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -91,3 +93,4 @@ run "$HERE/17_online_orders_rls.test.sql"
 run "$HERE/18_delete_project_rls.test.sql"
 run "$HERE/19_projects_rls.test.sql"
 run "$HERE/20_project_deletion_rls.test.sql"
+run "$HERE/21_project_deletion_refund.test.sql"
