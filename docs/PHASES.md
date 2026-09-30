@@ -2607,6 +2607,56 @@ than because deleting was impossible.
    sale for 1,500 is on today's Sales.
 5. Void that payment on Sales: the balance returns to 1,500 by itself.
 
+### Phase 15, second pass — the Project tab works like a sale (30 Sep 2026)
+
+**What you asked for.** Project should work like Regular sale but as a
+downpayment, with a printed receipt: pick a type and fill its details, take the
+payment on the same kind of form, print the receipt, find a project later and
+take a follow-up payment, and see every payment on the day it was paid.
+
+**Built**
+
+- **Type and details.** Tarpaulin, Apparel (kind of uniform, pieces, a size
+  breakdown that must add up), Printing (item, quantity, specs) and Repair
+  (device, brand/model, problem), plus a note. All in one config.
+- **The same payment section as Regular sale**: customer, total price, amount
+  paid now, way of paying, change - ending in *Complete sale & print*.
+- **One sale plus the project**, in one transaction. The sale is marked with its
+  project and as a `downpayment`, `full` or `balance` payment.
+- **The receipt** - the same page a regular sale prints - gains a project
+  header, the job as lines, Total price, Paid now, Paid so far and Balance, as at
+  that payment.
+- **Find project** at the top of the tab, by customer or number. The job shows
+  read-only; only the amount is asked. Fully paid is a balance of zero.
+- **Project page** shows the job and each payment with *Reprint receipt*.
+
+**Not changed**: Regular sale, `complete_sale`, End of day, the ledger's three
+routes. Decisions inside it are in `docs/DECISIONS.md`.
+
+**How it is verified**
+
+| What | How |
+|---|---|
+| Type config, parsing, size rule, receipt words and figures, search | `npm test` (`project-types`, `projects`, `project-find`, `actions`, `ProjectSaleForm`) |
+| The server refuses bad sizes, overpayment, forged division; one database call | `actions.test.ts` |
+| Regular sale untouched | `project-sale-scope.test.ts`, `PosScreen.test.tsx`, and the RLS suite |
+| Database: details rule, sale link, second payment, overpayment, backfill | `npm run test:rls` (`19_projects_rls.test.sql`) |
+| `0024` upgrades a database that already holds project sales | applied on top of one: old payments back-filled, a regular sale left unlinked, safe to run twice |
+| Layout at 390 / 768 / 1024 / 1440 | headless browser on the form with sample data: no sideways scroll, no tap target under 24px, the button reachable without scrolling. **The receipt and the real pages behind sign-in were not opened in a browser** - try them once against the real project. |
+
+**How to check it**
+
+1. `npm run db:push` to apply `0024`.
+2. Counter → Project → Apparel → Sublimation jersey, 15 pieces, sizes S 5, M 7,
+   L 3, a customer, total 9000, downpayment 3000, a due date → *Complete sale &
+   print* → *Print the receipt*. It should read PROJECT DOWNPAYMENT, the job
+   line, Total ₱9,000, Paid now ₱3,000, Balance ₱6,000.
+3. Change L to 2 and try again: it says 1 short and saves nothing.
+4. *Find project*, type the customer, pay 2000: the receipt shows Paid so far
+   ₱5,000, Balance ₱4,000. Try 5000: refused as more than the balance.
+5. Open the project: each payment has *Reprint receipt*, and the first one still
+   shows Balance ₱6,000.
+
 ---
 
 ## Phase 15b — Delete a project with the owner's approval ✅

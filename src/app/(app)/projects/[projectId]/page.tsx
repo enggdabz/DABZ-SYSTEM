@@ -15,6 +15,7 @@ import {
 } from "@/lib/project-deletion";
 import { formatPesos } from "@/lib/money";
 import { manilaToday } from "@/lib/period";
+import { PROJECT_TYPES, projectLines } from "@/lib/project-types";
 import {
   PROJECT_DIVISION_LABELS,
   PROJECT_PAYMENT_KIND_LABELS,
@@ -146,6 +147,26 @@ export default async function ProjectPage({
         <Card title="Details">
           <dl className="space-y-3 text-sm">
             <div>
+              <dt className="text-xs text-muted">
+                The job
+                {project.details
+                  ? ` (${PROJECT_TYPES[project.details.type].label})`
+                  : ""}
+              </dt>
+              <dd>
+                {project.details ? (
+                  <ul className="space-y-0.5">
+                    {projectLines(project.details).map((line, index) => (
+                      <li key={index}>{line}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  // Started before the job details existed.
+                  project.description
+                )}
+              </dd>
+            </div>
+            <div>
               <dt className="text-xs text-muted">Due / target release date</dt>
               <dd>
                 <DueNote project={project} today={today} />
@@ -186,6 +207,7 @@ export default async function ProjectPage({
               className="flex flex-wrap items-center justify-between gap-2 py-3 text-sm"
             >
               <span className={payment.voided ? "text-muted line-through" : ""}>
+                {payment.saleNumber} &middot;{" "}
                 {PROJECT_PAYMENT_KIND_LABELS[payment.kind]} &middot;{" "}
                 {formatManilaDate(`${payment.saleDate}T12:00:00+08:00`)}{" "}
                 &middot; {payment.method}
@@ -203,7 +225,7 @@ export default async function ProjectPage({
                   href={`/sales/${payment.saleId}/receipt`}
                   className={`text-xs underline underline-offset-2 ${TAP_AREA}`}
                 >
-                  Receipt {payment.saleNumber}
+                  Reprint receipt
                 </Link>
               </span>
             </li>
