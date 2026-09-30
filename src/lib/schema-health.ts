@@ -287,6 +287,24 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0020_phase14_online_orders",
     breaks: "linking a customer to their Messenger chat later on",
   },
+  /*
+    0024 adds a column to a table 0022 created and one to `sales`, and creates
+    no relation - so, again, nothing else could see it missing. The Counter's
+    Project tab writes both, and the Projects screen reads `details` on every
+    project, so a database without them fails on both.
+  */
+  {
+    name: "projects",
+    column: "details",
+    migration: "0024_project_details_and_sale_link",
+    breaks: "the job details on the Counter's Project tab and on a project's receipt, and the Projects screen",
+  },
+  {
+    name: "sales",
+    column: "project_id",
+    migration: "0024_project_details_and_sale_link",
+    breaks: "marking a sale as a project's payment, so a project sale cannot be taken",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */

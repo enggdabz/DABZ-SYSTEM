@@ -19,6 +19,13 @@ import { formatPesos, parsePesos } from "@/lib/money";
 import { civilDateToISO, manilaToday } from "@/lib/period";
 import { computeCashPayment } from "@/lib/pos";
 import {
+  PROJECT_TYPES,
+  isProjectTypeId,
+  parseProjectDetails,
+  projectCategory,
+  projectSummary,
+} from "@/lib/project-types";
+import {
   PROJECT_STEPS,
   belowDownPaymentPolicy,
   isProjectDivision,
@@ -33,6 +40,8 @@ const PAYMENT_METHODS = ["cash", "gcash", "maya", "bank"];
 export interface ProjectSaleState {
   error?: string;
   fieldErrors?: Partial<Record<NewProjectField, string>>;
+  /** Keyed by the job field's id (`sizes` for the size breakdown). */
+  detailErrors?: Record<string, string>;
   created?: {
     projectId: string;
     projectNumber: string;
@@ -78,7 +87,15 @@ export async function createProjectSaleAction(
   const user = await requirePermission("add_sales");
   const settings = await getSettings();
 
-  const division = String(formData.get("division") ?? "");
+  // The owner picks a TYPE; the division, the ledger category and the one-line
+  // description all follow from it, so none of them is taken from the browser.
+  const typeId = String(formData.get("projectType") ?? "");
+  const parsed = parseProjectDetails(typeId, (name) =>
+    String(formData.get(name) ?? ""),
+  );
+  const details = parsed.details;
+  const division = isProjectTypeId(typeId) ? PROJECT_TYPES[typeId].division : "";
+
   const total = pesosOrNull(formData.get("total"));
   const amount = pesosOrNull(formData.get("amount"));
   const moneyGiven = pesosOrNull(formData.get("moneyGiven"));
@@ -86,6 +103,7 @@ export async function createProjectSaleAction(
 
   if (Number.isNaN(total) || Number.isNaN(amount) || Number.isNaN(moneyGiven)) {
     return {
+      detailErrors: parsed.errors,
       fieldErrors: {
         ...(Number.isNaN(total)
           ? { total: "Enter the price like 2500 or 2500.00." }
@@ -106,19 +124,33 @@ export async function createProjectSaleAction(
   const input = {
     division,
     customerName: String(formData.get("customerName") ?? ""),
-    description: String(formData.get("description") ?? ""),
+    description: details ? projectSummary(details) : "",
     totalCentavos: total,
     kind: String(formData.get("kind") ?? ""),
     amountCentavos: amount,
     dueOn: String(formData.get("dueOn") ?? "").trim() || null,
-    incomeCategory: String(formData.get("incomeCategory") ?? ""),
+    incomeCategory: details ? (projectCategory(details) ?? "") : "",
     paymentMethod,
     moneyGivenCentavos: moneyGiven,
   };
 
   const fieldErrors = validateNewProject(input);
-  if (Object.keys(fieldErrors).length > 0 || !isProjectDivision(division)) {
-    return { fieldErrors };
+  if (!details) {
+    // The job's own errors say what is wrong; these two only restate them.
+    delete fieldErrors.division;
+    delete fieldErrors.description;
+    delete fieldErrors.incomeCategory;
+  }
+  if (details && fieldErrors.incomeCategory) {
+    return { error: "That kind of job cannot be filed. Choose it again." };
+  }
+  if (
+    Object.keys(fieldErrors).length > 0 ||
+    Object.keys(parsed.errors).length > 0 ||
+    !details ||
+    !isProjectDivision(division)
+  ) {
+    return { fieldErrors, detailErrors: parsed.errors };
   }
 
   // Both are set: validateNewProject refuses the states where either is not.
@@ -150,6 +182,7 @@ export async function createProjectSaleAction(
         : String(formData.get("referenceNumber") ?? "").trim() || null,
     p_money_given_centavos: paymentMethod === "cash" ? moneyGiven : null,
     p_change_centavos: changeCentavos,
+    p_details: details,
   });
 
   if (error) {
@@ -206,6 +239,7 @@ export interface BalanceState {
   error?: string;
   fieldErrors?: { amount?: string; moneyGiven?: string };
   paid?: {
+    projectNumber: string;
     saleId: string;
     saleNumber: string;
     changeCentavos: number;
@@ -308,6 +342,7 @@ export async function recordProjectBalanceAction(
 
   return {
     paid: {
+      projectNumber: project.number,
       saleId: result.sale_id,
       saleNumber: result.sale_number,
       changeCentavos: changeCentavos ?? 0,

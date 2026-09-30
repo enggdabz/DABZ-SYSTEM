@@ -88,7 +88,8 @@ begin
   select * into r from public.create_project(
     date '2026-09-30', 'printshoppe', null, 'Tita Baby', 'Messenger: Tita Baby',
     'Tarpaulin 4x6 for the fiesta', 200000, date '2026-10-05', 'tarpaulin',
-    'down', 50000, 'cash', null, 100000, 50000);
+    'down', 50000, 'cash', null, 100000, 50000,
+      '{"type":"tarpaulin","values":{"widthFeet":4,"heightFeet":6,"quantity":1}}'::jsonb);
 
   if r.project_number <> 'J-260930-001' then
     raise exception 'FAIL: unexpected project number %', r.project_number;
@@ -145,7 +146,8 @@ begin
   -- A helper would hide the differences, so each case is spelled out.
   begin
     perform public.create_project(date '2026-09-30', 'apparel', null, 'X', null, 'Jerseys',
-      100000, null, 'jackets', 'down', 30000, 'cash', null, 30000, 0);
+      100000, null, 'jackets', 'down', 30000, 'cash', null, 30000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
     raise exception 'FAIL: a down payment with no due date was accepted';
   exception when raise_exception then
     if sqlerrm like 'FAIL%' then raise; end if;
@@ -154,7 +156,8 @@ begin
 
   begin
     perform public.create_project(date '2026-09-30', 'apparel', null, 'X', null, 'Jerseys',
-      100000, date '2026-10-10', 'jackets', 'full', 30000, 'cash', null, 30000, 0);
+      100000, date '2026-10-10', 'jackets', 'full', 30000, 'cash', null, 30000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
     raise exception 'FAIL: a part payment was accepted as full';
   exception when raise_exception then
     if sqlerrm like 'FAIL%' then raise; end if;
@@ -163,7 +166,8 @@ begin
 
   begin
     perform public.create_project(date '2026-09-30', 'apparel', null, 'X', null, 'Jerseys',
-      100000, date '2026-10-10', 'jackets', 'down', 100000, 'cash', null, 100000, 0);
+      100000, date '2026-10-10', 'jackets', 'down', 100000, 'cash', null, 100000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
     raise exception 'FAIL: the whole price was accepted as a down payment';
   exception when raise_exception then
     if sqlerrm like 'FAIL%' then raise; end if;
@@ -172,7 +176,8 @@ begin
 
   begin
     perform public.create_project(date '2026-09-30', 'apparel', null, 'X', null, 'Jerseys',
-      100000, date '2026-10-10', 'jackets', 'down', 0, 'cash', null, 0, 0);
+      100000, date '2026-10-10', 'jackets', 'down', 0, 'cash', null, 0, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
     raise exception 'FAIL: a project with nothing paid was accepted';
   exception when raise_exception then
     if sqlerrm like 'FAIL%' then raise; end if;
@@ -181,7 +186,8 @@ begin
 
   begin
     perform public.create_project(date '2026-09-30', 'dabztech', null, 'X', null, 'Laptop',
-      100000, date '2026-10-10', 'tarpaulin', 'down', 30000, 'cash', null, 30000, 0);
+      100000, date '2026-10-10', 'tarpaulin', 'down', 30000, 'cash', null, 30000, 0,
+      '{"type":"repair","values":{"deviceType":"laptop","brandModel":"Lenovo","problem":"No power"}}'::jsonb);
     raise exception 'FAIL: a repair was filed under a printing category';
   exception when check_violation then
     raise notice 'PASS: the category has to fit the division';
@@ -189,7 +195,8 @@ begin
 
   begin
     perform public.create_project(date '2026-09-30', 'apparel', null, '  ', null, 'Jerseys',
-      100000, date '2026-10-10', 'jackets', 'down', 30000, 'cash', null, 30000, 0);
+      100000, date '2026-10-10', 'jackets', 'down', 30000, 'cash', null, 30000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
     raise exception 'FAIL: a project with no customer was accepted';
   exception when raise_exception then
     if sqlerrm like 'FAIL%' then raise; end if;
@@ -334,7 +341,8 @@ begin
 
   begin
     perform public.create_project(date '2026-09-30', 'apparel', null, 'X', null, 'Jerseys',
-      100000, date '2026-10-10', 'jackets', 'down', 30000, 'cash', null, 30000, 0);
+      100000, date '2026-10-10', 'jackets', 'down', 30000, 'cash', null, 30000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
     raise exception 'FAIL: somebody without add_sales started a project';
   exception when insufficient_privilege then
     raise notice 'PASS: without add_sales, no project can be started';
@@ -354,10 +362,12 @@ begin
 
   select project_id into v_apparel from public.create_project(
     date '2026-09-30', 'apparel', null, 'Team Falcons', null, '15 jerseys',
-    900000, date '2026-10-12', 'sublimation_jerseys', 'down', 300000, 'cash', null, 300000, 0);
+    900000, date '2026-10-12', 'sublimation_jerseys', 'down', 300000, 'cash', null, 300000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
   select project_id into v_print from public.create_project(
     date '2026-09-30', 'printshoppe', null, 'Mug Lady', null, '20 mugs',
-    100000, null, 'mugs_souvenirs', 'full', 100000, 'cash', null, 100000, 0);
+    100000, null, 'mugs_souvenirs', 'full', 100000, 'cash', null, 100000, 0,
+      '{"type":"printing","values":{"item":"mugs_souvenirs","quantity":20,"specs":"Full colour"}}'::jsonb);
 
   -- Juan has the counter but not the apparel permission.
   begin
@@ -447,13 +457,200 @@ declare
 begin
   select project_id into v_id from public.create_project(
     date '2026-09-30', 'apparel', null, 'Team Eagles', null, '10 shirts',
-    500000, date '2026-10-15', 'shirts', 'down', 100000, 'cash', null, 100000, 0);
+    500000, date '2026-10-15', 'shirts', 'down', 100000, 'cash', null, 100000, 0,
+      '{"type":"apparel","values":{"uniformKind":"jacket","pieces":10},"sizes":{"M":10}}'::jsonb);
   perform public.mark_project_step(v_id, 'design');
   perform public.mark_project_step(v_id, 'pattern');
   if (select count(*) from public.project_steps where project_id = v_id) <> 2 then
     raise exception 'FAIL: the steps did not land';
   end if;
   raise notice 'PASS: with the apparel permission, apparel steps are ticked in order';
+end;
+$$;
+
+-- ---- The job's details, and the link from a sale to its project --------
+-- (0024: the Counter's Project tab asks what the job IS, and a project
+-- payment is marked as one on the sale itself.)
+set test.user_id = '33333333-3333-3333-3333-333333333333';
+do $$
+declare
+  r record;
+  n_before int;
+  n_sales_before int;
+  v_details jsonb := '{"type":"apparel","values":{"uniformKind":"sublimation_jersey","pieces":15},"sizes":{"S":5,"M":7,"L":3}}';
+begin
+  raise notice '--- phase 15: job details ---';
+
+  -- The size breakdown has to add up to the pieces, checked by the database
+  -- as well as the app.
+  if public.project_details_problem(v_details, 'apparel', 'sublimation_jerseys') is not null then
+    raise exception 'FAIL: a breakdown that adds up was refused';
+  end if;
+  raise notice 'PASS: sizes that add up to the pieces are accepted';
+
+  if public.project_details_problem(
+       '{"type":"apparel","values":{"pieces":15},"sizes":{"S":5,"M":7}}',
+       'apparel', 'sublimation_jerseys') is null then
+    raise exception 'FAIL: 12 sizes for 15 pieces was accepted';
+  end if;
+  if public.project_details_problem(
+       '{"type":"apparel","values":{"pieces":15},"sizes":{"S":9,"M":7}}',
+       'apparel', 'sublimation_jerseys') is null then
+    raise exception 'FAIL: 16 sizes for 15 pieces was accepted';
+  end if;
+  if public.project_details_problem(
+       '{"type":"apparel","values":{"pieces":15}}',
+       'apparel', 'sublimation_jerseys') is null then
+    raise exception 'FAIL: apparel with no size breakdown was accepted';
+  end if;
+  if public.project_details_problem(
+       '{"type":"apparel","values":{"pieces":2},"sizes":{"S":-1,"M":3}}',
+       'apparel', 'sublimation_jerseys') is null then
+    raise exception 'FAIL: a negative size cancelled out a real one';
+  end if;
+  if public.project_details_problem(
+       '{"type":"apparel","values":{"pieces":2},"sizes":{"S":"two"}}',
+       'apparel', 'sublimation_jerseys') is null then
+    raise exception 'FAIL: a size that is not a number was accepted';
+  end if;
+  raise notice 'PASS: too few, too many, missing, negative and non-numeric sizes are all refused';
+
+  -- The type decides the division.
+  if public.project_details_problem(v_details, 'printshoppe', 'stickers') is null then
+    raise exception 'FAIL: apparel details were accepted on a printing project';
+  end if;
+  if public.project_details_problem(
+       '{"type":"tarpaulin","values":{"widthFeet":3,"heightFeet":5,"quantity":1}}',
+       'printshoppe', 'stickers') is null then
+    raise exception 'FAIL: a tarpaulin was filed as stickers';
+  end if;
+  if public.project_details_problem('{"type":"repair","values":{}}', 'printshoppe', 'stickers') is null then
+    raise exception 'FAIL: a repair was accepted on a printing project';
+  end if;
+  if public.project_details_problem(null, 'apparel', 'jackets') is null
+     or public.project_details_problem('{"type":"ufo"}', 'apparel', 'jackets') is null then
+    raise exception 'FAIL: missing or unknown details were accepted';
+  end if;
+  raise notice 'PASS: the type has to fit the division, and unknown details are refused';
+
+  -- Through create_project: refused, and nothing is left behind.
+  select count(*) into n_before from public.projects;
+  select count(*) into n_sales_before from public.sales;
+  begin
+    perform public.create_project(date '2026-09-30', 'apparel', null, 'Coach Ben', null,
+      '15 jerseys', 900000, date '2026-10-20', 'sublimation_jerseys', 'down', 300000,
+      'cash', null, 300000, 0,
+      '{"type":"apparel","values":{"uniformKind":"sublimation_jersey","pieces":15},"sizes":{"S":5,"M":7,"L":2}}');
+    raise exception 'FAIL: a project whose sizes do not add up was created';
+  exception when raise_exception then
+    if sqlerrm like 'FAIL%' then raise; end if;
+    if sqlerrm not like 'The sizes add up to 14, but 15 pieces were ordered.' then
+      raise exception 'FAIL: unexpected refusal: %', sqlerrm;
+    end if;
+  end;
+  if (select count(*) from public.projects) <> n_before then
+    raise exception 'FAIL: the refused project left a row behind';
+  end if;
+  if (select count(*) from public.sales) <> n_sales_before then
+    raise exception 'FAIL: the refused project left a sale behind';
+  end if;
+  raise notice 'PASS: a project whose sizes do not add up is refused, with nothing left behind';
+
+  begin
+    perform public.create_project(date '2026-09-30', 'apparel', null, 'Coach Ben', null,
+      '15 jerseys', 900000, date '2026-10-20', 'sublimation_jerseys', 'down', 300000,
+      'cash', null, 300000, 0, null);
+    raise exception 'FAIL: a project with no details was created';
+  exception when raise_exception then
+    if sqlerrm like 'FAIL%' then raise; end if;
+  end;
+  raise notice 'PASS: a project cannot be created without its details';
+
+  -- The happy path: stored as given, sale marked as a down payment.
+  select * into r from public.create_project(date '2026-09-30', 'apparel', null, 'Coach Ben', null,
+    'Sublimation jersey, 15 pcs, S:5 M:7 L:3', 900000, date '2026-10-20',
+    'sublimation_jerseys', 'down', 300000, 'cash', null, 300000, 0, v_details);
+
+  if (select details from public.projects where id = r.project_id) is distinct from v_details then
+    raise exception 'FAIL: the details were not stored as sent';
+  end if;
+  raise notice 'PASS: the job details are stored with the project';
+
+  if (select project_id from public.sales where id = r.sale_id) is distinct from r.project_id
+     or (select payment_kind from public.sales where id = r.sale_id) <> 'downpayment' then
+    raise exception 'FAIL: the sale is not marked as the down payment';
+  end if;
+  raise notice 'PASS: the sale is marked with its project and as a downpayment';
+
+  -- A second payment: its own sale, marked as a balance, and the balance moves.
+  perform public.record_project_balance(r.project_id, date '2026-10-01', 200000, 'gcash', 'GC9', null, null);
+  if public.project_paid_centavos(r.project_id) <> 500000 then
+    raise exception 'FAIL: paid is not 5,000.00 after a second payment';
+  end if;
+  if (select array_agg(s.payment_kind order by s.created_at, s.sale_number)
+        from public.sales s where s.project_id = r.project_id)
+     is distinct from array['downpayment', 'balance'] then
+    raise exception 'FAIL: the payments are not marked downpayment then balance';
+  end if;
+  raise notice 'PASS: a second payment is its own sale, marked as a balance';
+
+  begin
+    perform public.record_project_balance(r.project_id, date '2026-10-01', 400001, 'cash', null, 500000, 0);
+    raise exception 'FAIL: an overpayment was accepted';
+  exception when raise_exception then
+    if sqlerrm like 'FAIL%' then raise; end if;
+  end;
+  raise notice 'PASS: an overpayment is refused';
+end;
+$$;
+
+-- A regular sale carries no link, and the link agrees with project_payments.
+do $$
+declare
+  v_sale uuid;
+begin
+  raise notice '--- phase 15: the sale link ---';
+
+  select sale_id into v_sale from public.complete_sale(
+    date '2026-10-02', null, 2500, 0, 'none', null, 2500, 'cash', null, 2500, 0,
+    jsonb_build_array(jsonb_build_object('name', 'Photocopy', 'division', 'printshoppe',
+      'quantity', 1, 'unit_price_centavos', 2500, 'line_total_centavos', 2500,
+      'income_category', 'photocopy')),
+    jsonb_build_array(jsonb_build_object('division', 'printshoppe', 'category', 'photocopy',
+      'amount_centavos', 2500)));
+
+  if (select project_id from public.sales where id = v_sale) is not null
+     or (select payment_kind from public.sales where id = v_sale) is not null then
+    raise exception 'FAIL: a regular sale was marked as a project payment';
+  end if;
+  raise notice 'PASS: a regular sale carries no project link';
+
+  -- The two records of one fact must never disagree.
+  if exists (
+    select 1
+    from public.project_payments pp
+    join public.sales s on s.id = pp.sale_id
+    where s.project_id is distinct from pp.project_id
+       or s.payment_kind is distinct from case pp.kind when 'down' then 'downpayment' else pp.kind end
+  ) then
+    raise exception 'FAIL: a sale''s project link disagrees with project_payments';
+  end if;
+  if exists (
+    select 1 from public.sales s
+    where s.project_id is not null
+      and not exists (select 1 from public.project_payments pp where pp.sale_id = s.id)
+  ) then
+    raise exception 'FAIL: a sale claims a project that has no payment row for it';
+  end if;
+  raise notice 'PASS: sales.project_id and project_payments agree, in both directions';
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'sales_project_link_pairs' and conrelid = 'public.sales'::regclass
+  ) then
+    raise exception 'FAIL: a sale can be half linked to a project';
+  end if;
+  raise notice 'PASS: a sale is linked to a project fully or not at all';
 end;
 $$;
 

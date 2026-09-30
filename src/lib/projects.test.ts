@@ -19,6 +19,8 @@ import {
   isWorkFinished,
   productionLabel,
   projectMoney,
+  projectReceiptFigures,
+  projectReceiptTitle,
   undatedProjects,
   validateNewProject,
   type NewProjectInput,
@@ -36,6 +38,7 @@ function payment(
     saleId: `sale-${Math.random()}`,
     saleNumber: "S-1",
     saleDate: "2026-09-30",
+    occurredAt: "2026-09-30T02:00:00Z",
     kind: "down",
     amountCentavos,
     method: "cash",
@@ -52,6 +55,7 @@ function project(over: Partial<Project> = {}): Project {
     customerName: "Team Falcons",
     contact: null,
     description: "15 jerseys",
+    details: null,
     totalCentavos: 900000,
     dueOn: "2026-10-12",
     incomeCategory: "sublimation_jerseys",
@@ -532,5 +536,96 @@ describe("the down payment policy", () => {
     expect(belowDownPaymentPolicy({ ...base, amountCentavos: 70000 })).toBe(
       false,
     );
+  });
+});
+
+describe("the figures on a project receipt", () => {
+  // Three payments on one 9,000.00 job, oldest first.
+  const down = payment(300000, {
+    saleId: "s1",
+    saleNumber: "S-260930-001",
+    occurredAt: "2026-09-30T02:00:00Z",
+    kind: "down",
+  });
+  const second = payment(200000, {
+    saleId: "s2",
+    saleNumber: "S-261005-002",
+    occurredAt: "2026-10-05T03:00:00Z",
+    kind: "balance",
+  });
+  const third = payment(400000, {
+    saleId: "s3",
+    saleNumber: "S-261010-001",
+    occurredAt: "2026-10-10T04:00:00Z",
+    kind: "balance",
+  });
+  const job = project({ payments: [third, down, second] });
+
+  it("gives the first receipt its own payment, the total and what was left", () => {
+    expect(projectReceiptFigures(job, "s1")).toEqual({
+      totalCentavos: 900000,
+      paidNowCentavos: 300000,
+      paidSoFarCentavos: 300000,
+      balanceCentavos: 600000,
+      kind: "down",
+    });
+  });
+
+  it("gives a follow-up the running total, whatever order the payments were read in", () => {
+    const figures = projectReceiptFigures(job, "s2");
+    expect(figures?.paidNowCentavos).toBe(200000);
+    expect(figures?.paidSoFarCentavos).toBe(500000);
+    expect(figures?.balanceCentavos).toBe(400000);
+  });
+
+  it("reaches a zero balance on the payment that clears it", () => {
+    const figures = projectReceiptFigures(job, "s3");
+    expect(figures?.paidSoFarCentavos).toBe(900000);
+    expect(figures?.balanceCentavos).toBe(0);
+  });
+
+  it("does not let a later payment change an earlier receipt on a reprint", () => {
+    // Reprinting the first receipt after the job is fully paid.
+    expect(projectReceiptFigures(job, "s1")?.balanceCentavos).toBe(600000);
+  });
+
+  it("leaves a payment that was handed back out of the later receipts, but not its own", () => {
+    const voidedSecond = { ...second, voided: true };
+    const withVoid = project({ payments: [down, voidedSecond, third] });
+
+    // The third receipt no longer counts the 2,000.00 that went back.
+    expect(projectReceiptFigures(withVoid, "s3")?.paidSoFarCentavos).toBe(
+      700000,
+    );
+    // The voided payment's own receipt still says what it said.
+    expect(projectReceiptFigures(withVoid, "s2")?.paidSoFarCentavos).toBe(
+      500000,
+    );
+  });
+
+  it("breaks a tie on the same instant by sale number", () => {
+    const a = payment(100000, {
+      saleId: "a",
+      saleNumber: "S-261001-001",
+      occurredAt: "2026-10-01T01:00:00Z",
+    });
+    const b = payment(100000, {
+      saleId: "b",
+      saleNumber: "S-261001-002",
+      occurredAt: "2026-10-01T01:00:00Z",
+    });
+    const both = project({ payments: [b, a] });
+    expect(projectReceiptFigures(both, "a")?.paidSoFarCentavos).toBe(100000);
+    expect(projectReceiptFigures(both, "b")?.paidSoFarCentavos).toBe(200000);
+  });
+
+  it("is null for a sale that is not one of the project's payments", () => {
+    expect(projectReceiptFigures(job, "someone-elses-sale")).toBeNull();
+  });
+
+  it("titles a down payment as one, and every other payment as a payment", () => {
+    expect(projectReceiptTitle("down")).toBe("PROJECT DOWNPAYMENT");
+    expect(projectReceiptTitle("balance")).toBe("PROJECT PAYMENT");
+    expect(projectReceiptTitle("full")).toBe("PROJECT PAYMENT");
   });
 });
