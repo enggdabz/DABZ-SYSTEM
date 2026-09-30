@@ -13,8 +13,11 @@ import "server-only";
  */
 import { cache } from "react";
 
+import { throwIfBehind } from "@/lib/database-behind";
 import type { DeletionRequestStatus } from "@/lib/project-deletion";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const MIGRATION = "0023_project_deletion_requests";
 
 const REQUEST_COLUMNS =
   "id, project_id, requested_by, reason, status, reviewed_by, review_note, created_at, reviewed_at";
@@ -140,6 +143,8 @@ export const getDeletionRequests = cache(
         .order("reviewed_at", { ascending: false })
         .limit(20),
     ]);
+    throwIfBehind(pendingRead.error, MIGRATION);
+    throwIfBehind(recentRead.error, MIGRATION);
     if (pendingRead.error)
       throw new Error(`Could not read the requests: ${pendingRead.error.message}`);
     if (recentRead.error)
@@ -163,6 +168,7 @@ export async function getPendingRequestForProject(
     .eq("project_id", projectId)
     .eq("status", "pending")
     .maybeSingle();
+  throwIfBehind(error, MIGRATION);
   if (error) throw new Error(`Could not read the request: ${error.message}`);
   if (!data) return null;
   return (await label([data as RequestRow]))[0] ?? null;
@@ -178,6 +184,7 @@ export async function getDeletionRequest(
     .select(REQUEST_COLUMNS)
     .eq("id", requestId)
     .maybeSingle();
+  throwIfBehind(error, MIGRATION);
   if (error) throw new Error(`Could not read the request: ${error.message}`);
   if (!data) return null;
   return (await label([data as RequestRow]))[0] ?? null;
@@ -194,6 +201,7 @@ export const getPendingDeletionProjectIds = cache(async (): Promise<Set<string>>
     .from("project_deletion_requests")
     .select("project_id")
     .eq("status", "pending");
+  throwIfBehind(error, MIGRATION);
   if (error) throw new Error(`Could not read the requests: ${error.message}`);
   return new Set(
     ((data ?? []) as { project_id: string }[]).map((row) => row.project_id),

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { DatabaseBehind } from "@/components/DatabaseBehind";
 import { Card, TAP_AREA, Tag } from "@/components/ui";
 import { requireOwner } from "@/lib/auth/dal";
 import {
@@ -8,6 +9,7 @@ import {
   type DeletionRequest,
 } from "@/lib/data/project-deletions";
 import { formatManilaDateTime } from "@/lib/datetime";
+import { isDatabaseBehind } from "@/lib/database-behind";
 import { DELETION_STATUS_LABELS } from "@/lib/project-deletion";
 
 import { DecisionForm } from "./DecisionForm";
@@ -25,7 +27,25 @@ export default async function DeletionRequestsPage() {
   await connection();
   await requireOwner();
 
-  const { pending, recent } = await getDeletionRequests();
+  // The owner is the only person here, so the System check link is theirs.
+  let requests: Awaited<ReturnType<typeof getDeletionRequests>>;
+  try {
+    requests = await getDeletionRequests();
+  } catch (error) {
+    // Deployed before `npm run db:push`: say so, instead of a blank error page.
+    if (isDatabaseBehind(error)) {
+      return (
+        <div className="space-y-6">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Deletion requests
+          </h1>
+          <DatabaseBehind migration={error.migration} canOpenSystemCheck />
+        </div>
+      );
+    }
+    throw error;
+  }
+  const { pending, recent } = requests;
 
   return (
     <div className="space-y-8">
