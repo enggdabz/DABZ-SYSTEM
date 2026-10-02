@@ -1680,3 +1680,14 @@ to ask:
      every month. Each part payment writes its own ledger entry and, for a
      loan installment, pays the loan down by exactly that part. **Undo** takes
      back the latest payment of that month, one at a time.
+- **A profit graph on Reports** (your request, 2 October 2026), under the
+  Money card. What I decided:
+  1. **It follows the period chosen at the top** of Reports: a point per day
+     for This week, This month and Last month, and a point per month for This
+     year (anything longer than two months - `RANGE_DAILY_LIMIT` in
+     `src/lib/sales-trend.ts`). Today is a single point, so the card says to
+     choose a longer period instead of drawing a dot.
+  2. **Profit is income less shop expenses**, the same figure as the Money
+     card above it, and the same line as the Overview's profit graph. It reads
+     the ledger page by page on its own, so a busy year is never cut short.
+  3. It is on the screen only, not on the printed report or the spreadsheet.

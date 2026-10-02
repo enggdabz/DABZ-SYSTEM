@@ -65,7 +65,7 @@ import {
   type TrendChartId,
   type TrendView,
 } from "@/lib/sales-trend";
-import { TrendChart } from "./TrendChart";
+import { TrendChart } from "@/components/TrendChart";
 
 export const metadata = { title: "Overview · Dabz System" };
 

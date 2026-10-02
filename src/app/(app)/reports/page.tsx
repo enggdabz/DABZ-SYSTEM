@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
+import { TrendChart } from "@/components/TrendChart";
 import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
@@ -8,6 +9,7 @@ import {
   getReportWithComparison,
   getStanding,
 } from "@/lib/data/reports";
+import { getRangeMoneyTrend, type MoneyTrend } from "@/lib/data/sales-trend";
 import { MONEY_SOURCES, MONEY_SOURCE_LABELS, type MoneySource } from "@/lib/ledger";
 import { formatPesos } from "@/lib/money";
 import { civilDateToISO, formatCivilDate, manilaToday, parseISODate } from "@/lib/period";
@@ -78,6 +80,62 @@ function Line({
   );
 }
 
+/**
+ * Profit across the chosen period, a point per day - or per month once the
+ * period is longer than two months, which today means only This year.
+ *
+ * The same numbers as the Money card above, laid out over time: income less
+ * shop expenses, with borrowed money, owner capital and owner withdrawals left
+ * out. It reads the ledger itself, page by page, rather than taking the
+ * report's entries, so a long period is never cut short at one request's
+ * row limit.
+ */
+function ProfitOverTime({
+  trend,
+  rangeLabel,
+}: {
+  trend: MoneyTrend;
+  rangeLabel: string;
+}) {
+  return (
+    <Card
+      title="Profit over time"
+      description="Income less shop expenses for each part of the period. Below the zero line, more went out than came in."
+    >
+      {trend.failed ? (
+        <Notice tone="attention" title="This graph could not be read">
+          <p>
+            The ledger did not answer, so there is nothing to draw. The figures
+            above are unaffected - try opening the page again.
+          </p>
+        </Notice>
+      ) : trend.profit.length < 2 ? (
+        <Notice tone="info" title="One day is a single point, not a line">
+          <p>Choose This week or longer to see how profit moved.</p>
+        </Notice>
+      ) : (
+        <>
+          {trend.truncated ? (
+            <div className="mb-4">
+              <Notice tone="attention" title="The earliest points on this graph are wrong">
+                <p>
+                  There were too many entries to read at once, so the oldest
+                  ones were left out of the graph.
+                </p>
+              </Notice>
+            </div>
+          ) : null}
+          <TrendChart
+            title="Profit"
+            rangeWords={rangeLabel}
+            series={[{ label: "Profit", color: "var(--ink)", points: trend.profit }]}
+          />
+        </>
+      )}
+    </Card>
+  );
+}
+
 export default async function ReportsPage({
   searchParams,
 }: {
@@ -96,16 +154,14 @@ export default async function ReportsPage({
     ? (period as RangePreset)
     : "this_month";
 
-  const range: ReportRange = rangeForPreset(
-    preset,
-    civilDateToISO(manilaToday()),
-    settings.weekStartsOn,
-  );
+  const todayISO = civilDateToISO(manilaToday());
+  const range: ReportRange = rangeForPreset(preset, todayISO, settings.weekStartsOn);
 
-  const [{ current, previous }, standing, collections] = await Promise.all([
+  const [{ current, previous }, standing, collections, trend] = await Promise.all([
     getReportWithComparison(range),
     getStanding(),
     getCollectionsReport(range),
+    getRangeMoneyTrend(range.fromISO, range.toISO, todayISO),
   ]);
 
   const nothingYet = current.entryCount === 0;
@@ -213,6 +269,11 @@ export default async function ReportsPage({
           </div>
         ) : null}
       </Card>
+
+      {/* ---- Profit over the period --------------------------------------- */}
+      {nothingYet ? null : (
+        <ProfitOverTime trend={trend} rangeLabel={range.label.toLowerCase()} />
+      )}
 
       {/* ---- Divisions ---------------------------------------------------- */}
       {current.byDivision.length > 0 ? (
