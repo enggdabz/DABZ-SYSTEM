@@ -25,6 +25,7 @@ export function MarkPaidForm({
   billId: string;
   billName: string;
   period: string;
+  /** What is still owed for the month - the bill less any part payments. */
   amountCentavos: number;
 }) {
   const [state, submit, pending] = useActionState<BillActionState, FormData>(
@@ -34,6 +35,7 @@ export function MarkPaidForm({
   // Most bills are paid for exactly their usual amount, so the form starts
   // filled in and only needs changing when the amount differs.
   const { open, answer, openPanel, closePanel } = useFormPanel(state);
+  const [kind, setKind] = useState<"full" | "part">("full");
 
   if (!open) {
     return (
@@ -52,6 +54,23 @@ export function MarkPaidForm({
       <input type="hidden" name="period" value={period} />
 
       <div className="grid gap-3 sm:grid-cols-2">
+        <Field
+          label="Paying"
+          hint={
+            kind === "part"
+              ? "The bill stays open and shows only what is left."
+              : "This settles the bill for the month."
+          }
+        >
+          <Select
+            name="kind"
+            value={kind}
+            onChange={(event) => setKind(event.target.value as "full" | "part")}
+          >
+            <option value="full">In full</option>
+            <option value="part">Part payment only</option>
+          </Select>
+        </Field>
         <Field label="Amount paid" error={answer.fieldErrors?.amount}>
           <Input
             name="amount"
@@ -75,7 +94,11 @@ export function MarkPaidForm({
 
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
-          {pending ? "Saving…" : `Confirm ${billName} paid`}
+          {pending
+            ? "Saving…"
+            : kind === "part"
+              ? `Record part payment`
+              : `Confirm ${billName} paid`}
         </Button>
         <Button type="button" variant="quiet" onClick={closePanel}>
           Cancel
@@ -88,9 +111,11 @@ export function MarkPaidForm({
 export function UndoPaymentForm({
   billId,
   period,
+  label = "Undo",
 }: {
   billId: string;
   period: string;
+  label?: string;
 }) {
   const [state, submit, pending] = useActionState<BillActionState, FormData>(
     undoBillPaymentAction,
@@ -103,7 +128,7 @@ export function UndoPaymentForm({
         <input type="hidden" name="billId" value={billId} />
         <input type="hidden" name="period" value={period} />
         <Button type="submit" variant="quiet" disabled={pending}>
-          {pending ? "Undoing…" : "Undo"}
+          {pending ? "Undoing…" : label}
         </Button>
       </form>
       {state.error ? <Notice tone="attention" title={state.error} /> : null}
@@ -152,6 +177,7 @@ export function DueDayForm({
 export function BillEditForm({
   bill,
   loans,
+  defaultMonthKey,
 }: {
   bill?: {
     id: string;
@@ -160,9 +186,14 @@ export function BillEditForm({
     dueDay: number | null;
     type: "operating" | "loan_installment";
     loanId: string | null;
+    frequency: "monthly" | "one_time";
+    /** "2026-10", or null for a bill written before 0029. */
+    startsMonthKey: string | null;
   };
   /** The loans this bill could be paying down. Active ones only. */
   loans: { id: string; lender: string }[];
+  /** "2026-10" - where a new bill's month box starts. */
+  defaultMonthKey: string;
 }) {
   const [state, submit, pending] = useActionState<BillActionState, FormData>(
     saveBillAction,
@@ -180,6 +211,12 @@ export function BillEditForm({
     bill?.type ?? "operating",
   );
 
+  // The month box means a different thing for each, so its label follows.
+  const [frequency, setFrequency] = useState<"monthly" | "one_time">(
+    bill?.frequency ?? "monthly",
+  );
+  const oneTime = frequency === "one_time";
+
   return (
     <form action={submit} className="space-y-5">
       {bill ? <input type="hidden" name="billId" value={bill.id} /> : null}
@@ -189,7 +226,41 @@ export function BillEditForm({
           <Input name="name" defaultValue={bill?.name ?? ""} required placeholder="e.g. Internet" />
         </Field>
 
-        <Field label="Amount a month" error={errors.amount}>
+        <Field
+          label="Monthly or one time?"
+          hint={
+            oneTime
+              ? "Owed once, in the month below. It will not come back next month."
+              : "Comes back every month from the month below."
+          }
+          error={errors.frequency}
+        >
+          <Select
+            name="frequency"
+            value={frequency}
+            onChange={(event) =>
+              setFrequency(event.target.value as "monthly" | "one_time")
+            }
+          >
+            <option value="monthly">Monthly bill</option>
+            <option value="one_time">One-time bill</option>
+          </Select>
+        </Field>
+
+        <Field
+          label={oneTime ? "Month it is for" : "First month it counts"}
+          hint="If it is not paid in that month, it moves to the next month as a priority bill."
+          error={errors.startsMonth}
+        >
+          <Input
+            name="startsMonth"
+            type="month"
+            defaultValue={bill?.startsMonthKey ?? defaultMonthKey}
+            required={oneTime}
+          />
+        </Field>
+
+        <Field label={oneTime ? "Amount" : "Amount a month"} error={errors.amount}>
           <Input
             name="amount"
             inputMode="decimal"
@@ -200,7 +271,7 @@ export function BillEditForm({
         </Field>
 
         <Field
-          label="Due day of the month"
+          label={oneTime ? "Due day in that month" : "Due day of the month"}
           hint="Leave blank if you are not sure yet."
           error={errors.dueDay}
         >

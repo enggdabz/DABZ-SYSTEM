@@ -25,6 +25,7 @@ import {
   getLoanSummaries,
   liveEntries,
   paidKeysFrom,
+  partPaidFrom,
 } from "@/lib/data/money";
 import { getRepairTickets } from "@/lib/data/repairs";
 import { getStockOverview } from "@/lib/data/stocks";
@@ -168,6 +169,7 @@ export const getStanding = cache(async (): Promise<Standing> => {
   const billTotals = monthTotals({
     bills,
     paidKeys: paidKeysFrom(payments),
+    partPaid: partPaidFrom(payments),
     period,
     today,
   });
