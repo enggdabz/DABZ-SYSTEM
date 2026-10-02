@@ -37,6 +37,7 @@ import {
   periodKey,
   type Period,
 } from "@/lib/period";
+import { readPaged } from "@/lib/paged";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const getBills = cache(async (): Promise<Bill[]> => {
@@ -286,21 +287,27 @@ export const getLedgerEntries = cache(
   async (options?: { from?: string; to?: string; limit?: number }): Promise<LedgerEntryRow[]> => {
     const supabase = await createSupabaseServerClient();
 
-    let query = supabase
-      .from("ledger_entries")
-      .select(
-        "id, occurred_at, direction, amount_centavos, tag, category, source, note, source_table, source_id, voided_at, void_reason",
-      )
-      .order("occurred_at", { ascending: false })
-      .limit(options?.limit ?? 200);
+    // Read a page at a time: a single request stops at 1,000 rows however
+    // many it asks for, and a month's or a year's totals would be quietly
+    // short. Ordered by id as well, so a page break never splits a tie.
+    const { rows, error } = await readPaged((from, to) => {
+      let query = supabase
+        .from("ledger_entries")
+        .select(
+          "id, occurred_at, direction, amount_centavos, tag, category, source, note, source_table, source_id, voided_at, void_reason",
+        )
+        .order("occurred_at", { ascending: false })
+        .order("id", { ascending: false });
 
-    if (options?.from) query = query.gte("occurred_at", options.from);
-    if (options?.to) query = query.lt("occurred_at", options.to);
+      if (options?.from) query = query.gte("occurred_at", options.from);
+      if (options?.to) query = query.lt("occurred_at", options.to);
 
-    const { data, error } = await query;
-    if (error || !data) return [];
+      return query.range(from, to);
+    }, options?.limit ?? 200);
 
-    return data.map((row) => ({
+    if (error) return [];
+
+    return rows.map((row) => ({
       id: row.id,
       occurredAt: row.occurred_at,
       direction: row.direction === "out" ? "out" : "in",

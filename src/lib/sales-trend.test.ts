@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { parsePesos } from "./money";
 import {
+  bucketsForRange,
   buildSalesTrend,
   formatAxisPesos,
   niceAxisMax,
@@ -269,5 +270,60 @@ describe("niceAxisRange", () => {
 
   it("still has a scale when every point is zero", () => {
     expect(niceAxisRange([0, 0])).toEqual({ min: 0, max: 100 });
+  });
+});
+
+describe("bucketsForRange", () => {
+  const d = (iso: string) => {
+    const [year, month, day] = iso.split("-").map(Number);
+    return { year, month, day };
+  };
+
+  it("gives a point per day for this week, ending on today", () => {
+    const buckets = bucketsForRange(d("2026-09-28"), d("2026-10-02"), TODAY);
+    expect(buckets.map((b) => civilDateToISO(b.start))).toEqual([
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+    ]);
+    expect(buckets.filter((b) => b.current).map((b) => civilDateToISO(b.start))).toEqual([
+      "2026-10-02",
+    ]);
+  });
+
+  it("marks nothing as still filling up in a period that has ended", () => {
+    const lastMonth = bucketsForRange(d("2026-09-01"), d("2026-09-30"), TODAY);
+    expect(lastMonth).toHaveLength(30);
+    expect(lastMonth.some((b) => b.current)).toBe(false);
+  });
+
+  it("goes a month at a time for this year", () => {
+    const buckets = bucketsForRange(d("2026-01-01"), d("2026-10-02"), TODAY);
+    expect(buckets.map((b) => b.shortLabel)).toHaveLength(10);
+    expect(civilDateToISO(buckets[0].start)).toBe("2026-01-01");
+    expect(civilDateToISO(buckets[9].start)).toBe("2026-10-01");
+    expect(buckets[9].current).toBe(true);
+  });
+
+  it("switches from days to months past two months", () => {
+    expect(bucketsForRange(d("2026-08-02"), d("2026-10-02"), TODAY)).toHaveLength(62);
+    expect(bucketsForRange(d("2026-08-01"), d("2026-10-02"), TODAY)).toHaveLength(3);
+  });
+
+  it("puts every centavo of the range in some bucket", () => {
+    const buckets = bucketsForRange(d("2026-01-01"), d("2026-10-02"), TODAY);
+    const entries = [
+      entry({ occurredAt: "2025-12-31T16:00:00Z" }), // 1 Jan, 00:00 Manila
+      entry({ occurredAt: "2026-06-15T02:00:00Z", amountCentavos: 1 }),
+      entry(),
+    ];
+    const total = trendSummary(buildSalesTrend(entries, buckets)).totalCentavos;
+    expect(total).toBe(parsePesos("1000") + 1);
+  });
+
+  it("gives one point for a single day", () => {
+    expect(bucketsForRange(TODAY, TODAY, TODAY)).toHaveLength(1);
   });
 });

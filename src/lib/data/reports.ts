@@ -62,14 +62,32 @@ function utcWindow(range: ReportRange): { from: string; to: string } {
   };
 }
 
-export async function getReport(range: ReportRange): Promise<PeriodReport> {
+/**
+ * How many ledger entries one report reads. Read a page at a time, so this is
+ * a real limit and not PostgREST's 1,000 - fifty pages, enough for years of a
+ * busy shop. Past it the report SAYS it is short (`partial`) rather than
+ * printing a total that is quietly low.
+ */
+export const REPORT_LEDGER_LIMIT = 50_000;
+
+export interface ReadReport extends PeriodReport {
+  /** The period had more entries than one report reads; the figures are low. */
+  partial: boolean;
+}
+
+export async function getReport(range: ReportRange): Promise<ReadReport> {
   const window = utcWindow(range);
 
-  const entries = liveEntries(
-    await getLedgerEntries({ from: window.from, to: window.to, limit: 5000 }),
-  );
+  // One more than the limit, so arriving at it is how we know there is more.
+  const read = await getLedgerEntries({
+    from: window.from,
+    to: window.to,
+    limit: REPORT_LEDGER_LIMIT + 1,
+  });
+  const partial = read.length > REPORT_LEDGER_LIMIT;
+  const entries = liveEntries(partial ? read.slice(0, REPORT_LEDGER_LIMIT) : read);
 
-  return buildReport(entries, range);
+  return { ...buildReport(entries, range), partial };
 }
 
 /**
@@ -111,7 +129,7 @@ export async function getCollectionsReport(
 /** The same report for the period before, so the two can be compared. */
 export async function getReportWithComparison(
   range: ReportRange,
-): Promise<{ current: PeriodReport; previous: PeriodReport }> {
+): Promise<{ current: ReadReport; previous: ReadReport }> {
   const earlier = previousRange(range);
 
   const [current, previous] = await Promise.all([

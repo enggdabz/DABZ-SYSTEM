@@ -1680,3 +1680,27 @@ to ask:
      every month. Each part payment writes its own ledger entry and, for a
      loan installment, pays the loan down by exactly that part. **Undo** takes
      back the latest payment of that month, one at a time.
+- **A profit graph on Reports** (your request, 2 October 2026), under the
+  Money card. What I decided:
+  1. **It follows the period chosen at the top** of Reports: a point per day
+     for This week, This month and Last month, and a point per month for This
+     year (anything longer than two months - `RANGE_DAILY_LIMIT` in
+     `src/lib/sales-trend.ts`). Today is a single point, so the card says to
+     choose a longer period instead of drawing a dot.
+  2. **Profit is income less shop expenses**, the same figure as the Money
+     card above it, and the same line as the Overview's profit graph. It reads
+     the ledger page by page on its own, so a busy year is never cut short.
+  3. It is on the screen only, not on the printed report or the spreadsheet.
+- **Fixed on 2 October 2026 - totals stopped at 1,000 entries without saying
+  so.** Supabase hands back at most 1,000 rows a request, whatever is asked
+  for. Reports asked for 5,000 money entries at once, and the Overview's month
+  figures and End of day for 2,000, so on a busy period every one of those
+  totals would have been low with nothing on screen to say so. The Reports
+  collections section had the same gap, and its "not the whole period" warning
+  could never appear, because it only fired past 5,000.
+  1. **Every such read now goes a page at a time** through `readPaged` in
+     `src/lib/paged.ts`, ordered by time and then id so no entry is counted
+     twice or missed at a page break.
+  2. **A report now reads up to 50,000 entries** (`REPORT_LEDGER_LIMIT`). Past
+     that, Reports and the printed report say the figures are low, rather than
+     printing a short total as if it were whole.

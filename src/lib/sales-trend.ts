@@ -23,10 +23,13 @@ import {
   addMonths,
   civilDateFromTimestamp,
   civilDateToISO,
+  daysBetween,
   formatPeriod,
+  periodKey,
   formatWeekRange,
   startOfWeek,
   type CivilDate,
+  type Period,
   type WeekStart,
 } from "@/lib/period";
 
@@ -109,6 +112,27 @@ function format(date: CivilDate, options: Intl.DateTimeFormatOptions): string {
   return new Intl.DateTimeFormat("en-PH", { ...options, timeZone: "UTC" }).format(utc(date));
 }
 
+function dayBucket(start: CivilDate, current: boolean): TrendBucket {
+  return {
+    start,
+    end: addDays(start, 1),
+    label: format(start, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
+    shortLabel: format(start, { day: "numeric", month: "short" }),
+    current,
+  };
+}
+
+function monthBucket(period: Period, current: boolean): TrendBucket {
+  const next = addMonths(period, 1);
+  return {
+    start: { ...period, day: 1 },
+    end: { ...next, day: 1 },
+    label: formatPeriod(period),
+    shortLabel: format({ ...period, day: 1 }, { month: "short" }),
+    current,
+  };
+}
+
 /** The buckets for a view, oldest first, ending with the one today is in. */
 export function trendBuckets(
   view: TrendView,
@@ -122,14 +146,7 @@ export function trendBuckets(
     const current = back === 0;
 
     if (view === "daily") {
-      const start = addDays(today, -back);
-      buckets.push({
-        start,
-        end: addDays(start, 1),
-        label: format(start, { weekday: "short", day: "numeric", month: "short", year: "numeric" }),
-        shortLabel: format(start, { day: "numeric", month: "short" }),
-        current,
-      });
+      buckets.push(dayBucket(addDays(today, -back), current));
     } else if (view === "weekly") {
       const start = addDays(startOfWeek(today, weekStartsOn), -7 * back);
       buckets.push({
@@ -140,15 +157,7 @@ export function trendBuckets(
         current,
       });
     } else if (view === "monthly") {
-      const period = addMonths({ year: today.year, month: today.month }, -back);
-      const next = addMonths(period, 1);
-      buckets.push({
-        start: { ...period, day: 1 },
-        end: { ...next, day: 1 },
-        label: formatPeriod(period),
-        shortLabel: format({ ...period, day: 1 }, { month: "short" }),
-        current,
-      });
+      buckets.push(monthBucket(addMonths({ year: today.year, month: today.month }, -back), current));
     } else {
       const year = today.year - back;
       buckets.push({
@@ -162,6 +171,44 @@ export function trendBuckets(
   }
 
   return buckets;
+}
+
+/**
+ * The longest range drawn a day at a time. Two months of days is about as many
+ * points as a phone can still show one tap apart; past that, the Reports graph
+ * goes a month at a time.
+ */
+export const RANGE_DAILY_LIMIT = 62;
+
+/**
+ * Buckets for a fixed range of Manila dates, inclusive at both ends - the
+ * Reports page's chosen period. Days for a short range, months for a long one.
+ * A month bucket may run past the range at either end; that is harmless,
+ * because only the range is ever read from the ledger.
+ */
+export function bucketsForRange(
+  from: CivilDate,
+  to: CivilDate,
+  today: CivilDate,
+): TrendBucket[] {
+  const todayISO = civilDateToISO(today);
+  const contains = (bucket: TrendBucket) =>
+    todayISO >= civilDateToISO(bucket.start) && todayISO < civilDateToISO(bucket.end);
+  const buckets: TrendBucket[] = [];
+
+  if (daysBetween(from, to) + 1 <= RANGE_DAILY_LIMIT) {
+    for (let day = from; civilDateToISO(day) <= civilDateToISO(to); day = addDays(day, 1)) {
+      buckets.push(dayBucket(day, false));
+    }
+  } else {
+    const last = periodKey(to);
+    let month: Period = { year: from.year, month: from.month };
+    for (; periodKey(month) <= last; month = addMonths(month, 1)) {
+      buckets.push(monthBucket(month, false));
+    }
+  }
+
+  return buckets.map((bucket) => ({ ...bucket, current: contains(bucket) }));
 }
 
 /** The ledger fields the line needs - nothing else is read. */
