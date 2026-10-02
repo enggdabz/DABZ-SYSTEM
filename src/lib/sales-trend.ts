@@ -43,12 +43,6 @@ export const TREND_MEASURE_LABELS: Record<TrendMeasure, string> = {
   expenses: "Expenses",
 };
 
-/** Which way the money moved, so the reader asks the ledger for one side only. */
-export const TREND_MEASURE_DIRECTION: Record<TrendMeasure, LedgerDirection> = {
-  sales: "in",
-  expenses: "out",
-};
-
 const COUNTS: Record<
   TrendMeasure,
   (entry: { direction: LedgerDirection; category: LedgerCategory }) => boolean
@@ -181,6 +175,8 @@ export interface TrendEntry {
 
 /**
  * Adds the live income (or, for expenses, the live shop costs) in each bucket.
+ * Entries of the other kind are simply skipped, so one read of the ledger can
+ * feed both lines.
  *
  * A voided entry is skipped (money handed back was not taken in), and an
  * entry is placed by its MANILA date - a sale at 7am Manila is 11pm the day
@@ -208,6 +204,21 @@ export function buildSalesTrend(
 }
 
 /**
+ * Profit per point: sales less expenses, the same sum Reports calls profit.
+ * Both lists must come from the same buckets - they always do, because the
+ * Overview builds them from one read.
+ */
+export function profitTrend(
+  sales: readonly TrendPoint[],
+  expenses: readonly TrendPoint[],
+): TrendPoint[] {
+  if (sales.length !== expenses.length) {
+    throw new Error("Sales and expenses must cover the same periods");
+  }
+  return sales.map((point, i) => ({ ...point, centavos: point.centavos - expenses[i].centavos }));
+}
+
+/**
  * The top of the chart's scale: the highest point rounded UP to a figure a
  * person would write on an axis (1, 2, 2.5 or 5 times a power of ten), in
  * whole pesos. Never zero, so an empty line still has somewhere to sit.
@@ -220,6 +231,19 @@ export function niceAxisMax(maxCentavos: Centavos): Centavos {
     if (step * power >= pesos) return Math.round(step * power) * 100;
   }
   return 10 * power * 100;
+}
+
+/**
+ * Both ends of the scale. Zero is always on it - a profit line that only dips
+ * below zero must still show where zero is, or a loss reads as a small gain -
+ * and each end is rounded out to an axis figure on its own.
+ */
+export function niceAxisRange(values: readonly Centavos[]): { min: Centavos; max: Centavos } {
+  const highest = Math.max(0, ...values);
+  const lowest = Math.min(0, ...values);
+  const min = lowest < 0 ? -niceAxisMax(-lowest) : 0;
+  const max = highest > 0 || lowest === 0 ? niceAxisMax(highest) : 0;
+  return { min, max };
 }
 
 /** Totals for the line under the chart. */
@@ -236,26 +260,32 @@ export function trendSummary(points: readonly TrendPoint[]): {
 }
 
 /**
- * A short figure for the chart's axis: "₱0", "₱2.5K", "₱10K", "₱1.2M".
+ * A short figure for the chart's axis: "₱0", "₱2.5K", "₱10K", "₱1.2M", "-₱2K".
  * Display only - the readout and the table carry the exact amount.
  */
 export function formatAxisPesos(amount: Centavos): string {
   const compact = new Intl.NumberFormat("en-PH", {
     notation: "compact",
     maximumFractionDigits: 2,
-  }).format(amount / 100);
-  return `₱${compact}`;
+  }).format(Math.abs(amount) / 100);
+  // The sign goes before the peso sign, as formatPesos writes it: "-₱2K".
+  return `${amount < 0 ? "-" : ""}₱${compact}`;
 }
 
+/** The two graphs on the Overview, each with its own Daily / Weekly / ... choice. */
+export const TREND_CHARTS = ["money", "profit"] as const;
+export type TrendChartId = (typeof TREND_CHARTS)[number];
+
 /**
- * The Overview address for a pair of views. Each line keeps its own choice, so
- * switching expenses to weekly must not put sales back to daily. Daily is the
- * default and is left out, so the plain `/overview` stays the plain page.
+ * The Overview address for both graphs' views. Each graph keeps its own
+ * choice, so switching profit to monthly must not put the other back to
+ * daily. Daily is the default and is left out, so the plain `/overview` stays
+ * the plain page.
  */
-export function overviewTrendHref(views: Record<TrendMeasure, TrendView>): string {
+export function overviewTrendHref(views: Record<TrendChartId, TrendView>): string {
   const params = new URLSearchParams();
-  for (const measure of ["sales", "expenses"] as const) {
-    if (views[measure] !== "daily") params.set(measure, views[measure]);
+  for (const chart of TREND_CHARTS) {
+    if (views[chart] !== "daily") params.set(chart, views[chart]);
   }
   const query = params.toString();
   return query ? `/overview?${query}` : "/overview";

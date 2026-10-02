@@ -1635,3 +1635,20 @@ to ask:
      be on screen together (`/overview?sales=weekly&expenses=monthly`).
   3. Under the line it says the **highest** day/week/month/year, not the
      "best" - a dear month is not a good one.
+- **Sales and expenses on one graph, and a profit graph** (your request, 2
+  October 2026). This replaces the separate Sales and Expenses cards above;
+  what counts as a sale and as an expense is unchanged. What I decided:
+  1. **Sales is green and expenses is red**, as you asked. Red and green are
+     the two colours red-green colour blindness mixes up, so the green is a
+     teal-leaning one picked with a colour checker (`--chart-sales` in
+     `globals.css`, a different shade in dark mode), and each line also carries
+     its NAME at its right-hand end and in the key above the graph.
+  2. **Profit is sales less expenses**, the same as Reports, on a graph of its
+     own. It can go below zero, and the zero line is always drawn: a third line
+     squeezed under two lines in the thousands would make a ₱300 loss look like
+     a ₱300 gain. The profit line is plain white (black in light mode) rather
+     than green or red, so a profitable day and a losing one are read from
+     where the line sits against zero, not from its colour.
+  3. **Each graph keeps its own Daily / Weekly / Monthly / Yearly choice**
+     (`/overview?money=weekly&profit=monthly`). When both are on the same view
+     the ledger is read once, not twice.
