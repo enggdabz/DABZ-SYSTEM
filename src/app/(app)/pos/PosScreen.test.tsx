@@ -23,6 +23,8 @@ const actions = vi.hoisted(() => ({
   removeCounterProductPhotoAction: vi.fn(),
   deleteCounterProductAction: vi.fn(),
   updateCounterProductAction: vi.fn(),
+  saveProductCategoryAction: vi.fn(),
+  deleteProductCategoryAction: vi.fn(),
 }));
 vi.mock("./actions", () => actions);
 
@@ -46,6 +48,7 @@ function product(id: string, name: string, priceCentavos: number | null) {
     incomeCategory: "other_print_jobs",
     tiers: [],
     imageUrl: null,
+    categoryId: null as string | null,
   };
 }
 
@@ -449,6 +452,156 @@ describe("editing a product", () => {
     await user.click(within(editDialog()).getByRole("button", { name: "Cancel" }));
     const row = quantityBox("Xerox").closest("li")!;
     expect(within(row).getAllByText(/₱3\.00/).length).toBeGreaterThan(0);
+  });
+});
+
+describe("categories", () => {
+  const PRINTING = { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Printing" };
+  const MUGS = { id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", name: "Mugs" };
+
+  function renderWithCategories(options: { canManage?: boolean } = {}) {
+    return render(
+      <PosScreen
+        products={[
+          { ...ID_PHOTO },
+          { ...PRINT_BW, categoryId: PRINTING.id },
+          { ...XEROX, categoryId: PRINTING.id },
+        ]}
+        categories={[MUGS, PRINTING]}
+        customers={[]}
+        canDiscount={false}
+        canManageProducts={options.canManage ?? true}
+        discountLimitPercent={0}
+        discountLimitCentavos={0}
+      />,
+    );
+  }
+
+  function headings() {
+    return screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+  }
+
+  it("puts each product under its category's header, with Other last", () => {
+    renderWithCategories();
+    expect(headings()).toEqual(["Mugs", "Printing", "Other"]);
+
+    const printing = screen.getByRole("list", { name: "Printing" });
+    expect(within(printing).getByLabelText("Quantity of Print (Black & White)")).toBeTruthy();
+    expect(within(printing).getByLabelText("Quantity of Xerox")).toBeTruthy();
+    const other = screen.getByRole("list", { name: "Other" });
+    expect(within(other).getByLabelText("Quantity of ID PHOTO PACKAGE")).toBeTruthy();
+  });
+
+  it("boxes every category header in the red accent with white text", () => {
+    renderWithCategories();
+    for (const heading of screen.getAllByRole("heading", { level: 3 })) {
+      expect(heading.className).toContain("bg-accent");
+      expect(heading.className).toContain("text-on-accent");
+    }
+  });
+
+  it("shows staff only the categories with something to sell", () => {
+    renderWithCategories({ canManage: false });
+    expect(headings()).toEqual(["Printing", "Other"]);
+    expect(screen.queryByRole("button", { name: "Manage categories" })).toBeNull();
+  });
+
+  it("keeps quantities across categories in the one sale", async () => {
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.type(quantityBox("Xerox"), "10");
+    await user.type(quantityBox("ID PHOTO PACKAGE"), "1");
+    const footer = completeButton().closest("div.sticky") as HTMLElement;
+    expect(within(footer).getByText("₱80.00")).toBeTruthy();
+  });
+
+  it("moves a product to another category from its edit dialog", async () => {
+    actions.updateCounterProductAction.mockImplementation(async () => ({
+      product: {
+        id: ID_PHOTO.id,
+        name: "ID PHOTO PACKAGE",
+        priceCentavos: 5000,
+        manualPrice: false,
+        categoryId: MUGS.id,
+      },
+    }));
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.click(screen.getByRole("button", { name: "Edit ID PHOTO PACKAGE" }));
+    const dialog = screen.getByRole("dialog", { name: "Edit ID PHOTO PACKAGE" });
+    await user.selectOptions(within(dialog).getByLabelText(/Category/), MUGS.id);
+    await user.click(within(dialog).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const form = actions.updateCounterProductAction.mock.calls[0][0] as FormData;
+    expect(form.get("categoryId")).toBe(MUGS.id);
+    const mugs = screen.getByRole("list", { name: "Mugs" });
+    expect(within(mugs).getByLabelText("Quantity of ID PHOTO PACKAGE")).toBeTruthy();
+    // Nothing is left without a category, so the Other header goes.
+    expect(headings()).toEqual(["Mugs", "Printing"]);
+  });
+
+  it("refuses a new category with a name already in use, before asking the server", async () => {
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.click(screen.getByRole("button", { name: "+ New product" }));
+    const dialog = screen.getByRole("dialog", { name: "New product" });
+    await user.type(within(dialog).getByLabelText(/Product name/), "Lamination");
+    await user.type(within(dialog).getByLabelText(/Price each/), "25");
+    await user.selectOptions(within(dialog).getByLabelText(/^Category/), "new");
+    await user.type(within(dialog).getByLabelText(/New category name/), "printing");
+    await user.click(within(dialog).getByRole("button", { name: "Save product" }));
+
+    expect(within(dialog).getByText(/already a category called "printing"/)).toBeTruthy();
+    expect(actions.addCounterProductAction).not.toHaveBeenCalled();
+  });
+
+  it("deletes a category after saying its products move to Other", async () => {
+    actions.deleteProductCategoryAction.mockImplementation(async () => ({}));
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.click(screen.getByRole("button", { name: "Manage categories" }));
+    const dialog = screen.getByRole("dialog", { name: "Categories" });
+    await user.click(within(dialog).getByRole("button", { name: "Delete the category Printing" }));
+    expect(within(dialog).getByText(/Its 2 products will move to Other/)).toBeTruthy();
+    await user.click(within(dialog).getByRole("button", { name: "Delete" }));
+
+    await waitFor(() => expect(actions.deleteProductCategoryAction).toHaveBeenCalledWith(PRINTING.id));
+    await user.click(within(screen.getByRole("dialog", { name: "Categories" })).getByRole("button", { name: "Done" }));
+    expect(headings()).toEqual(["Mugs", "Other"]);
+    const other = screen.getByRole("list", { name: "Other" });
+    expect(within(other).getByLabelText("Quantity of Xerox")).toBeTruthy();
+  });
+
+  it("adds and renames categories", async () => {
+    actions.saveProductCategoryAction.mockImplementation(async (form: FormData) => ({
+      category: {
+        id: String(form.get("id") || "cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+        name: String(form.get("name")),
+      },
+    }));
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.click(screen.getByRole("button", { name: "Manage categories" }));
+    const dialog = screen.getByRole("dialog", { name: "Categories" });
+    await user.type(within(dialog).getByLabelText("New category"), "ID photo");
+    await user.click(within(dialog).getByRole("button", { name: "Add" }));
+    await waitFor(() => expect(within(dialog).getByLabelText("Name of ID photo")).toBeTruthy());
+
+    const mugs = within(dialog).getByLabelText("Name of Mugs");
+    await user.clear(mugs);
+    await user.type(mugs, "Mugs & souvenirs");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(within(dialog).getByLabelText("Name of Mugs & souvenirs")).toBeTruthy());
+
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+    // The empty categories still show to the owner, by name.
+    expect(headings()).toEqual(["ID photo", "Mugs & souvenirs", "Printing", "Other"]);
   });
 });
 

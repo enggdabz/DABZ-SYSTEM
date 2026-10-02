@@ -304,3 +304,102 @@ export function reconcileProducts<T extends { id: string }>(
   const added = incoming.filter((item) => !known.has(item.id) && !gone.has(item.id));
   return [...kept, ...added];
 }
+
+// ---------------------------------------------------------------------------
+// Categories (0027)
+// ---------------------------------------------------------------------------
+
+export interface CategoryGroup<T> {
+  /** Stable key for React: the category id, or "none". */
+  key: string;
+  categoryId: string | null;
+  /** The red header's text. Null: no header at all (no categories exist). */
+  title: string | null;
+  items: T[];
+}
+
+/** What the group of products with no category is called. */
+export const NO_CATEGORY_TITLE = "Other";
+
+/**
+ * The Counter's products under their category headers.
+ *
+ * Categories come in the order given (by name, from the database); products
+ * keep the order the owner dragged them into. Products with no category - or
+ * pointing at a category that has since gone - come last, under "Other".
+ *
+ * With no categories at all there is one group and NO header: a single red
+ * "Other" box above every product would be a heading that says nothing.
+ * An empty category is shown only when `includeEmpty` (the owner or an admin,
+ * who need to see it exists to put something in it); staff see only the
+ * categories that have something to sell.
+ */
+export function groupByCategory<T extends { categoryId: string | null }>(
+  items: readonly T[],
+  categories: readonly { id: string; name: string }[],
+  options: { includeEmpty: boolean },
+): CategoryGroup<T>[] {
+  if (categories.length === 0) {
+    return [{ key: "none", categoryId: null, title: null, items: [...items] }];
+  }
+
+  const known = new Set(categories.map((category) => category.id));
+  const groups: CategoryGroup<T>[] = categories.map((category) => ({
+    key: category.id,
+    categoryId: category.id,
+    title: category.name,
+    items: items.filter((item) => item.categoryId === category.id),
+  }));
+
+  const rest = items.filter((item) => item.categoryId === null || !known.has(item.categoryId));
+  if (rest.length > 0) {
+    groups.push({ key: "none", categoryId: null, title: NO_CATEGORY_TITLE, items: rest });
+  }
+
+  return options.includeEmpty ? groups : groups.filter((group) => group.items.length > 0);
+}
+
+/**
+ * The whole list's new order after a row is dragged INSIDE its category.
+ *
+ * The saved order is one list across every category, so a drag among the
+ * rows of one category moves only those rows: every other product keeps its
+ * exact place, and the dragged category's rows fill their own old positions
+ * in the new order.
+ */
+export function moveWithinGroup(
+  allIds: readonly string[],
+  groupIds: readonly string[],
+  fromId: string,
+  toId: string,
+): string[] {
+  const reordered = moveId(groupIds, fromId, toId);
+  const inGroup = new Set(groupIds);
+  let next = 0;
+  return allIds.map((id) => (inGroup.has(id) ? reordered[next++] : id));
+}
+
+export const CATEGORY_NAME_MAX = 60;
+
+export type CategoryNameCheck = { ok: true; name: string } | { ok: false; error: string };
+
+/**
+ * A category's name, new or renamed. `otherNames` leaves out the category
+ * being renamed, so changing only its capitals is allowed. The database's
+ * unique index says the same, case and spacing aside.
+ */
+export function checkCategoryName(
+  input: string,
+  otherNames: readonly string[],
+): CategoryNameCheck {
+  const name = input.trim().replace(/\s+/g, " ");
+  if (name === "") return { ok: false, error: "Give the category a name." };
+  if (name.length > CATEGORY_NAME_MAX) {
+    return { ok: false, error: `Keep the name under ${CATEGORY_NAME_MAX} characters.` };
+  }
+  const key = nameKey(name);
+  if (otherNames.some((other) => nameKey(other) === key)) {
+    return { ok: false, error: `There is already a category called "${name}".` };
+  }
+  return { ok: true, name };
+}

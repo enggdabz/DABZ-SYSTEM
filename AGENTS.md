@@ -306,6 +306,11 @@ round trip is the one thing that must be tried against a real project.
   `src/lib/data/product-photos.ts`. A photo file is removed only AFTER the row
   stops pointing at it, and with the product only when the product is really
   deleted - a sold product is hidden and keeps its photo.
+- **Product categories are the owner's own (`product_categories`, 0027)**, not
+  the old fixed `products.section`. A drag reorders within ONE category
+  (`moveWithinGroup`); changing a product's category is a deliberate choice in
+  its edit dialog, never a side effect of where a row was dropped. Deleting a
+  category never deletes a product (`on delete set null`).
 - **The server re-derives every total.** `completeSaleAction` never trusts the
   figures the browser sends; it rebuilds them with `src/lib/pos.ts` and writes
   those. The screen's totals are a preview, not the record.

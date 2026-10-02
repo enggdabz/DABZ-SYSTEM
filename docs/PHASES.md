@@ -2733,6 +2733,10 @@ The owner's request, inside Phase 4's Counter. Waiting for the owner to try it.
 - Owners and admins can rename or reprice a product by tapping its name on the
   Counter (added 2 Oct 2026, no migration). Past sales keep the name and price
   they were sold at.
+- Categories (added 2 Oct 2026, migration `0027_product_categories.sql`): the
+  owner names them under **Manage categories**, a product is put in one from
+  its edit dialog, and the Counter groups the products under a red header per
+  category, in two columns where the list has the room.
 
 **How it is verified**
 

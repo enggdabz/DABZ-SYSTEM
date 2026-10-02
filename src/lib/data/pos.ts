@@ -35,6 +35,8 @@ export interface Product {
   active: boolean;
   /** The photo in the product-images bucket (0026). Null: no photo. */
   imagePath: string | null;
+  /** The owner's category (0027). Null: none. */
+  categoryId: string | null;
   /** Carries the row id too, so a rule can be removed again. */
   tiers: (PriceTier & { id: string })[];
 }
@@ -55,48 +57,60 @@ export const SECTION_LABELS: Record<string, string> = {
 };
 
 /*
-  `image_path` arrives with 0026. Until that migration reaches the database,
-  asking for it fails the WHOLE read - and an empty product list on the
-  Counter reads as "the shop has no products", which is the confident wrong
-  answer schema-health.ts exists to prevent. So the read is tried with it and,
-  if the column is missing, again without; the Counter then shows no photos
-  and offers no dragging, and the System check names the migration.
+  `image_path` arrives with 0026 and `category_id` with 0027. Until a
+  migration reaches the database, asking for its column fails the WHOLE read -
+  and an empty product list on the Counter reads as "the shop has no
+  products", which is the confident wrong answer schema-health.ts exists to
+  prevent. So the read is tried with everything and, while a column is
+  missing, again with less; the Counter then leaves out what the database
+  cannot give yet, and the System check names the migration.
 */
 const PRODUCT_COLUMNS =
   "id, name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active";
 const PRODUCT_COLUMNS_WITH_PHOTO = `${PRODUCT_COLUMNS}, image_path`;
+const PRODUCT_COLUMNS_WITH_CATEGORY = `${PRODUCT_COLUMNS}, image_path, category_id`;
+
+type ProductRead = "everything" | "photo" | "plain";
 
 async function readProducts(
   activeOnly: boolean,
-): Promise<{ products: Product[]; photosReady: boolean }> {
+): Promise<{ products: Product[]; photosReady: boolean; categoriesReady: boolean }> {
   const supabase = await createSupabaseServerClient();
 
-  // Written out twice rather than built from a variable, so that
-  // `npm run check:schema` can read both column lists.
-  const query = (withPhoto: boolean) => {
-    let builder = withPhoto
-      ? supabase.from("products").select(PRODUCT_COLUMNS_WITH_PHOTO)
-      : supabase.from("products").select(PRODUCT_COLUMNS);
+  // Each column list written out in full rather than built from a variable,
+  // so that `npm run check:schema` can read all three.
+  const query = (read: ProductRead) => {
+    let builder =
+      read === "everything"
+        ? supabase.from("products").select(PRODUCT_COLUMNS_WITH_CATEGORY)
+        : read === "photo"
+          ? supabase.from("products").select(PRODUCT_COLUMNS_WITH_PHOTO)
+          : supabase.from("products").select(PRODUCT_COLUMNS);
     if (activeOnly) builder = builder.eq("active", true);
     else builder = builder.order("active", { ascending: false });
     return builder.order("sort_order").order("name");
   };
 
   const [first, { data: tierRows }] = await Promise.all([
-    query(true),
+    query("everything"),
     supabase
       .from("product_price_tiers")
       .select("id, product_id, min_quantity, unit_price_centavos"),
   ]);
 
   let { data, error } = first;
+  let categoriesReady = true;
   let photosReady = true;
   if (error && isColumnMissingFromApi(error)) {
+    categoriesReady = false;
+    ({ data, error } = await query("photo"));
+  }
+  if (error && isColumnMissingFromApi(error)) {
     photosReady = false;
-    ({ data, error } = await query(false));
+    ({ data, error } = await query("plain"));
   }
 
-  if (error || !data) return { products: [], photosReady };
+  if (error || !data) return { products: [], photosReady, categoriesReady };
 
   const tiersByProduct = new Map<string, (PriceTier & { id: string })[]>();
   for (const row of tierRows ?? []) {
@@ -112,6 +126,7 @@ async function readProducts(
   const rows = data as unknown as ProductRow[];
   return {
     photosReady,
+    categoriesReady,
     products: rows.map((row) => ({
       id: row.id,
       name: row.name,
@@ -124,6 +139,7 @@ async function readProducts(
       incomeCategory: row.income_category,
       active: row.active,
       imagePath: row.image_path ?? null,
+      categoryId: row.category_id ?? null,
       tiers: tiersByProduct.get(row.id) ?? [],
     })),
   };
@@ -141,6 +157,7 @@ interface ProductRow {
   income_category: string;
   active: boolean;
   image_path?: string | null;
+  category_id?: string | null;
 }
 
 /** The products the Counter shows, in the order the owner dragged them into. */
@@ -154,6 +171,28 @@ export const getProducts = cache(
 export const getAllProducts = cache(
   async (): Promise<Product[]> => (await readProducts(false)).products,
 );
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+}
+
+/**
+ * The owner's product categories (0027), by name.
+ *
+ * Null - not an empty list - when the table cannot be read: "no categories
+ * yet" and "the database is behind" are different things to tell the owner.
+ */
+export const getProductCategories = cache(async (): Promise<ProductCategory[] | null> => {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("product_categories")
+    .select("id, name")
+    .order("name");
+
+  if (error || !data) return null;
+  return data.map((row) => ({ id: row.id, name: row.name }));
+});
 
 /**
  * Which products have been sold, so the Products screen knows which ones may
