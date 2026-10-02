@@ -337,6 +337,18 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0025_project_deletion_refund",
     breaks: "refunding a down payment when a project is deleted",
   },
+  {
+    /*
+      A column on a table 0005 created, and 0026 creates no relation. The
+      Counter falls back to reading products without it, so a missing 0026
+      costs the photos and the drag order rather than the whole product list -
+      which is exactly why nothing else would notice it was missing.
+    */
+    name: "products",
+    column: "image_path",
+    migration: "0026_counter_product_list",
+    breaks: "product photos on the Counter, and dragging the products into order",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */

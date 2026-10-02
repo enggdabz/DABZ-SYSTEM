@@ -4,8 +4,9 @@ import { Notice } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getPayableJobs } from "@/lib/data/collections";
-import { getCustomers, getProducts } from "@/lib/data/pos";
+import { getCounterProducts, getCustomers } from "@/lib/data/pos";
 import { getProjects } from "@/lib/data/projects";
+import { productImageUrl } from "@/lib/online/storage";
 import { payableProjects, type FindableProject } from "@/lib/project-find";
 
 import { PosScreen } from "./PosScreen";
@@ -31,8 +32,8 @@ export default async function PosPage() {
   const canTakeApparel = can(user, "apparel_job_orders");
   const canTakeRepairs = can(user, "dabztech_tickets");
 
-  const [products, customers, payableJobs] = await Promise.all([
-    getProducts(),
+  const [{ products, photosReady }, customers, payableJobs] = await Promise.all([
+    getCounterProducts(),
     getCustomers(),
     getPayableJobs({
       apparel: canTakeApparel,
@@ -57,6 +58,7 @@ export default async function PosPage() {
   }
 
   const unpriced = products.filter((product) => product.priceCentavos === null);
+  const ownerOrAdmin = isOwnerOrAdmin(user);
 
   return (
     <div className="space-y-6">
@@ -64,8 +66,8 @@ export default async function PosPage() {
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">Counter</h1>
           <p className="mt-2 text-muted">
-            Tap a button, confirm the quantity, then complete the sale. Nothing
-            is added until you confirm it.
+            Type how many of each product the customer wants, then press
+            Complete sale. Nothing is saved until you do.
           </p>
         </div>
 
@@ -83,17 +85,26 @@ export default async function PosPage() {
             {products.length === 0 ? (
               <Notice
                 tone="info"
-                title="No buttons yet, but the counter still works"
+                title="No saved products yet, but the counter still works"
               >
                 <p>
-                  Nothing has been added to the product list, so there is
-                  nothing to tap. Use <strong>New product</strong> below to type
-                  an item, a quantity and a price straight onto the sale &mdash;
-                  and tick &ldquo;save this to the product list&rdquo; to turn
-                  it into a button for next time.
-                  {isOwnerOrAdmin(user)
+                  Use <strong>+ New product</strong> below to add one with its
+                  price. It appears in the list straight away, ready for a
+                  quantity.
+                  {ownerOrAdmin
                     ? " The Products screen is where you add them in bulk."
                     : ""}
+                </p>
+              </Notice>
+            ) : null}
+
+            {ownerOrAdmin && !photosReady ? (
+              <Notice tone="attention" title="The database is behind: photos and dragging are off">
+                <p>
+                  Migration <strong>0026</strong> has not been applied yet, so
+                  product photos and putting the products in order cannot be
+                  saved. Selling works as normal. Run{" "}
+                  <code>npm run db:push</code> and reload this page.
                 </p>
               </Notice>
             ) : null}
@@ -101,15 +112,15 @@ export default async function PosPage() {
             {unpriced.length > 0 ? (
               <Notice
                 tone="info"
-                title={`${unpriced.length} ${unpriced.length === 1 ? "button asks" : "buttons ask"} for the price each time`}
+                title={`${unpriced.length} ${unpriced.length === 1 ? "product asks" : "products ask"} for the price each time`}
               >
                 <p>
                   {unpriced.map((product) => product.name).join(", ")}{" "}
                   {unpriced.length === 1 ? "has" : "have"} no set price yet, so
-                  the counter asks you for the amount. That is on purpose
+                  the row has a box for the amount. That is on purpose
                   &mdash; nothing was guessed.
-                  {isOwnerOrAdmin(user)
-                    ? " Set the prices on the Products screen to turn them into fixed buttons."
+                  {ownerOrAdmin
+                    ? " Set the prices on the Products screen to fix them."
                     : ""}
                 </p>
               </Notice>
@@ -126,14 +137,16 @@ export default async function PosPage() {
                 section: product.section,
                 incomeCategory: product.incomeCategory,
                 tiers: product.tiers,
+                imageUrl: productImageUrl(product.imagePath),
               }))}
               customers={customers.map((customer) => ({
                 id: customer.id,
                 name: customer.name,
                 contactNumber: customer.contactNumber,
               }))}
+              canManageProducts={ownerOrAdmin && photosReady}
               canDiscount={
-                isOwnerOrAdmin(user) ||
+                ownerOrAdmin ||
                 user.permissions.includes("give_discounts")
               }
               discountLimitPercent={settings.staffDiscountLimitPercent}

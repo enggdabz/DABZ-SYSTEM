@@ -2706,6 +2706,54 @@ routes. Decisions inside it are in `docs/DECISIONS.md`.
 
 ---
 
+## The Counter's saved products as a list (2 Oct 2026)
+
+The owner's request, inside Phase 4's Counter. Waiting for the owner to try it.
+
+**Built**
+
+- The saved products are a list, one row each: grip, photo, name, price, a
+  quantity box (number keypad on a phone, whole numbers only), the line total
+  and a bin. Rows with a quantity are highlighted in gold. Enter moves to the
+  next row's box. Below the list: the total, **Clear** and **Complete sale**,
+  which stays on screen while the list is scrolled.
+- Drag a row by its grip to reorder (touch or mouse). The new order is saved
+  for everybody as soon as the row is dropped; if it cannot be saved the row
+  goes back and a message says so.
+- One optional photo per product: tap the "+" square to add one (camera or
+  gallery on a phone), tap a photo to replace or remove it. JPG, PNG or WebP up
+  to 5 MB; cropped square and shrunk to 400px before it is uploaded.
+- **+ New product** asks for a name, a price and an optional photo, and puts
+  the product at the bottom of the list without a reload.
+- The bin asks "Delete *name*? This cannot be undone." An unsold product is
+  deleted with its photo; a sold one is hidden, and old sales still read the
+  same. See `docs/DECISIONS.md` for this and the other choices made.
+- Migration `0026_counter_product_list.sql`: `products.image_path` and
+  `reorder_products`.
+
+**How it is verified**
+
+| What | How |
+|---|---|
+| Line totals, bulk prices, the grand total, quantities staying with their product through a reorder, the new-product and photo checks | `npm test` (`counter-list.test.ts`) |
+| Typing, Enter, Clear, Complete sale sending one sale, delete with confirm and put-back, add at the bottom, photo errors, put-back of a failed reorder | `npm test` (`PosScreen.test.tsx`) |
+| Only Owner/Admin reorder or set a photo, a reorder is all-or-nothing | `npm run test:rls` (`22_counter_product_list.test.sql`) |
+| Touch drag on a phone, mouse drag on a desktop, a swipe on a row scrolls instead of dragging, no sideways scroll at 390, 768, 1024, 1280 and 1440px, a photo arrives as a 400x400 WebP | Chromium, with sample products (2 Oct 2026) |
+
+**How to check it**
+
+1. `npm run db:push` to apply `0026`.
+2. Add a product with a photo - it appears at the bottom.
+3. Add a photo to an existing product, then replace it.
+4. Type quantities in a few rows, drag one to the top - the quantities stay
+   with their products. Refresh: the order is still there.
+5. Record a sale with two or three products and find it on Sales.
+6. Delete a product that has been sold before: it leaves the list, and its old
+   sales on Sales and End of day still show its name and price.
+7. Try a photo over 5 MB, or a PDF - the message says why.
+
+---
+
 ## Later, and not in the first build
 
 Push notifications to a phone, and anything that needs a Meta app: the

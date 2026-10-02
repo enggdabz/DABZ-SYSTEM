@@ -1,11 +1,12 @@
 "use client";
 
-import { useActionState, useMemo, useState, useTransition } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { listSale } from "@/lib/counter-list";
 import type { DivisionId } from "@/lib/divisions";
-import { centavosToDecimalString, formatPesos, parsePesos } from "@/lib/money";
+import { formatPesos, parsePesos } from "@/lib/money";
 import {
   CUSTOM_TARPAULIN_RATE,
   DEFAULT_TARPAULIN_RATE,
@@ -14,17 +15,13 @@ import {
   computeSale,
   parseTarpaulinRate,
   quoteTarpaulin,
-  unitPriceFor,
   type PriceTier,
   type SaleLineInput,
 } from "@/lib/pos";
 
-import {
-  completeSaleAction,
-  saveCustomerAction,
-  saveProductAction,
-  type PosState,
-} from "./actions";
+import { completeSaleAction, saveCustomerAction, type PosState } from "./actions";
+import { CounterProductList, NewCounterProductDialog } from "./CounterProductList";
+import { useCounterProducts } from "./useCounterProducts";
 
 export interface PosProduct {
   id: string;
@@ -36,6 +33,8 @@ export interface PosProduct {
   section: string;
   incomeCategory: string;
   tiers: (PriceTier & { id?: string })[];
+  /** The product photo's public address, or null for the placeholder. */
+  imageUrl: string | null;
 }
 
 export interface PosCustomer {
@@ -44,38 +43,36 @@ export interface PosCustomer {
   contactNumber: string | null;
 }
 
-interface CartLine extends SaleLineInput {
+/** A line that is not a saved product - today, a tarpaulin from the calculator. */
+interface ExtraLine extends SaleLineInput {
   key: string;
   incomeCategory: string;
 }
-
-const SECTION_LABELS: Record<string, string> = {
-  printing: "Printing",
-  photocopy: "Photocopy",
-  souvenirs: "Mugs & souvenirs",
-  other: "Saved products",
-};
 
 /**
  * The counter screen (spec 6, 7).
  *
  * Two rules from the specification shape it:
- *   1. A sale ALWAYS starts blank. Nothing is added by tapping a button alone -
- *      the quantity (and the price, where it is not fixed) is confirmed first.
- *   2. Every figure is worked out by src/lib/pos.ts, the same tested code the
- *      server re-runs when the sale is completed. The screen never invents a
- *      total of its own.
+ *   1. A sale ALWAYS starts blank. Every quantity box is empty, and nothing is
+ *      recorded until "Complete sale" is pressed - typing a number into a row
+ *      is the confirmation the old tap-then-confirm step used to be.
+ *   2. Every figure is worked out by src/lib/counter-list.ts and
+ *      src/lib/pos.ts, the same tested code the server re-runs when the sale
+ *      is completed. The screen never invents a total of its own.
  */
 export function PosScreen({
   products,
   customers,
   canDiscount,
+  canManageProducts,
   discountLimitPercent,
   discountLimitCentavos,
 }: {
   products: PosProduct[];
   customers: PosCustomer[];
   canDiscount: boolean;
+  /** Owner/Admin with 0026 applied: drag, photos and delete. */
+  canManageProducts: boolean;
   discountLimitPercent: number;
   discountLimitCentavos: number;
 }) {
@@ -85,8 +82,8 @@ export function PosScreen({
     {},
   );
 
-  const [lines, setLines] = useState<CartLine[]>([]);
-  const [pendingProduct, setPendingProduct] = useState<PosProduct | null>(null);
+  const list = useCounterProducts(products);
+  const [extraLines, setExtraLines] = useState<ExtraLine[]>([]);
   const [discountKind, setDiscountKind] = useState<"none" | "amount" | "percent">("none");
   const [discountValue, setDiscountValue] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -101,6 +98,27 @@ export function PosScreen({
     sale" get back to a blank counter.
   */
   const [finishedSaleId, setFinishedSaleId] = useState<string | null>(null);
+
+  // The rows with a quantity, in the order they are shown.
+  const fromList = useMemo(
+    () => listSale(list.items, list.quantities, list.prices),
+    [list.items, list.quantities, list.prices],
+  );
+
+  const lines = useMemo(
+    () => [
+      ...fromList.lines,
+      ...extraLines.map((line) => ({
+        name: line.name,
+        quantity: line.quantity,
+        unitPriceCentavos: line.unitPriceCentavos,
+        division: line.division,
+        productId: line.productId ?? null,
+        incomeCategory: line.incomeCategory,
+      })),
+    ],
+    [fromList.lines, extraLines],
+  );
 
   const totals = useMemo(() => {
     const discount =
@@ -133,23 +151,12 @@ export function PosScreen({
     }
   }, [moneyGiven, paymentMethod, totals.totalCentavos]);
 
-  const bySection = useMemo(() => {
-    const groups = new Map<string, PosProduct[]>();
-    for (const product of products) {
-      const list = groups.get(product.section) ?? [];
-      list.push(product);
-      groups.set(product.section, list);
-    }
-    return groups;
-  }, [products]);
-
-  function addLine(line: Omit<CartLine, "key">) {
-    setLines((current) => [...current, { ...line, key: crypto.randomUUID() }]);
-  }
+  const nothingChosen = lines.length === 0 && fromList.rowsWithQuantity === 0;
+  const blocked = fromList.missingPrice.length > 0;
 
   function clearSale() {
-    setLines([]);
-    setPendingProduct(null);
+    list.clearQuantities();
+    setExtraLines([]);
     setDiscountKind("none");
     setDiscountValue("");
     setMoneyGiven("");
@@ -205,104 +212,164 @@ export function PosScreen({
   return (
     /*
       Side by side from `lg` up (desktop and tablet landscape). Below that -
-      tablet portrait and phones - the sale panel drops underneath the buttons,
-      and a fixed bar keeps the total and the pay button reachable without
-      scrolling back down. The bottom padding stops that bar covering the last
-      row of buttons.
+      tablet portrait and phones - the payment panel drops underneath, and the
+      total with the Complete sale button sticks to the bottom of the screen
+      while the list is being scrolled, so it is always reachable.
     */
-    <div className="grid gap-6 pb-24 lg:grid-cols-[1fr_22rem] lg:pb-0">
+    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
       <div className="space-y-6">
-        {[...bySection.entries()].map(([section, items]) => (
-          <section key={section}>
-            <h2 className="text-sm font-medium text-muted">
-              {SECTION_LABELS[section] ?? section}
+        <section aria-labelledby="saved-products">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 id="saved-products" className="text-sm font-medium text-muted">
+              Saved products
             </h2>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {items.map((product) => (
-                <button
-                  key={product.id}
-                  type="button"
-                  onClick={() => setPendingProduct(product)}
-                  className="rounded-control bg-surface px-4 py-3 text-left ring-1 ring-line/60 transition-colors hover:ring-accent/50"
-                >
-                  <span className="block text-sm font-medium">{product.name}</span>
-                  <span className="mt-0.5 block text-xs text-muted">
-                    {product.priceCentavos === null
-                      ? "Price asked each time"
-                      : `${formatPesos(product.priceCentavos)}${product.unit ? ` / ${product.unit}` : ""}`}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-        ))}
+            {canManageProducts && list.items.length > 1 ? (
+              <p className="text-xs text-muted">
+                Drag <span aria-hidden="true">⋮⋮</span> to put the best sellers at the top.
+              </p>
+            ) : null}
+          </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" variant="secondary" onClick={() => setShowNewProduct(true)}>
-            + New product
-          </Button>
-        </div>
+          <div className="mt-3">
+            <CounterProductList
+              items={list.items}
+              quantities={list.quantities}
+              prices={list.prices}
+              canManage={canManageProducts}
+              onQuantity={list.setQuantity}
+              onPrice={list.setPrice}
+              onReorder={(activeId, overId) => void list.reorder(activeId, overId)}
+              onChangePhoto={(id, file) => void list.changePhoto(id, file)}
+              onRemovePhoto={(id) => void list.removePhoto(id)}
+              onDelete={(id) => void list.remove(id)}
+              photoBusy={list.photoBusy}
+              photoErrors={list.photoErrors}
+              notice={list.notice}
+              onDismissNotice={list.dismissNotice}
+            />
+          </div>
+
+          <div className="mt-3">
+            <Button type="button" variant="secondary" onClick={() => setShowNewProduct(true)}>
+              + New product
+            </Button>
+          </div>
+
+          {/* Below the list: the total, Clear, and the one Complete sale button. */}
+          <div className="sticky bottom-0 z-20 -mx-4 mt-4 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-md sm:mx-0 sm:rounded-card sm:border-0 sm:ring-1 sm:ring-line/60">
+            {state.error ? (
+              <div className="mb-3">
+                <Notice tone="attention" title={state.error} />
+              </div>
+            ) : null}
+            {state.fieldErrors?.moneyGiven ? (
+              <div className="mb-3">
+                <Notice tone="attention" title={state.fieldErrors.moneyGiven} />
+              </div>
+            ) : null}
+            {blocked ? (
+              <p className="mb-3 flex items-start gap-1.5 text-sm text-attention">
+                <span aria-hidden="true">{"⚠"}</span>
+                <span>
+                  Type the price for {fromList.missingPrice.join(", ")} before completing the sale.
+                </span>
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-muted">
+                  {totals.itemCount === 0
+                    ? "Nothing chosen yet"
+                    : `${totals.itemCount} item${totals.itemCount === 1 ? "" : "s"}`}
+                  {totals.discountCentavos > 0
+                    ? ` · less ${formatPesos(totals.discountCentavos)} discount`
+                    : ""}
+                </p>
+                <p className="text-2xl font-semibold tracking-tight tabular-nums">
+                  {formatPesos(totals.totalCentavos)}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="quiet"
+                  onClick={clearSale}
+                  disabled={nothingChosen || pending}
+                >
+                  Clear
+                </Button>
+                <Button
+                  type="submit"
+                  form="counter-sale"
+                  className="py-3 text-base"
+                  disabled={pending || lines.length === 0 || blocked}
+                >
+                  {pending ? "Saving…" : "Complete sale"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <TarpaulinCalculator
           onAdd={(line) =>
-            addLine({
-              ...line,
-              division: "printshoppe",
-              incomeCategory: "tarpaulin",
-              productId: null,
-            })
+            setExtraLines((current) => [
+              ...current,
+              {
+                ...line,
+                key: crypto.randomUUID(),
+                division: "printshoppe",
+                incomeCategory: "tarpaulin",
+                productId: null,
+              },
+            ])
           }
         />
       </div>
 
-      {/* The sale itself. */}
+      {/* How the sale is paid. The items themselves are the rows on the left. */}
       <aside id="this-sale" className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-surface p-5 shadow-sm ring-1 ring-line/60">
-          <div className="flex items-baseline justify-between">
-            <h2 className="font-semibold tracking-tight">This sale</h2>
-            {lines.length > 0 ? (
-              <button
-                type="button"
-                onClick={clearSale}
-                className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
-              >
-                Clear sale
-              </button>
-            ) : null}
-          </div>
+          <h2 className="font-semibold tracking-tight">This sale</h2>
 
-          {lines.length === 0 ? (
+          {totals.lines.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
-              Nothing added yet. Tap a button to start.
+              Nothing chosen yet. Type a quantity beside a product to start.
             </p>
           ) : (
             <ul className="mt-4 divide-y divide-line/60">
-              {totals.lines.map((line, index) => (
-                <li key={lines[index].key} className="flex gap-2 py-2.5">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{line.name}</p>
-                    <p className="text-xs text-muted">
-                      {line.quantity} &times; {formatPesos(line.unitPriceCentavos)}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium">
-                      {formatPesos(line.lineTotalCentavos)}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setLines((current) =>
-                          current.filter((entry) => entry.key !== lines[index].key),
-                        )
-                      }
-                      className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </li>
-              ))}
+              {totals.lines.map((line, index) => {
+                const extra =
+                  index >= fromList.lines.length
+                    ? extraLines[index - fromList.lines.length]
+                    : undefined;
+                return (
+                  <li key={line.productId ?? extra?.key ?? index} className="flex gap-2 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium">{line.name}</p>
+                      <p className="text-xs text-muted">
+                        {line.quantity} &times; {formatPesos(line.unitPriceCentavos)}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-medium">{formatPesos(line.lineTotalCentavos)}</p>
+                      {extra ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setExtraLines((current) =>
+                              current.filter((entry) => entry.key !== extra.key),
+                            )
+                          }
+                          className={`text-xs text-muted underline hover:text-ink ${TAP_AREA}`}
+                        >
+                          Remove
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
 
@@ -326,7 +393,7 @@ export function PosScreen({
           </dl>
         </div>
 
-        <form action={submit} className="space-y-4">
+        <form id="counter-sale" action={submit} className="space-y-4">
           <input type="hidden" name="lines" value={JSON.stringify(lines)} />
           <input type="hidden" name="customerId" value={customerId} />
           <input type="hidden" name="discountKind" value={discountKind} />
@@ -363,6 +430,11 @@ export function PosScreen({
                   </p>
                 </div>
               ) : null}
+              {state.fieldErrors?.discount ? (
+                <div className="mt-3">
+                  <Notice tone="attention" title={state.fieldErrors.discount} />
+                </div>
+              ) : null}
             </div>
           ) : null}
 
@@ -382,7 +454,11 @@ export function PosScreen({
 
             {paymentMethod === "cash" ? (
               <div className="mt-4">
-                <Field label="Money given" error={state.fieldErrors?.moneyGiven}>
+                <Field
+                  label="Money given"
+                  hint="Leave it empty when the customer pays the exact amount."
+                  error={state.fieldErrors?.moneyGiven}
+                >
                   <Input
                     name="moneyGiven"
                     inputMode="decimal"
@@ -433,53 +509,8 @@ export function PosScreen({
               </Button>
             </div>
           </div>
-
-          {state.error ? <Notice tone="attention" title={state.error} /> : null}
-          {state.fieldErrors?.discount ? (
-            <Notice tone="attention" title={state.fieldErrors.discount} />
-          ) : null}
-
-          <Button
-            type="submit"
-            className="w-full py-3 text-base"
-            disabled={pending || lines.length === 0}
-          >
-            {pending ? "Saving…" : "Complete sale & print"}
-          </Button>
         </form>
       </aside>
-
-      {lines.length > 0 ? (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-surface/95 px-4 py-3 backdrop-blur-md lg:hidden">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-            <div>
-              <p className="text-xs text-muted">
-                {totals.itemCount} item{totals.itemCount === 1 ? "" : "s"}
-              </p>
-              <p className="text-xl font-semibold tracking-tight">
-                {formatPesos(totals.totalCentavos)}
-              </p>
-            </div>
-            <a
-              href="#this-sale"
-              className="rounded-control bg-accent px-5 py-2.5 text-sm font-medium text-on-accent"
-            >
-              Review &amp; pay
-            </a>
-          </div>
-        </div>
-      ) : null}
-
-      {pendingProduct ? (
-        <AddItemDialog
-          product={pendingProduct}
-          onCancel={() => setPendingProduct(null)}
-          onAdd={(line) => {
-            addLine(line);
-            setPendingProduct(null);
-          }}
-        />
-      ) : null}
 
       {showCustomer ? (
         <CustomerDialog
@@ -492,15 +523,13 @@ export function PosScreen({
         />
       ) : null}
 
-      {showNewProduct ? (
-        <NewProductDialog
-          onCancel={() => setShowNewProduct(false)}
-          onAdd={(line) => {
-            addLine(line);
-            setShowNewProduct(false);
-          }}
-        />
-      ) : null}
+      <NewCounterProductDialog
+        open={showNewProduct}
+        existingNames={list.items.map((product) => product.name)}
+        canAddPhoto={canManageProducts}
+        onClose={() => setShowNewProduct(false)}
+        onAdd={list.add}
+      />
     </div>
   );
 }
@@ -542,121 +571,6 @@ function Dialog({
         <div className="mt-5">{children}</div>
       </div>
     </div>
-  );
-}
-
-/**
- * Spec 6: nothing is added until the quantity - and the price, where it is not
- * fixed - is confirmed. This is that confirmation.
- */
-function AddItemDialog({
-  product,
-  onAdd,
-  onCancel,
-}: {
-  product: PosProduct;
-  onAdd: (line: Omit<CartLine, "key">) => void;
-  onCancel: () => void;
-}) {
-  const [quantity, setQuantity] = useState("1");
-  const [price, setPrice] = useState(
-    product.priceCentavos === null ? "" : centavosToDecimalString(product.priceCentavos),
-  );
-  const [error, setError] = useState<string | null>(null);
-
-  const quantityNumber = Number(quantity);
-  // Bulk pricing, if the owner has set any rules for this product.
-  const suggested = useMemo(() => {
-    if (product.priceCentavos === null || !Number.isInteger(quantityNumber)) return null;
-    try {
-      const unit = unitPriceFor(product.priceCentavos, quantityNumber, product.tiers);
-      return unit === product.priceCentavos ? null : unit;
-    } catch {
-      return null;
-    }
-  }, [product, quantityNumber]);
-
-  function confirm() {
-    setError(null);
-
-    if (!Number.isInteger(quantityNumber) || quantityNumber < 1) {
-      setError("Enter a whole quantity of 1 or more.");
-      return;
-    }
-
-    let unitPriceCentavos: number;
-    try {
-      unitPriceCentavos = parsePesos(price);
-    } catch {
-      setError("Enter a price like 25 or 25.50.");
-      return;
-    }
-
-    onAdd({
-      name: product.name,
-      quantity: quantityNumber,
-      unitPriceCentavos,
-      division: product.division,
-      productId: product.id,
-      incomeCategory: product.incomeCategory,
-    });
-  }
-
-  return (
-    <Dialog
-      title={product.name}
-      description={
-        product.priceCentavos === null
-          ? "This one has no set price yet, so type what you are charging."
-          : undefined
-      }
-      onClose={onCancel}
-    >
-      <div className="space-y-4">
-        <Field label={`Quantity${product.unit ? ` (${product.unit})` : ""}`}>
-          <Input
-            type="number"
-            min={1}
-            value={quantity}
-            autoFocus
-            onChange={(event) => setQuantity(event.target.value)}
-          />
-        </Field>
-
-        <Field label="Price each">
-          <Input
-            inputMode="decimal"
-            value={price}
-            onChange={(event) => setPrice(event.target.value)}
-          />
-        </Field>
-
-        {suggested !== null ? (
-          <Notice tone="info" title={`Bulk price: ${formatPesos(suggested)} each`}>
-            <p>
-              <button
-                type="button"
-                className={`underline ${TAP_AREA}`}
-                onClick={() => setPrice(centavosToDecimalString(suggested))}
-              >
-                Use the bulk price
-              </button>
-            </p>
-          </Notice>
-        ) : null}
-
-        {error ? <Notice tone="attention" title={error} /> : null}
-
-        <div className="flex gap-2">
-          <Button type="button" onClick={confirm}>
-            Add to sale
-          </Button>
-          <Button type="button" variant="quiet" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </Dialog>
   );
 }
 
@@ -792,126 +706,6 @@ function TarpaulinCalculator({
         </p>
       )}
     </section>
-  );
-}
-
-/** Spec 7.2, including the "save this to my product list" tick. */
-function NewProductDialog({
-  onAdd,
-  onCancel,
-}: {
-  onAdd: (line: Omit<CartLine, "key">) => void;
-  onCancel: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [price, setPrice] = useState("");
-  const [quantity, setQuantity] = useState("1");
-  const [save, setSave] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [savingProduct, startSaving] = useTransition();
-
-  function confirm() {
-    setError(null);
-    const quantityNumber = Number(quantity);
-
-    if (name.trim() === "") {
-      setError("Give the product a name.");
-      return;
-    }
-    if (!Number.isInteger(quantityNumber) || quantityNumber < 1) {
-      setError("Enter a whole quantity of 1 or more.");
-      return;
-    }
-
-    let unitPriceCentavos: number;
-    try {
-      unitPriceCentavos = parsePesos(price);
-    } catch {
-      setError("Enter a price like 25 or 25.50.");
-      return;
-    }
-
-    /*
-      Saving it to the product list is a SEPARATE step from adding it to this
-      sale (spec 7.2). It is deliberately fire-and-forget: if the list cannot be
-      added to, the customer standing at the counter still gets their sale.
-    */
-    if (save) {
-      const form = new FormData();
-      form.set("name", name.trim());
-      form.set("price", price);
-      form.set("division", "printshoppe");
-      startSaving(() => {
-        void saveProductAction({}, form);
-      });
-    }
-
-    onAdd({
-      name: name.trim(),
-      quantity: quantityNumber,
-      unitPriceCentavos,
-      division: "printshoppe",
-      productId: null,
-      incomeCategory: "other_print_jobs",
-    });
-  }
-
-  return (
-    <Dialog
-      title="New product"
-      description="For something that is not on a button yet."
-      onClose={onCancel}
-    >
-      <div className="space-y-4">
-        <Field label="Product name">
-          <Input value={name} autoFocus onChange={(event) => setName(event.target.value)} />
-        </Field>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Price each">
-            <Input
-              inputMode="decimal"
-              value={price}
-              onChange={(event) => setPrice(event.target.value)}
-            />
-          </Field>
-          <Field label="Quantity">
-            <Input
-              type="number"
-              min={1}
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-            />
-          </Field>
-        </div>
-
-        <label className="flex items-start gap-2.5 text-sm">
-          <input
-            type="checkbox"
-            checked={save}
-            onChange={(event) => setSave(event.target.checked)}
-            className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
-          />
-          <span>
-            Save this product to my product list
-            <span className="block text-muted">
-              It becomes a button for next time. The owner can rename or remove
-              it later.
-            </span>
-          </span>
-        </label>
-
-        {error ? <Notice tone="attention" title={error} /> : null}
-
-        <div className="flex gap-2">
-          <Button type="button" onClick={confirm} disabled={savingProduct}>
-            Add to sale
-          </Button>
-          <Button type="button" variant="quiet" onClick={onCancel}>
-            Cancel
-          </Button>
-        </div>
-      </div>
-    </Dialog>
   );
 }
 

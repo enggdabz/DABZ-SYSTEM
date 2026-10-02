@@ -1444,3 +1444,53 @@ to ask:
      choice means giving them a soft delete first: the apparel list, calendar,
      production report and online orders all read them.
 
+- **The Counter's saved products are a list you type into** (your request,
+  2 October 2026). Each product is one row: grip, photo, name, price, a
+  quantity box, the line total and a bin. Typing a quantity replaces the old
+  tap-then-confirm step; nothing is saved until **Complete sale**. The sale is
+  saved through `completeSaleAction` exactly as before, so Sales, End of day and
+  Stocks did not change. Migration `0026_counter_product_list.sql` adds
+  `products.image_path` and `reorder_products`. What I decided along the way:
+  1. **Reordering, photos and the bin are Owner/Admin only.** That is the rule
+     the products table already had (spec 7.2: staff add, only the owner edits
+     or removes), and the photo bucket's write policy says the same. Staff still
+     see the list, type quantities and use **+ New product** (name and price, no
+     photo). To let staff do more, both the `products_update` policy and the
+     `product-images` write policy would have to be widened - a decision, not a
+     setting.
+  2. **Delete removes a product that was never sold; a sold one is hidden.**
+     The database has refused to delete a sold product since `0011`, because it
+     is shop history. So the bin deletes an unsold product together with its
+     bulk prices and its photo file, and hides a sold one (keeping its photo),
+     the same as **Hide** on the Products screen, and says so. Old sales are
+     untouched either way: each sale line keeps its own copy of the name and
+     the price. A hidden product can be shown again from Products.
+  3. **One list for every section.** Printing, Photocopy, Mugs and Saved
+     products used to be separate groups of buttons; they are now one list in
+     the order you drag them into, so the best sellers can sit at the very top.
+     `section` is still stored and still shown on the Products screen. To go
+     back to a list per section, group `list.items` by `section` in
+     `PosScreen.tsx` and give each group its own `SortableContext`.
+  4. **A product with no set price gets a price box in its row**, and the sale
+     cannot be completed until it is filled. Nothing is guessed.
+  5. **Bulk prices apply by themselves** once the quantity reaches a rule you
+     set on the Products screen - the row shows the normal price struck
+     through and the bulk price beside it. Before, staff had to tap "Use the
+     bulk price". To go back: `rowPrice` in `src/lib/counter-list.ts`.
+  6. **A blank "Money given" means the customer paid the exact amount.** That is
+     what lets staff type quantities and press Complete sale without filling
+     anything else in. It is recorded as exactly the total with no change; type
+     an amount to see the change as before. The rule is in `completeSaleAction`.
+  7. **"+ New product" always saves to the list.** The old "add to this sale
+     without saving it" option is gone, because a product added now appears at
+     the bottom of the list ready for a quantity. A name already in the list
+     (ignoring case and spaces) and a zero price are refused.
+  8. **Photos live in the online shop's `product-images` bucket** under
+     `counter/<product id>/`, checked by their content like every other upload.
+     The browser crops each to the middle square and shrinks it to 400 × 400
+     WebP (about 40 KB) before it is sent. A replaced or removed photo's file is
+     deleted after the product stops pointing at it, so a failed save keeps the
+     old photo.
+  9. **The drag library is `@dnd-kit`** (`core`, `sortable`, `utilities`),
+     approved by you on 2 October 2026. Dragging starts only from the grip, so
+     scrolling and tapping a quantity box on a phone work as normal.
