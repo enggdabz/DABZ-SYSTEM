@@ -268,6 +268,9 @@ export function PosScreen({
               onReorder={(activeId, overId, groupIds) =>
                 void list.reorder(activeId, overId, groupIds)
               }
+              onReorderCategories={(activeId, overId) =>
+                void list.reorderCategories(activeId, overId)
+              }
               onChangePhoto={(id, file) => void list.changePhoto(id, file)}
               onRemovePhoto={(id) => void list.removePhoto(id)}
               onDelete={(id) => void list.remove(id)}
@@ -570,6 +573,7 @@ export function PosScreen({
           onClose={() => setShowCategories(false)}
           onSave={list.saveCategory}
           onDelete={list.deleteCategory}
+          onMove={(activeId, overId) => void list.reorderCategories(activeId, overId)}
         />
       ) : null}
     </div>

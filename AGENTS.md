@@ -310,7 +310,9 @@ round trip is the one thing that must be tried against a real project.
   the old fixed `products.section`. A drag reorders within ONE category
   (`moveWithinGroup`); changing a product's category is a deliberate choice in
   its edit dialog, never a side effect of where a row was dropped. Deleting a
-  category never deletes a product (`on delete set null`).
+  category never deletes a product (`on delete set null`). The categories'
+  own order is saved whole by `reorder_product_categories` (0028), like the
+  products'; "Other" is always last and never sortable.
 - **The server re-derives every total.** `completeSaleAction` never trusts the
   figures the browser sends; it rebuilds them with `src/lib/pos.ts` and writes
   those. The screen's totals are a preview, not the record.

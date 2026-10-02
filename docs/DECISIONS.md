@@ -1557,3 +1557,18 @@ to ask:
   half-width column) puts the box and the line total on a second line under
   the name; a wide row keeps everything on one line. The rule is
   `stepQuantity` in `src/lib/counter-list.ts`.
+- **Categories can be moved into your own order** (your request, 2 October
+  2026). Migration `0028_product_category_order.sql` gives each category a
+  position and `reorder_product_categories` saves a new order in one step,
+  the same way product order is saved. This replaces item 3 of the categories
+  entry above ("listed by name"). What I decided:
+  1. **Drag the grip on a red header** (owner/admin) to move the whole
+     category, products and all. **Manage categories** also has ▲ and ▼ beside
+     each one, because dragging a tall section on a phone is fiddly.
+  2. **Other always stays last.** It is where everything without a category
+     goes, not a category of its own, so it has no grip.
+  3. **A new category goes to the bottom**; a renamed one keeps its place. The
+     categories that already existed start in the order they were shown in -
+     by name - so nothing jumped when `0028` arrived.
+  4. **If the save fails, the category goes back** and a message says so, as
+     with products. Staff see no grip and no arrows.

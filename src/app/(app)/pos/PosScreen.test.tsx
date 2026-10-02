@@ -25,6 +25,7 @@ const actions = vi.hoisted(() => ({
   updateCounterProductAction: vi.fn(),
   saveProductCategoryAction: vi.fn(),
   deleteProductCategoryAction: vi.fn(),
+  reorderProductCategoriesAction: vi.fn(),
 }));
 vi.mock("./actions", () => actions);
 
@@ -84,6 +85,7 @@ beforeEach(() => {
   }));
   actions.reorderCounterProductsAction.mockImplementation(async () => ({}));
   actions.deleteCounterProductAction.mockImplementation(async () => ({ outcome: "deleted" }));
+  actions.reorderProductCategoriesAction.mockImplementation(async () => ({}));
 });
 
 afterEach(() => {
@@ -620,6 +622,59 @@ describe("categories", () => {
     expect(within(other).getByLabelText("Quantity of Xerox")).toBeTruthy();
   });
 
+  it("gives the owner a grip on every category header except Other", () => {
+    renderWithCategories();
+    expect(screen.getByRole("button", { name: "Move the category Mugs" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Move the category Printing" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Move the category Other" })).toBeNull();
+  });
+
+  it("gives staff no grip on a category header", () => {
+    renderWithCategories({ canManage: false });
+    expect(screen.queryByRole("button", { name: /^Move the category/ })).toBeNull();
+  });
+
+  it("moves a category up and down from Manage categories, and saves the order", async () => {
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.type(quantityBox("Xerox"), "4");
+    await user.click(screen.getByRole("button", { name: "Manage categories" }));
+    const dialog = screen.getByRole("dialog", { name: "Categories" });
+
+    // The top one cannot go higher.
+    expect(
+      (within(dialog).getByRole("button", { name: "Move Mugs up" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    await user.click(within(dialog).getByRole("button", { name: "Move Printing up" }));
+    await waitFor(() =>
+      expect(actions.reorderProductCategoriesAction).toHaveBeenCalledWith([PRINTING.id, MUGS.id]),
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+
+    expect(headings()).toEqual(["Printing", "Mugs", "Other"]);
+    // The products went with their category, quantity and all.
+    const printing = screen.getByRole("list", { name: "Printing" });
+    expect((within(printing).getByLabelText("Quantity of Xerox") as HTMLInputElement).value).toBe("4");
+  });
+
+  it("puts the categories back and says so when the new order is not saved", async () => {
+    actions.reorderProductCategoriesAction.mockImplementation(async () => ({
+      error: "The new order was not saved: offline.",
+    }));
+    const user = userEvent.setup();
+    renderWithCategories();
+
+    await user.click(screen.getByRole("button", { name: "Manage categories" }));
+    const dialog = screen.getByRole("dialog", { name: "Categories" });
+    await user.click(within(dialog).getByRole("button", { name: "Move Mugs down" }));
+    await user.click(within(dialog).getByRole("button", { name: "Done" }));
+
+    expect(await screen.findByText(/The category was put back/)).toBeTruthy();
+    expect(headings()).toEqual(["Mugs", "Printing", "Other"]);
+  });
+
   it("adds and renames categories", async () => {
     actions.saveProductCategoryAction.mockImplementation(async (form: FormData) => ({
       category: {
@@ -643,8 +698,9 @@ describe("categories", () => {
     await waitFor(() => expect(within(dialog).getByLabelText("Name of Mugs & souvenirs")).toBeTruthy());
 
     await user.click(within(dialog).getByRole("button", { name: "Done" }));
-    // The empty categories still show to the owner, by name.
-    expect(headings()).toEqual(["ID photo", "Mugs & souvenirs", "Printing", "Other"]);
+    // A new category goes to the bottom (0028); a renamed one keeps its
+    // place. Empty categories still show to the owner.
+    expect(headings()).toEqual(["Mugs & souvenirs", "Printing", "ID photo", "Other"]);
   });
 });
 
