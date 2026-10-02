@@ -107,6 +107,14 @@ export default async function PrintReportPage({
           </div>
         </header>
 
+        {current.partial || previous.partial ? (
+          <p className="mt-4 rounded border border-black/50 p-2 text-xs">
+            <strong>{"\u26a0"} Not the whole period.</strong> There were more
+            money entries than one report reads, so the income, expense and
+            profit figures below are low.
+          </p>
+        ) : null}
+
         <section className="mt-5">
           <h2 className="border-b border-black pb-1 text-sm font-bold">Money</h2>
           <table className="mt-2 w-full text-sm">

@@ -32,6 +32,7 @@ import type { DivisionId } from "@/lib/divisions";
 import type { MoneySource } from "@/lib/ledger";
 import { manilaDayRangeUtc, type CivilDate } from "@/lib/period";
 import { isOpenTicket, UNIT_KIND_LABELS } from "@/lib/repairs";
+import { readPaged } from "@/lib/paged";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const COLUMNS =
@@ -134,14 +135,24 @@ export async function getCollections(options: {
   // `lt` on the upper bound, never `lte`: the window from manilaDayRangeUtc
   // ends at midnight of the NEXT Manila day, and including it would count a
   // payment twice - once in each day.
-  const [{ data, error }, names] = await Promise.all([
-    supabase
-      .from("collections")
-      .select(COLUMNS)
-      .gte("taken_at", options.from)
-      .lt("taken_at", options.to)
-      .order("taken_at", { ascending: false })
-      .limit(limit + 1),
+  //
+  // Read a page at a time: one request stops at 1,000 rows however many it
+  // asks for, so a 5,000-row report read in one go came back with 1,000 and
+  // never knew - `truncated` below could not fire. Ordered by id as well, so a
+  // page break never splits a tie.
+  const [{ rows: data, error }, names] = await Promise.all([
+    readPaged(
+      (from, to) =>
+        supabase
+          .from("collections")
+          .select(COLUMNS)
+          .gte("taken_at", options.from)
+          .lt("taken_at", options.to)
+          .order("taken_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      limit + 1,
+    ),
     displayNames(supabase),
   ]);
 
@@ -152,7 +163,7 @@ export async function getCollections(options: {
     `rebuildCollections`. It is the same question put to the same rows without
     the view in the way.
   */
-  if (error || !data) {
+  if (error) {
     return rebuildCollections(supabase, options, limit, names);
   }
 
@@ -305,42 +316,55 @@ async function rebuildCollections(
   const cap = limit + 1;
 
   const [sales, apparel, repairs] = await Promise.all([
-    supabase
-      .from("sales")
-      .select(
-        "id, sale_number, customer_id, total_centavos, payment_method, reference_number, occurred_at, sale_date, created_by, voided_at",
-      )
-      .gte("occurred_at", window.from)
-      .lt("occurred_at", window.to)
-      .order("occurred_at", { ascending: false })
-      .limit(cap),
-    supabase
-      .from("apparel_payments")
-      .select(
-        "id, order_id, amount_centavos, kind, source, reference_number, created_at, paid_on, created_by, voided_at",
-      )
-      .gte("created_at", window.from)
-      .lt("created_at", window.to)
-      .order("created_at", { ascending: false })
-      .limit(cap),
-    supabase
-      .from("repair_payments")
-      .select(
-        "id, ticket_id, amount_centavos, source, reference_number, created_at, paid_on, created_by, voided_at",
-      )
-      .gte("created_at", window.from)
-      .lt("created_at", window.to)
-      .order("created_at", { ascending: false })
-      .limit(cap),
+    readPaged(
+      (from, to) =>
+        supabase
+          .from("sales")
+          .select(
+            "id, sale_number, customer_id, total_centavos, payment_method, reference_number, occurred_at, sale_date, created_by, voided_at",
+          )
+          .gte("occurred_at", window.from)
+          .lt("occurred_at", window.to)
+          .order("occurred_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      cap,
+    ),
+    readPaged(
+      (from, to) =>
+        supabase
+          .from("apparel_payments")
+          .select(
+            "id, order_id, amount_centavos, kind, source, reference_number, created_at, paid_on, created_by, voided_at",
+          )
+          .gte("created_at", window.from)
+          .lt("created_at", window.to)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      cap,
+    ),
+    readPaged(
+      (from, to) =>
+        supabase
+          .from("repair_payments")
+          .select(
+            "id, ticket_id, amount_centavos, source, reference_number, created_at, paid_on, created_by, voided_at",
+          )
+          .gte("created_at", window.from)
+          .lt("created_at", window.to)
+          .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
+          .range(from, to),
+      cap,
+    ),
   ]);
 
-  if (sales.error || !sales.data) return unreadable;
-  if (apparel.error || !apparel.data) return unreadable;
-  if (repairs.error || !repairs.data) return unreadable;
+  if (sales.error || apparel.error || repairs.error) return unreadable;
 
-  const saleRaw = sales.data as Record<string, unknown>[];
-  const apparelRaw = apparel.data as Record<string, unknown>[];
-  const repairRaw = repairs.data as Record<string, unknown>[];
+  const saleRaw = sales.rows as Record<string, unknown>[];
+  const apparelRaw = apparel.rows as Record<string, unknown>[];
+  const repairRaw = repairs.rows as Record<string, unknown>[];
 
   const [orders, tickets] = await Promise.all([
     rowsById(

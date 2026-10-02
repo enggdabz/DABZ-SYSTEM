@@ -216,6 +216,16 @@ export default async function ReportsPage({
         </Notice>
       ) : null}
 
+      {current.partial || previous.partial ? (
+        <Notice tone="attention" title="These figures do not cover the whole period">
+          <p>
+            There were more money entries than one report reads, so income,
+            expenses and profit below are lower than they really are. Choose a
+            shorter period for exact figures.
+          </p>
+        </Notice>
+      ) : null}
+
       {/* ---- The money ---------------------------------------------------- */}
       <Card
         title="Money"
