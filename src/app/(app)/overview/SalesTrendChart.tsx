@@ -28,9 +28,12 @@ const LABEL_SPACING = 60;
 export function SalesTrendChart({
   points,
   rangeWords,
+  measureLabel = "Sales",
 }: {
   points: TrendPoint[];
   rangeWords: string;
+  /** "Sales" or "Expenses" - names the line for screen readers and the table. */
+  measureLabel?: string;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
@@ -115,7 +118,7 @@ export function SalesTrendChart({
           viewBox={`0 0 ${width} ${HEIGHT}`}
           className="absolute inset-0 block touch-pan-y select-none rounded-control focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           role="img"
-          aria-label={`Sales over ${rangeWords}. Use the left and right arrow keys to read each point.`}
+          aria-label={`${measureLabel} over ${rangeWords}. Use the left and right arrow keys to read each point.`}
           tabIndex={0}
           onKeyDown={onKeyDown}
         >
@@ -215,7 +218,7 @@ export function SalesTrendChart({
             <thead>
               <tr className="border-b border-line text-left text-muted">
                 <th className="py-2 pr-4 font-medium">Period</th>
-                <th className="py-2 text-right font-medium">Sales</th>
+                <th className="py-2 text-right font-medium">{measureLabel}</th>
               </tr>
             </thead>
             <tbody>

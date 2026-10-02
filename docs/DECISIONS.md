@@ -1624,6 +1624,17 @@ to ask:
      that range is read from the ledger. No migration: it adds up ledger rows
      each time, like Reports. If five busy years ever exceed 50,000 entries the
      card says the oldest points are too low rather than drawing a false dip.
+- **An expenses line beside it** (your request, 2 October 2026), the same graph
+  with the same four buttons, under the sales line. What I decided:
+  1. **"Expenses" is the cost of running the shop** - the figure Reports calls
+     expenses: materials, bills, wages, cash advances, loan payments and the
+     rest. An **owner withdrawal is left out**, because taking money home is
+     not a shop cost. Voided entries are taken back. To change what counts,
+     edit `COUNTS` in `src/lib/sales-trend.ts`.
+  2. **Each line keeps its own choice**: weekly sales and monthly expenses can
+     be on screen together (`/overview?sales=weekly&expenses=monthly`).
+  3. Under the line it says the **highest** day/week/month/year, not the
+     "best" - a dear month is not a good one.
 - **Bills: monthly or one-time, priority bills, sorted by due date, and part
   payments** (your requests, 2 October 2026). Migrations
   `0029_bill_frequency.sql` and `0030_bill_partial_payments.sql`. What I

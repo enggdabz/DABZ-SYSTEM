@@ -11,7 +11,12 @@
  * capital also arrive as money in, and a loan would otherwise show up as the
  * best day the shop ever had.
  */
-import { countsAsIncome, type LedgerCategory, type LedgerDirection } from "@/lib/ledger";
+import {
+  countsAsIncome,
+  countsAsShopExpense,
+  type LedgerCategory,
+  type LedgerDirection,
+} from "@/lib/ledger";
 import { sumCentavos, type Centavos } from "@/lib/money";
 import {
   addDays,
@@ -24,6 +29,33 @@ import {
   type CivilDate,
   type WeekStart,
 } from "@/lib/period";
+
+/**
+ * What a line adds up. "Sales" is earnings (see above). "Expenses" is the cost
+ * of running the shop (`countsAsShopExpense`) - the same figure Reports calls
+ * expenses - so an owner withdrawal is left out: taking money home is not a
+ * shop cost, and it would otherwise read as the dearest day of the month.
+ */
+export type TrendMeasure = "sales" | "expenses";
+
+export const TREND_MEASURE_LABELS: Record<TrendMeasure, string> = {
+  sales: "Sales",
+  expenses: "Expenses",
+};
+
+/** Which way the money moved, so the reader asks the ledger for one side only. */
+export const TREND_MEASURE_DIRECTION: Record<TrendMeasure, LedgerDirection> = {
+  sales: "in",
+  expenses: "out",
+};
+
+const COUNTS: Record<
+  TrendMeasure,
+  (entry: { direction: LedgerDirection; category: LedgerCategory }) => boolean
+> = {
+  sales: countsAsIncome,
+  expenses: countsAsShopExpense,
+};
 
 export const TREND_VIEWS = ["daily", "weekly", "monthly", "yearly"] as const;
 export type TrendView = (typeof TREND_VIEWS)[number];
@@ -148,7 +180,7 @@ export interface TrendEntry {
 }
 
 /**
- * Adds the live income in each bucket.
+ * Adds the live income (or, for expenses, the live shop costs) in each bucket.
  *
  * A voided entry is skipped (money handed back was not taken in), and an
  * entry is placed by its MANILA date - a sale at 7am Manila is 11pm the day
@@ -157,13 +189,15 @@ export interface TrendEntry {
 export function buildSalesTrend(
   entries: readonly TrendEntry[],
   buckets: readonly TrendBucket[],
+  measure: TrendMeasure = "sales",
 ): TrendPoint[] {
+  const counts = COUNTS[measure];
   const starts = buckets.map((bucket) => civilDateToISO(bucket.start));
   const ends = buckets.map((bucket) => civilDateToISO(bucket.end));
   const amounts: Centavos[][] = buckets.map(() => []);
 
   for (const entry of entries) {
-    if (entry.voidedAt !== null || !countsAsIncome(entry)) continue;
+    if (entry.voidedAt !== null || !counts(entry)) continue;
     // ISO dates compare correctly as strings.
     const day = civilDateToISO(civilDateFromTimestamp(entry.occurredAt));
     const index = starts.findIndex((start, i) => day >= start && day < ends[i]);
@@ -211,4 +245,18 @@ export function formatAxisPesos(amount: Centavos): string {
     maximumFractionDigits: 2,
   }).format(amount / 100);
   return `₱${compact}`;
+}
+
+/**
+ * The Overview address for a pair of views. Each line keeps its own choice, so
+ * switching expenses to weekly must not put sales back to daily. Daily is the
+ * default and is left out, so the plain `/overview` stays the plain page.
+ */
+export function overviewTrendHref(views: Record<TrendMeasure, TrendView>): string {
+  const params = new URLSearchParams();
+  for (const measure of ["sales", "expenses"] as const) {
+    if (views[measure] !== "daily") params.set(measure, views[measure]);
+  }
+  const query = params.toString();
+  return query ? `/overview?${query}` : "/overview";
 }
