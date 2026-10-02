@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getCollectionsReport,
@@ -113,8 +113,8 @@ export default async function ReportsPage({
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Reports</h1>
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Reports</h1>
           <p className="mt-2 text-muted">
             {range.label} &middot; {showDate(range.fromISO)} to{" "}
             {showDate(range.toISO)}
@@ -227,7 +227,7 @@ export default async function ReportsPage({
                 className="border-t border-line/60 pt-6 first:border-0 first:pt-0"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-semibold">{division.name}</h3>
+                  <h3 className={`${HEADING_BOX} grow font-semibold`}>{division.name}</h3>
                   <span className="text-right">
                     <span className="text-lg font-semibold">
                       {formatPesos(division.incomeCentavos)}
@@ -453,7 +453,7 @@ export default async function ReportsPage({
       >
         <div className="grid gap-6 sm:grid-cols-2">
           <div>
-            <h3 className="text-sm font-medium text-muted">Owed to you</h3>
+            <h3 className={`${HEADING_BOX} text-sm font-medium`}>Owed to you</h3>
             <p className="mt-1 text-2xl font-semibold tracking-tight text-success">
               {formatPesos(standing.owedToShopCentavos)}
             </p>
@@ -470,7 +470,7 @@ export default async function ReportsPage({
           </div>
 
           <div>
-            <h3 className="text-sm font-medium text-muted">Owed by you</h3>
+            <h3 className={`${HEADING_BOX} text-sm font-medium`}>Owed by you</h3>
             <p className="mt-1 text-2xl font-semibold tracking-tight text-attention">
               {formatPesos(standing.owedByShopCentavos)}
             </p>
@@ -493,7 +493,7 @@ export default async function ReportsPage({
 
         <div className="mt-6 border-t border-line/60 pt-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-sm font-medium text-muted">
+            <h3 className={`${HEADING_BOX} grow text-sm font-medium`}>
               Materials on the shelves
             </h3>
             <span className="text-lg font-semibold">

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Button, Card, Field, Input, Notice, TAP_AREA } from "@/components/ui";
+import { Button, Card, Field, Input, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getPayrollDaysForWeeks,
@@ -80,7 +80,7 @@ export default async function PayrollSummaryPage({
         <Link href="/payroll" className={`text-sm underline ${TAP_AREA}`}>
           {"←"} Back to payroll
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className={`${HEADING_BOX} mt-2 text-3xl font-semibold tracking-tight`}>
           Payroll summary
         </h1>
         <p className="mt-2 text-muted">

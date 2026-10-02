@@ -17,7 +17,7 @@ import { useEffect, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
 
 import { markNotificationsReadAction } from "@/app/(app)/bell-actions";
-import { TAP_AREA } from "@/components/ui";
+import { TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { formatManilaDateTime } from "@/lib/datetime";
 
 export interface BellNotification {
@@ -67,7 +67,7 @@ export function NotificationBell({
             aria-label="Notifications"
             className="absolute inset-x-4 top-[4.5rem] max-h-[70vh] overflow-y-auto rounded-card bg-surface p-4 shadow-lg ring-1 ring-line/60 sm:left-auto sm:w-96"
           >
-            <h2 className="text-base font-semibold tracking-tight">
+            <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>
               Notifications
             </h2>
             {notifications.length === 0 ? (

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/dal";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getPendingRequestForProject } from "@/lib/data/project-deletions";
@@ -62,7 +62,7 @@ export default async function ProjectPage({
     if (isDatabaseBehind(error)) {
       return (
         <div className="space-y-6">
-          <h1 className="text-3xl font-semibold tracking-tight">Project</h1>
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Project</h1>
           <DatabaseBehind
             migration={error.migration}
             canOpenSystemCheck={isOwnerOrAdmin(user)}
@@ -91,9 +91,9 @@ export default async function ProjectPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
+        <div className="grow">
           <p className="text-sm text-muted">{project.number}</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight">
+          <h1 className={`${HEADING_BOX} mt-1 text-3xl font-semibold tracking-tight`}>
             {project.customerName}
           </h1>
           <p className="mt-2 max-w-2xl">{project.description}</p>

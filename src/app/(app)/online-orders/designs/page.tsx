@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { connection } from "next/server";
 
-import { Card, Disclosure, Notice, Tag } from "@/components/ui";
+import { Card, Disclosure, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getOnlineDesigns, getOnlineProducts } from "@/lib/data/online";
 import { nextDesignCode } from "@/lib/online/catalogue";
@@ -34,7 +34,7 @@ export default async function OnlineDesignsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Jersey designs</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Jersey designs</h1>
         <p className="mt-2 text-muted">
           Layouts you have already drawn, that a customer can pick instead of
           sending their own artwork. You recolour them to the team&rsquo;s

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getAccountOptions, getAdvanceBalances, getStaff } from "@/lib/data/staff";
 import { DIVISIONS, type DivisionId } from "@/lib/divisions";
@@ -42,7 +42,7 @@ export default async function StaffPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Staff</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Staff</h1>
         <p className="mt-2 text-muted">
           The people the shop employs and pays. A login is optional &mdash;
           someone who only taps the time clock does not need one. Logins and

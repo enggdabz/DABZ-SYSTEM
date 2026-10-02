@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { formatManilaDateTime } from "@/lib/datetime";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { NAV_SECTIONS, visibleSections } from "@/lib/auth/navigation";
@@ -76,7 +76,7 @@ export default async function HomePage({
         <p className="text-sm font-medium text-muted">
           {formatManilaDateTime(new Date())}
         </p>
-        <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
+        <h1 className={`${HEADING_BOX} mt-1 text-3xl font-semibold tracking-tight sm:text-4xl`}>
           Good day, {user.fullName.split(" ")[0]}.
         </h1>
       </div>
@@ -308,7 +308,7 @@ async function OwnerOverview() {
     <>
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium text-muted">Today&apos;s target</h2>
+          <h2 className={`${HEADING_BOX} grow text-sm font-medium`}>Today&apos;s target</h2>
           {progress.unknown ? (
             <Tag tone="attention">{"⚠"} No target yet</Tag>
           ) : progress.reached ? (
@@ -433,8 +433,8 @@ async function OwnerOverview() {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="flex items-center gap-2 font-semibold tracking-tight">
-                <span aria-hidden="true" className="text-attention">
+              <h2 className={`${HEADING_BOX} flex items-center gap-2 font-semibold tracking-tight`}>
+                <span aria-hidden="true">
                   {"\u26a0"}
                 </span>
                 {checklist.items.length} thing
@@ -459,7 +459,7 @@ async function OwnerOverview() {
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
-              <h2 className="font-semibold tracking-tight">
+              <h2 className={`${HEADING_BOX} font-semibold tracking-tight`}>
                 {waitingEnquiries} customer message
                 {waitingEnquiries === 1 ? "" : "s"} waiting for an answer
               </h2>

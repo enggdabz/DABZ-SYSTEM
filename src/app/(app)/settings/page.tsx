@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice } from "@/components/ui";
+import { Card, Notice, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getMySubscriptions } from "@/lib/data/notifications";
 import { pushSetup } from "@/lib/notifications";
@@ -32,7 +32,7 @@ export default async function SettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Settings</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Settings</h1>
         <p className="mt-2 text-muted">
           The numbers the rest of the system works from. Changing one is
           recorded in Activity, with the old and new value.

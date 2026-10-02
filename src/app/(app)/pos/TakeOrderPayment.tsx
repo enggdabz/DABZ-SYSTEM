@@ -18,7 +18,7 @@
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import {
   DIVISION_DOOR_LABELS,
   defaultPaymentKind,
@@ -107,7 +107,7 @@ function Dialog({
       <div className="flex max-h-full w-full max-w-2xl flex-col rounded-t-card bg-surface shadow-lg ring-1 ring-line/60 sm:max-h-[90vh] sm:rounded-card">
         <div className="flex items-start justify-between gap-4 border-b border-line/60 p-5">
           <div>
-            <h2 className="text-lg font-semibold tracking-tight">
+            <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>
               Take payment for an order
             </h2>
             <p className="mt-1 text-sm text-muted">

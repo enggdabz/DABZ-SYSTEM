@@ -28,6 +28,7 @@ import {
   Select,
   TAP_AREA,
   Tag,
+  HEADING_BOX,
 } from "@/components/ui";
 import { formatManilaDate } from "@/lib/datetime";
 import { centavosToDecimalString, formatPesos, parsePesos } from "@/lib/money";
@@ -181,7 +182,7 @@ function FindProject({
     <section className={CARD} aria-label="Find project">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>
             Find project
           </h2>
           <p className="mt-1 text-sm text-muted">
@@ -556,7 +557,7 @@ function NewProjectForm({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={CARD}>
-          <h2 className="text-base font-semibold tracking-tight">The job</h2>
+          <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>The job</h2>
 
           <Field label="Project type" error={detailErrors.type}>
             <Select
@@ -610,7 +611,7 @@ function NewProjectForm({
         </div>
 
         <div className={CARD}>
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>
             The customer
           </h2>
 
@@ -659,7 +660,7 @@ function NewProjectForm({
       </div>
 
       <div className={CARD}>
-        <h2 className="text-base font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>
           Payment today
         </h2>
 
@@ -982,7 +983,7 @@ function FollowUpForm({
 
       <div className="grid gap-5 lg:grid-cols-2">
         <div className={CARD}>
-          <h2 className="text-base font-semibold tracking-tight">The job</h2>
+          <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>The job</h2>
           <div className="flex flex-wrap items-center gap-2">
             <Tag>{project.number}</Tag>
             <Tag>{project.typeLabel}</Tag>
@@ -998,7 +999,7 @@ function FollowUpForm({
         </div>
 
         <div className={CARD}>
-          <h2 className="text-base font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>
             The customer
           </h2>
           <dl className="space-y-3 text-sm">
@@ -1029,7 +1030,7 @@ function FollowUpForm({
       </div>
 
       <div className={CARD}>
-        <h2 className="text-base font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} text-base font-semibold tracking-tight`}>
           Payment today
         </h2>
 

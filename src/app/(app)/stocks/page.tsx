@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getSuppliers } from "@/lib/data/expenses";
@@ -32,7 +32,7 @@ export default async function StocksPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Stocks</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Stocks</h1>
         <p className="mt-2 text-muted">
           What is on the shelf. Every figure here is added up from the deliveries
           and withdrawals below it &mdash; nothing is stored separately, so the

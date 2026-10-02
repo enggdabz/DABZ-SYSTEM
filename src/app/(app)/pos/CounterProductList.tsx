@@ -49,7 +49,7 @@ import {
 } from "react";
 
 import { Modal } from "@/components/Modal";
-import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import {
   checkCategoryName,
   checkNewProduct,
@@ -349,22 +349,22 @@ function SortableSection({
       }`}
     >
       {group.title !== null ? (
-        <h3 className="mb-2 flex items-center gap-1 rounded-control bg-accent py-1 pr-3 pl-1 text-sm font-semibold tracking-tight text-on-accent">
+        <h3 className={`${HEADING_BOX} mb-2 flex items-center gap-1.5 text-sm font-semibold tracking-tight`}>
           {canMove ? (
+            // Pulled into the box's own padding so the title sits where an
+            // unmovable header's would, and the grip is still 36px tall.
             <button
               type="button"
               ref={setActivatorNodeRef}
               {...attributes}
               {...listeners}
               aria-label={`Move the category ${group.title}`}
-              className="flex h-9 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-control text-on-accent/80 hover:text-on-accent active:cursor-grabbing"
+              className="-my-2 -ml-2 flex h-9 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-control opacity-80 hover:opacity-100 active:cursor-grabbing"
             >
               <GripIcon />
             </button>
-          ) : (
-            <span className="w-2" aria-hidden="true" />
-          )}
-          <span className="py-1">{group.title}</span>
+          ) : null}
+          <span>{group.title}</span>
         </h3>
       ) : null}
       {children}

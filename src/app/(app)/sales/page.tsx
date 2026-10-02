@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Button, Card, Field, Input, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Button, Card, Field, Input, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requireUser } from "@/lib/auth/dal";
 import { doorViewer, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import {
@@ -154,7 +154,7 @@ export default async function SalesPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Sales</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Sales</h1>
         <p className="mt-2 text-muted">
           {formatCivilDate(day.date)} &middot; everything taken at the counter, on
           a job order and on a repair ticket

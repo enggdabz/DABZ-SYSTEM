@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { DatabaseBehind } from "@/components/DatabaseBehind";
-import { Card, TAP_AREA, Tag } from "@/components/ui";
+import { Card, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwner } from "@/lib/auth/dal";
 import {
   getDeletionRequests,
@@ -37,7 +37,7 @@ export default async function DeletionRequestsPage() {
     if (isDatabaseBehind(error)) {
       return (
         <div className="space-y-6">
-          <h1 className="text-3xl font-semibold tracking-tight">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>
             Deletion requests
           </h1>
           <DatabaseBehind migration={error.migration} canOpenSystemCheck />
@@ -51,8 +51,8 @@ export default async function DeletionRequestsPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>
             Deletion requests
           </h1>
           <p className="mt-2 max-w-2xl text-muted">

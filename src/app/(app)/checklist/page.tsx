@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getChecklist } from "@/lib/data/checklist";
 
@@ -26,7 +26,7 @@ export default async function ChecklistPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">To fill in</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>To fill in</h1>
         <p className="mt-2 text-muted">
           Figures only you can know. The system is running without them &mdash;
           fill them in whenever you get to it, and this list gets shorter.
@@ -54,7 +54,7 @@ export default async function ChecklistPage() {
 
       {important.length > 0 ? (
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>
             Worth doing first
           </h2>
           {important.map((item) => (
@@ -65,7 +65,7 @@ export default async function ChecklistPage() {
 
       {rest.length > 0 ? (
         <section className="space-y-4">
-          <h2 className="text-xl font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>
             When you get a chance
           </h2>
           {rest.map((item) => (
