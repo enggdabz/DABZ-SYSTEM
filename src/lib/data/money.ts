@@ -10,6 +10,7 @@ import "server-only";
 import { cache } from "react";
 
 import {
+  partPaidTotals,
   totalMonthlyBills,
   type Bill,
 } from "@/lib/bills";
@@ -40,24 +41,44 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const getBills = cache(async (): Promise<Bill[]> => {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("bills")
-    .select("id, name, amount_centavos, due_day, type, loan_id, active, note")
-    .order("active", { ascending: false })
-    .order("name");
+  const read = (columns: string) =>
+    supabase
+      .from("bills")
+      .select(columns)
+      .order("active", { ascending: false })
+      .order("name");
+
+  /*
+    `frequency` and `starts_month` arrive in 0029. Without them the bills are
+    read as they were before - every one monthly, none carried over - so a
+    database that is behind costs one-time bills, not the whole Bills screen.
+  */
+  let { data, error } = await read(`${BILL_COLUMNS}, frequency, starts_month`);
+  if (error) ({ data, error } = await read(BILL_COLUMNS));
 
   if (error || !data) return [];
 
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    amountCentavos: Number(row.amount_centavos),
-    dueDay: row.due_day === null ? null : Number(row.due_day),
-    type: row.type === "loan_installment" ? "loan_installment" : "operating",
-    loanId: row.loan_id,
-    active: row.active,
-  }));
+  return (data as unknown as Record<string, unknown>[]).map(billFromRow);
 });
+
+const BILL_COLUMNS = "id, name, amount_centavos, due_day, type, loan_id, active, note";
+
+/** One `bills` row as a Bill. Shared with the morning digest. */
+export function billFromRow(row: Record<string, unknown>): Bill {
+  const starts =
+    typeof row.starts_month === "string" ? parseISODate(row.starts_month) : null;
+  return {
+    id: String(row.id),
+    name: String(row.name),
+    amountCentavos: Number(row.amount_centavos),
+    dueDay: row.due_day === null || row.due_day === undefined ? null : Number(row.due_day),
+    type: row.type === "loan_installment" ? "loan_installment" : "operating",
+    loanId: (row.loan_id as string | null) ?? null,
+    active: Boolean(row.active),
+    frequency: row.frequency === "one_time" ? "one_time" : "monthly",
+    startsMonth: starts ? { year: starts.year, month: starts.month } : null,
+  };
+}
 
 export interface BillPaymentRow {
   id: string;
@@ -66,6 +87,8 @@ export interface BillPaymentRow {
   amountCentavos: Centavos;
   paidOn: string;
   source: string;
+  /** A part payment (0030). Only a payment where this is false settles the month. */
+  isPartial: boolean;
 }
 
 /**
@@ -83,35 +106,59 @@ export const getBillPayments = cache(
     const from = `${periodKey(addMonths(centre, -12))}-01`;
     const to = `${periodKey(addMonths(centre, 12))}-01`;
 
-    const { data, error } = await supabase
-      .from("bill_payments")
-      .select("id, bill_id, period_month, amount_centavos, paid_on, source")
-      .gte("period_month", from)
-      .lte("period_month", to);
+    const read = (columns: string) =>
+      supabase
+        .from("bill_payments")
+        .select(columns)
+        .gte("period_month", from)
+        .lte("period_month", to)
+        .order("created_at");
+
+    // `is_partial` arrives in 0030. Without it every payment is a whole one,
+    // which is exactly what every payment was before it.
+    const base = "id, bill_id, period_month, amount_centavos, paid_on, source";
+    let { data, error } = await read(`${base}, is_partial`);
+    if (error) ({ data, error } = await read(base));
 
     if (error || !data) return [];
 
-    return data.flatMap((row) => {
-      const parsed = parseISODate(row.period_month);
+    return (data as unknown as Record<string, unknown>[]).flatMap((row) => {
+      const parsed = parseISODate(String(row.period_month));
       if (!parsed) return [];
       return [
         {
-          id: row.id,
-          billId: row.bill_id,
+          id: String(row.id),
+          billId: String(row.bill_id),
           period: { year: parsed.year, month: parsed.month },
           amountCentavos: Number(row.amount_centavos),
-          paidOn: row.paid_on,
-          source: row.source,
+          paidOn: String(row.paid_on),
+          source: String(row.source),
+          isPartial: row.is_partial === true,
         },
       ];
     });
   },
 );
 
-/** "billId:2026-09" for every month already marked paid. */
+/** "billId:2026-09" for every month already SETTLED - part payments excluded. */
 export function paidKeysFrom(payments: readonly BillPaymentRow[]): Set<string> {
   return new Set(
-    payments.map((payment) => `${payment.billId}:${periodKey(payment.period)}`),
+    payments
+      .filter((payment) => !payment.isPartial)
+      .map((payment) => `${payment.billId}:${periodKey(payment.period)}`),
+  );
+}
+
+/** "billId:2026-09" -> what the part payments of that month add up to. */
+export function partPaidFrom(
+  payments: readonly BillPaymentRow[],
+): Map<string, Centavos> {
+  return partPaidTotals(
+    payments.map((payment) => ({
+      key: `${payment.billId}:${periodKey(payment.period)}`,
+      amountCentavos: payment.amountCentavos,
+      isPartial: payment.isPartial,
+    })),
   );
 }
 

@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 
 import {
   REMINDER_DAYS,
+  billAppliesTo,
   billLoanLink,
   billStatus,
+  carriedOverBills,
+  compareByDueDate,
   billsNeedingAttention,
   monthTotals,
   needsAttention,
   paidKey,
+  partPaidTotals,
+  remainingFor,
   totalMonthlyBills,
   type Bill,
 } from "./bills";
@@ -25,6 +30,8 @@ function bill(overrides: Partial<Bill> = {}): Bill {
     type: "operating",
     loanId: null,
     active: true,
+    frequency: "monthly",
+    startsMonth: null,
     ...overrides,
   };
 }
@@ -342,5 +349,233 @@ describe("billLoanLink", () => {
 
   it("trims what it is given, so a stray space cannot break the key", () => {
     expect(billLoanLink("loan_installment", " loan-1 ")).toBe("loan-1");
+  });
+});
+
+describe("monthly and one-time bills", () => {
+  const AUG = { year: 2026, month: 8 };
+  const OCT = { year: 2026, month: 10 };
+
+  it("owes a monthly bill from its first month onwards, never before", () => {
+    const rent = bill({ startsMonth: SEPT });
+    expect(billAppliesTo(rent, AUG)).toBe(false);
+    expect(billAppliesTo(rent, SEPT)).toBe(true);
+    expect(billAppliesTo(rent, OCT)).toBe(true);
+  });
+
+  it("owes a one-time bill in its own month only", () => {
+    const repair = bill({ frequency: "one_time", startsMonth: SEPT });
+    expect(billAppliesTo(repair, AUG)).toBe(false);
+    expect(billAppliesTo(repair, SEPT)).toBe(true);
+    expect(billAppliesTo(repair, OCT)).toBe(false);
+  });
+
+  it("counts a one-time bill in the daily target for its own month only", () => {
+    const bills = [
+      bill({ id: "rent", amountCentavos: parsePesos("10000"), startsMonth: SEPT }),
+      bill({
+        id: "aircon",
+        amountCentavos: parsePesos("4500"),
+        frequency: "one_time",
+        startsMonth: SEPT,
+      }),
+    ];
+    expect(totalMonthlyBills(bills, SEPT)).toBe(parsePesos("14500"));
+    expect(totalMonthlyBills(bills, OCT)).toBe(parsePesos("10000"));
+  });
+
+  it("leaves a one-time bill out of another month's totals", () => {
+    const totals = monthTotals({
+      bills: [bill({ frequency: "one_time", startsMonth: OCT })],
+      paidKeys: new Set(),
+      period: SEPT,
+      today: TODAY,
+    });
+    expect(totals.total).toBe(0);
+    expect(totals.unpaidCount).toBe(0);
+  });
+});
+
+describe("carriedOverBills (priority bills)", () => {
+  const OCT = { year: 2026, month: 10 };
+  const OCT_2 = { year: 2026, month: 10, day: 2 };
+
+  it("carries a bill unpaid last month into this month", () => {
+    const water = bill({ id: "water", dueDay: 15, startsMonth: SEPT });
+    const carried = carriedOverBills({
+      bills: [water],
+      paidKeys: new Set(),
+      period: OCT,
+      today: OCT_2,
+    });
+    expect(carried).toHaveLength(1);
+    expect(carried[0].period).toEqual(SEPT);
+    expect(carried[0].status).toMatchObject({ kind: "overdue", warn: true });
+    expect(carried[0].status.label).toBe(
+      "Unpaid from September 2026 · overdue 17 days",
+    );
+  });
+
+  it("does not carry a month that was paid", () => {
+    const water = bill({ id: "water", startsMonth: SEPT });
+    expect(
+      carriedOverBills({
+        bills: [water],
+        paidKeys: new Set([paidKey("water", SEPT)]),
+        period: OCT,
+        today: OCT_2,
+      }),
+    ).toEqual([]);
+  });
+
+  it("keeps carrying every unpaid month, oldest first, not only last month", () => {
+    const rent = bill({ id: "rent", startsMonth: { year: 2026, month: 7 } });
+    const carried = carriedOverBills({
+      bills: [rent],
+      paidKeys: new Set([paidKey("rent", { year: 2026, month: 8 })]),
+      period: OCT,
+      today: OCT_2,
+    });
+    expect(carried.map((entry) => entry.period.month)).toEqual([7, 9]);
+  });
+
+  it("carries an unpaid one-time bill forward until it is paid", () => {
+    const repair = bill({ id: "repair", frequency: "one_time", startsMonth: SEPT });
+    const carried = carriedOverBills({
+      bills: [repair],
+      paidKeys: new Set(),
+      period: { year: 2026, month: 11 },
+      today: { year: 2026, month: 11, day: 3 },
+    });
+    expect(carried.map((entry) => entry.period)).toEqual([SEPT]);
+  });
+
+  it("never calls the current month unpaid, even when looking ahead", () => {
+    const water = bill({ id: "water", startsMonth: SEPT });
+    const carried = carriedOverBills({
+      bills: [water],
+      paidKeys: new Set([paidKey("water", SEPT)]),
+      period: { year: 2026, month: 11 },
+      today: OCT_2,
+    });
+    // October has not ended, so it is not carried into November yet.
+    expect(carried).toEqual([]);
+  });
+
+  it("invents no backlog for a bill with no first month, or a stopped one", () => {
+    expect(
+      carriedOverBills({
+        bills: [bill({ startsMonth: null }), bill({ id: "x", startsMonth: SEPT, active: false })],
+        paidKeys: new Set(),
+        period: OCT,
+        today: OCT_2,
+      }),
+    ).toEqual([]);
+  });
+
+  it("adds carried bills to the month's totals separately, to the centavo", () => {
+    const totals = monthTotals({
+      bills: [
+        bill({ id: "a", amountCentavos: parsePesos("100.25"), dueDay: 28, startsMonth: SEPT }),
+        bill({ id: "b", amountCentavos: parsePesos("50.50"), dueDay: 28, startsMonth: SEPT }),
+      ],
+      paidKeys: new Set([paidKey("b", SEPT)]),
+      period: OCT,
+      today: OCT_2,
+    });
+    expect(totals.total).toBe(parsePesos("150.75"));
+    expect(totals.unpaid).toBe(parsePesos("150.75"));
+    expect(totals.carriedOver).toBe(parsePesos("100.25"));
+    expect(totals.carriedOverCount).toBe(1);
+    expect(totals.attentionCount).toBe(1);
+  });
+
+  it("puts a carried bill in the reminder once, as overdue", () => {
+    const water = bill({ id: "water", dueDay: 3, startsMonth: SEPT });
+    const attention = billsNeedingAttention({
+      bills: [water],
+      paidKeys: new Set(),
+      period: OCT,
+      today: OCT_2,
+    });
+    expect(attention).toHaveLength(1);
+    expect(attention[0].period).toEqual(SEPT);
+    expect(attention[0].status.kind).toBe("overdue");
+  });
+});
+
+describe("compareByDueDate", () => {
+  it("lists bills by due day, with no due day last and ties by name", () => {
+    const sorted = [
+      bill({ id: "1", name: "Water", dueDay: null }),
+      bill({ id: "2", name: "Rent", dueDay: 25 }),
+      bill({ id: "3", name: "Internet", dueDay: 5 }),
+      bill({ id: "4", name: "Electricity", dueDay: 5 }),
+    ].sort(compareByDueDate);
+    expect(sorted.map((b) => b.name)).toEqual([
+      "Electricity",
+      "Internet",
+      "Rent",
+      "Water",
+    ]);
+  });
+});
+
+describe("part payments", () => {
+  const OCT = { year: 2026, month: 10 };
+  const OCT_2 = { year: 2026, month: 10, day: 2 };
+
+  it("adds up only the part payments, per bill and month", () => {
+    const totals = partPaidTotals([
+      { key: "a:2026-09", amountCentavos: parsePesos("1000"), isPartial: true },
+      { key: "a:2026-09", amountCentavos: parsePesos("500.50"), isPartial: true },
+      { key: "a:2026-10", amountCentavos: parsePesos("200"), isPartial: true },
+      { key: "b:2026-09", amountCentavos: parsePesos("999"), isPartial: false },
+    ]);
+    expect(totals.get("a:2026-09")).toBe(parsePesos("1500.50"));
+    expect(totals.get("a:2026-10")).toBe(parsePesos("200"));
+    expect(totals.has("b:2026-09")).toBe(false);
+  });
+
+  it("leaves only the remaining amount, never below zero", () => {
+    const rent = bill({ id: "rent", amountCentavos: parsePesos("5000") });
+    expect(
+      remainingFor(rent, SEPT, new Map([["rent:2026-09", parsePesos("1250.25")]])),
+    ).toBe(parsePesos("3749.75"));
+    expect(remainingFor(rent, SEPT, new Map([["rent:2026-09", parsePesos("6000")]]))).toBe(0);
+    expect(remainingFor(rent, SEPT)).toBe(parsePesos("5000"));
+  });
+
+  it("counts a part payment as paid and only the rest as still to pay", () => {
+    const totals = monthTotals({
+      bills: [bill({ id: "rent", amountCentavos: parsePesos("5000") })],
+      paidKeys: new Set(),
+      partPaid: new Map([["rent:2026-09", parsePesos("2000")]]),
+      period: SEPT,
+      today: TODAY,
+    });
+    expect(totals.paid).toBe(parsePesos("2000"));
+    expect(totals.unpaid).toBe(parsePesos("3000"));
+    expect(totals.total).toBe(parsePesos("5000"));
+    // Part paid is still not settled.
+    expect(totals.paidCount).toBe(0);
+    expect(totals.unpaidCount).toBe(1);
+  });
+
+  it("carries only the remaining amount of a part-paid month forward", () => {
+    const water = bill({ id: "water", amountCentavos: parsePesos("800"), startsMonth: SEPT });
+    const partPaid = new Map([["water:2026-09", parsePesos("300")]]);
+    const carried = carriedOverBills({
+      bills: [water],
+      paidKeys: new Set(),
+      partPaid,
+      period: OCT,
+      today: OCT_2,
+    });
+    expect(carried[0].remainingCentavos).toBe(parsePesos("500"));
+    expect(
+      monthTotals({ bills: [water], paidKeys: new Set(), partPaid, period: OCT, today: OCT_2 })
+        .carriedOver,
+    ).toBe(parsePesos("500"));
   });
 });

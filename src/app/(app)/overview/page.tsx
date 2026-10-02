@@ -37,7 +37,7 @@ import { getRepairTickets } from "@/lib/data/repairs";
 import { isAwaitingCollection, isOpenTicket } from "@/lib/repairs";
 import { expenseTotals, payableTotals } from "@/lib/expenses";
 import { formatQuantity } from "@/lib/quantity";
-import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom } from "@/lib/data/money";
+import { getBillPayments, getBills, getOverviewMoney, paidKeysFrom, partPaidFrom } from "@/lib/data/money";
 import {
   getAdvanceBalances,
   getEstimatedMonthlyPayroll,
@@ -292,6 +292,7 @@ async function OwnerOverview({
   const billTotals = monthTotals({
     bills,
     paidKeys: paidKeysFrom(payments),
+    partPaid: partPaidFrom(payments),
     period,
     today,
   });

@@ -24,6 +24,7 @@ import { formatPesos, parsePesos } from "@/lib/money";
 import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import {
   civilDateToISO,
+  currentPeriod,
   formatPeriod,
   manilaToday,
   parsePeriodKey,
@@ -58,12 +59,20 @@ export async function markBillPaidAction(
   const source = readMoneySource(formData.get("source"));
   if (!source) return { error: "Choose where the money came from." };
 
+  // "full" settles the month; "part" is money towards it (0030). The owner
+  // says which - the amounts are not trusted to decide it, because a bill's
+  // real figure is not always its usual one.
+  const isPartial = String(formData.get("kind") ?? "full") === "part";
+
   let amountCentavos: number;
   try {
     amountCentavos = parsePesos(String(formData.get("amount") ?? ""));
     if (amountCentavos < 0) throw new Error("negative");
   } catch {
     return { fieldErrors: { amount: "Enter an amount like 35000 or 35000.00." } };
+  }
+  if (isPartial && amountCentavos === 0) {
+    return { fieldErrors: { amount: "A part payment has to be more than zero." } };
   }
 
   const supabase = await createSupabaseServerClient();
@@ -83,6 +92,9 @@ export async function markBillPaidAction(
     p_paid_on: civilDateToISO(manilaToday()),
     p_source: source,
     p_note: null,
+    // Only sent when it is true, so paying in full still works on a database
+    // that has not had 0030 yet.
+    ...(isPartial ? { p_is_partial: true } : {}),
   });
 
   if (error) {
@@ -102,8 +114,13 @@ export async function markBillPaidAction(
     action: "create",
     entity: "bill_payments",
     entityId: billId,
-    summary: `Marked "${bill.name}" paid for ${formatPeriod(period)} - ${formatPesos(amountCentavos)} from ${source.replace(/_/g, " ")}`,
-    after: { amount_centavos: amountCentavos, source, period: periodKeyValue },
+    summary: `${isPartial ? "Part payment on" : "Marked"} "${bill.name}"${isPartial ? "" : " paid"} for ${formatPeriod(period)} - ${formatPesos(amountCentavos)} from ${source.replace(/_/g, " ")}`,
+    after: {
+      amount_centavos: amountCentavos,
+      source,
+      period: periodKeyValue,
+      is_partial: isPartial,
+    },
   });
 
   revalidatePath("/bills");
@@ -111,7 +128,11 @@ export async function markBillPaidAction(
   revalidatePath("/loans");
   revalidatePath("/overview");
 
-  return { success: `${bill.name} is marked paid for ${formatPeriod(period)}.` };
+  return {
+    success: isPartial
+      ? `Recorded a part payment of ${formatPesos(amountCentavos)} on ${bill.name} for ${formatPeriod(period)}.`
+      : `${bill.name} is marked paid for ${formatPeriod(period)}.`,
+  };
 }
 
 export async function undoBillPaymentAction(
@@ -148,7 +169,9 @@ export async function undoBillPaymentAction(
     action: "void",
     entity: "bill_payments",
     entityId: billId,
-    summary: `Undid the payment of "${bill.name}" for ${formatPeriod(period)}`,
+    // undo_bill_payment takes back the LATEST payment of the month - the
+    // settling one if there is one, otherwise the last part payment.
+    summary: `Undid the latest payment of "${bill.name}" for ${formatPeriod(period)}`,
     before: { paid: true },
     after: { paid: false },
   });
@@ -158,7 +181,7 @@ export async function undoBillPaymentAction(
   revalidatePath("/loans");
   revalidatePath("/overview");
 
-  return { success: `${bill.name} is no longer marked paid for ${formatPeriod(period)}.` };
+  return { success: `Took back the latest payment of ${bill.name} for ${formatPeriod(period)}.` };
 }
 
 /**
@@ -261,6 +284,21 @@ export async function saveBillAction(
     fieldErrors.type = "Choose whether this is an operating cost or a loan installment.";
   }
 
+  const frequency = String(formData.get("frequency") ?? "monthly");
+  if (frequency !== "monthly" && frequency !== "one_time") {
+    fieldErrors.frequency = "Choose whether this bill is monthly or one time only.";
+  }
+
+  // The browser's month box sends "2026-10". A monthly bill without one starts
+  // this month; a one-time bill has to say which month it is for.
+  const rawMonth = String(formData.get("startsMonth") ?? "").trim();
+  const startsMonth = rawMonth === "" ? null : parsePeriodKey(rawMonth);
+  if (rawMonth !== "" && startsMonth === null) {
+    fieldErrors.startsMonth = "Choose a month.";
+  } else if (frequency === "one_time" && startsMonth === null) {
+    fieldErrors.startsMonth = "Choose the month this bill is for.";
+  }
+
   if (Object.keys(fieldErrors).length > 0) return { fieldErrors };
 
   const supabase = await createSupabaseServerClient();
@@ -293,6 +331,8 @@ export async function saveBillAction(
     due_day: dueDay,
     type,
     loan_id: loanId,
+    frequency,
+    starts_month: periodToMonthStartISO(startsMonth ?? currentPeriod()),
   };
 
   if (billId === "") {
@@ -306,7 +346,10 @@ export async function saveBillAction(
       actorUsername: actor.username,
       action: "create",
       entity: "bills",
-      summary: `Added the bill "${name}" at ${formatPesos(amountCentavos)} a month`,
+      summary:
+        frequency === "one_time"
+          ? `Added the one-time bill "${name}" of ${formatPesos(amountCentavos)} for ${formatPeriod(startsMonth ?? currentPeriod())}`
+          : `Added the bill "${name}" at ${formatPesos(amountCentavos)} a month`,
       after: values,
     });
 
@@ -319,7 +362,7 @@ export async function saveBillAction(
 
   const { data: before } = await supabase
     .from("bills")
-    .select("name, amount_centavos, due_day, type, loan_id")
+    .select("name, amount_centavos, due_day, type, loan_id, frequency, starts_month")
     .eq("id", billId)
     .maybeSingle();
 
@@ -413,7 +456,7 @@ export async function deleteBillAction(
   // the row itself is gone.
   const { data: bill } = await supabase
     .from("bills")
-    .select("name, amount_centavos, due_day, type, loan_id, active, note")
+    .select("*")
     .eq("id", billId)
     .maybeSingle();
 
