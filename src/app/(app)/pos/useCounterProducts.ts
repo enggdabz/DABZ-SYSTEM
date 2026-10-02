@@ -25,6 +25,7 @@ import {
   deleteProductCategoryAction,
   removeCounterProductPhotoAction,
   reorderCounterProductsAction,
+  reorderProductCategoriesAction,
   saveProductCategoryAction,
   setCounterProductPhotoAction,
   updateCounterProductAction,
@@ -36,11 +37,6 @@ import type { PosCategory, PosProduct } from "./PosScreen";
 export interface ListNotice {
   tone: "attention" | "info";
   text: string;
-}
-
-/** Categories in the order the Counter shows them: by name, as the database sorts. */
-function byName(categories: PosCategory[]): PosCategory[] {
-  return [...categories].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 }
 
 export function useCounterProducts(
@@ -312,10 +308,11 @@ export function useCounterProducts(
   /** A category made on the way, from "+ New category" in a product form. */
   function rememberCategory(category: PosCategory | undefined) {
     if (!category) return;
+    // At the bottom, where the server put it (0028).
     setCategories((current) =>
       current === null || current.some((entry) => entry.id === category.id)
         ? current
-        : byName([...current, category]),
+        : [...current, category],
     );
   }
 
@@ -329,13 +326,47 @@ export function useCounterProducts(
     );
     const category = result.category;
     if (category) {
+      // A rename keeps its place; a new category goes to the bottom.
       setCategories((current) =>
         current === null
           ? current
-          : byName([...current.filter((entry) => entry.id !== category.id), category]),
+          : current.some((entry) => entry.id === category.id)
+            ? current.map((entry) => (entry.id === category.id ? category : entry))
+            : [...current, category],
       );
     }
     return { error: result.error };
+  }
+
+  /**
+   * Moves a category (its red header and everything under it) to where
+   * another one is. Shown at once, saved after, put back if the save fails.
+   */
+  async function reorderCategories(activeId: string, overId: string) {
+    if (categories === null) return;
+    const before = categories;
+    const ids = moveId(
+      before.map((category) => category.id),
+      activeId,
+      overId,
+    );
+    if (ids.join() === before.map((category) => category.id).join()) return;
+    const byId = new Map(before.map((category) => [category.id, category]));
+    setCategories(ids.map((id) => byId.get(id)!));
+    setNotice(null);
+
+    const result = await saving(() =>
+      reorderProductCategoriesAction(ids).catch(() => ({
+        error: "The new order was not saved - the connection dropped.",
+      })),
+    );
+
+    if (result.error) {
+      setCategories((current) =>
+        current?.map((category) => category.id).join() === ids.join() ? before : current,
+      );
+      setNotice({ tone: "attention", text: `${result.error} The category was put back.` });
+    }
   }
 
   /** Deletes a category. Its products stay, with no category. */
@@ -361,6 +392,7 @@ export function useCounterProducts(
     categories,
     saveCategory,
     deleteCategory,
+    reorderCategories,
     quantities,
     prices,
     setQuantity,

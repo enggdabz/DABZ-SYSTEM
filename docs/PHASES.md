@@ -2738,6 +2738,9 @@ The owner's request, inside Phase 4's Counter. Waiting for the owner to try it.
   its edit dialog, and the Counter groups the products under a red header per
   category, in two columns where the list has the room.
 - A − and + beside every quantity box (added 2 Oct 2026, no migration).
+- Categories can be moved into the owner's own order: a grip on each red
+  header, and ▲ ▼ in Manage categories (added 2 Oct 2026, migration
+  `0028_product_category_order.sql`).
 
 **How it is verified**
 

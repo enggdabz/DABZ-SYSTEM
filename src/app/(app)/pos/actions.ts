@@ -613,9 +613,26 @@ async function createCategory(
   const checked = checkCategoryName(rawName, (existing ?? []).map((row) => row.name as string));
   if (!checked.ok) return { ok: false, error: checked.error };
 
+  // A new category goes to the bottom, one past the last position in use.
+  const { data: last, error: orderError } = await supabase
+    .from("product_categories")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // A database still waiting for 0028 has no positions; the name orders it.
+  const position =
+    orderError && isColumnMissingFromApi(orderError)
+      ? null
+      : Number(last?.sort_order ?? 0) + 1;
+
   const { data, error } = await supabase
     .from("product_categories")
-    .insert({ name: checked.name, created_by: user.id })
+    .insert({
+      name: checked.name,
+      created_by: user.id,
+      ...(position === null ? {} : { sort_order: position }),
+    })
     .select("id, name")
     .single();
 
@@ -950,6 +967,38 @@ export async function saveProductCategoryAction(
 
   revalidatePath("/pos");
   return { category: { id, name: checked.name } };
+}
+
+/**
+ * Saves the categories' new order after a red header is moved - the whole
+ * list in one statement (`reorder_product_categories`, 0028). Owner/Admin;
+ * the function checks too, and its update runs under the ordinary policy.
+ */
+export async function reorderProductCategoriesAction(
+  ids: string[],
+): Promise<{ error?: string }> {
+  await requireOwnerOrAdmin();
+
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 1000) {
+    return { error: "The new order could not be read." };
+  }
+  if (!ids.every((id) => typeof id === "string" && UUID.test(id))) {
+    return { error: "The new order could not be read." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("reorder_product_categories", { p_ids: ids });
+
+  if (error) {
+    return {
+      error: isFunctionMissingFromApi(error)
+        ? "The database is behind: the categories' order cannot be saved until migration 0028 is applied."
+        : `The new order was not saved: ${error.message}`,
+    };
+  }
+
+  revalidatePath("/pos");
+  return {};
 }
 
 /**

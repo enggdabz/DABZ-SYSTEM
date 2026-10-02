@@ -28,16 +28,25 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type Modifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
   rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
+  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
-import { useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from "react";
 
 import { Modal } from "@/components/Modal";
 import { Button, Field, Input, Notice, Select, TAP_AREA, HEADING_BOX } from "@/components/ui";
@@ -67,6 +76,7 @@ export function CounterProductList({
   onQuantity,
   onPrice,
   onReorder,
+  onReorderCategories,
   onChangePhoto,
   onRemovePhoto,
   onDelete,
@@ -88,6 +98,8 @@ export function CounterProductList({
   onPrice: (id: string, value: string) => void;
   /** `groupIds`: the category the row was dragged within. */
   onReorder: (activeId: string, overId: string, groupIds: string[]) => void;
+  /** Moves a whole category. Absent: the categories cannot be moved here. */
+  onReorderCategories?: (activeId: string, overId: string) => void;
   onChangePhoto: (id: string, file: File) => void;
   onRemovePhoto: (id: string) => void;
   onDelete: (id: string) => void;
@@ -157,71 +169,96 @@ export function CounterProductList({
         </div>
       ) : null}
 
-      {groups.map((group, groupIndex) => {
-        const ids = group.items.map((product) => product.id);
-        const label = group.title ?? "Saved products";
-        return (
-          <section key={group.key} aria-label={label} className="@container">
-            {group.title !== null ? (
-              <h3 className={`${HEADING_BOX} mb-2 text-sm font-semibold tracking-tight`}>
-                {group.title}
-              </h3>
-            ) : null}
+      {/*
+        The categories themselves are a sortable list too: the grip on a red
+        header moves the whole section, products and all. "Other" is not in
+        it - it is always last, because it is where the rest goes. Each
+        category's products have their own drag area inside, so a header's
+        grip and a row's grip can never be confused for one another.
+      */}
+      <DndContext
+        id={`${dndId}-categories`}
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[upAndDownOnly]}
+        onDragEnd={(event: DragEndEvent) => {
+          const { active, over } = event;
+          if (over && active.id !== over.id) {
+            onReorderCategories?.(String(active.id), String(over.id));
+          }
+        }}
+      >
+        <SortableContext
+          items={groups.filter((group) => group.categoryId !== null).map((group) => group.categoryId!)}
+          strategy={verticalListSortingStrategy}
+        >
+        {groups.map((group, groupIndex) => {
+          const ids = group.items.map((product) => product.id);
+          const label = group.title ?? "Saved products";
+          return (
+            <SortableSection
+              key={group.key}
+              group={group}
+              label={label}
+              canMove={canManage && onReorderCategories !== undefined && group.categoryId !== null}
+            >
 
-            {group.items.length === 0 ? (
-              <p className="rounded-control px-3 py-2 text-sm text-muted ring-1 ring-line/60">
-                Nothing in this category yet. Tap a product&rsquo;s name to move it here.
-              </p>
-            ) : (
-              /*
-                One drag area per category: a row moves among its own
-                category's rows and cannot be dropped into another. Its
-                category is changed from the edit dialog, where the choice is
-                deliberate rather than the side effect of a slipped finger.
-              */
-              <DndContext
-                id={`${dndId}-${groupIndex}`}
-                sensors={sensors}
-                collisionDetection={closestCenter}
-                onDragEnd={(event: DragEndEvent) => {
-                  const { active, over } = event;
-                  if (over && active.id !== over.id) {
-                    onReorder(String(active.id), String(over.id), ids);
-                  }
-                }}
-              >
-                <SortableContext items={ids} strategy={rectSortingStrategy}>
-                  <ul className="grid gap-2 @xl:grid-cols-2" aria-label={label}>
-                    {group.items.map((product) => (
-                      <SortableRow
-                        key={product.id}
-                        product={product}
-                        isLast={product.id === shown[shown.length - 1]?.id}
-                        quantity={quantities[product.id] ?? ""}
-                        typedPrice={prices[product.id] ?? ""}
-                        canManage={canManage}
-                        onQuantity={onQuantity}
-                        onPrice={onPrice}
-                        onEnter={nextBox}
-                        registerBox={(element) => {
-                          if (element) quantityBoxes.current.set(product.id, element);
-                          else quantityBoxes.current.delete(product.id);
-                        }}
-                        photoBusy={photoBusy[product.id] ?? false}
-                        photoError={photoErrors[product.id] ?? ""}
-                        onPhoto={(file) => onChangePhoto(product.id, file)}
-                        onPhotoMenu={() => setPhotoMenu(product)}
-                        onAskEdit={() => setEditing(product)}
-                        onAskDelete={() => setConfirming(product)}
-                      />
-                    ))}
-                  </ul>
-                </SortableContext>
-              </DndContext>
-            )}
-          </section>
-        );
-      })}
+              {group.items.length === 0 ? (
+                <p className="rounded-control px-3 py-2 text-sm text-muted ring-1 ring-line/60">
+                  Nothing in this category yet. Tap a product&rsquo;s name to move it here.
+                </p>
+              ) : (
+                /*
+                  One drag area per category: a row moves among its own
+                  category's rows and cannot be dropped into another. Its
+                  category is changed from the edit dialog, where the choice is
+                  deliberate rather than the side effect of a slipped finger.
+                */
+                <DndContext
+                  id={`${dndId}-${groupIndex}`}
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  onDragEnd={(event: DragEndEvent) => {
+                    const { active, over } = event;
+                    if (over && active.id !== over.id) {
+                      onReorder(String(active.id), String(over.id), ids);
+                    }
+                  }}
+                >
+                  <SortableContext items={ids} strategy={rectSortingStrategy}>
+                    <ul className="grid gap-2 @xl:grid-cols-2" aria-label={label}>
+                      {group.items.map((product) => (
+                        <SortableRow
+                          key={product.id}
+                          product={product}
+                          isLast={product.id === shown[shown.length - 1]?.id}
+                          quantity={quantities[product.id] ?? ""}
+                          typedPrice={prices[product.id] ?? ""}
+                          canManage={canManage}
+                          onQuantity={onQuantity}
+                          onPrice={onPrice}
+                          onEnter={nextBox}
+                          registerBox={(element) => {
+                            if (element) quantityBoxes.current.set(product.id, element);
+                            else quantityBoxes.current.delete(product.id);
+                          }}
+                          photoBusy={photoBusy[product.id] ?? false}
+                          photoError={photoErrors[product.id] ?? ""}
+                          onPhoto={(file) => onChangePhoto(product.id, file)}
+                          onPhotoMenu={() => setPhotoMenu(product)}
+                          onAskEdit={() => setEditing(product)}
+                          onAskDelete={() => setConfirming(product)}
+                        />
+                      ))}
+                    </ul>
+                  </SortableContext>
+                </DndContext>
+              )}
+            </SortableSection>
+          );
+        })}
+        </SortableContext>
+      </DndContext>
 
       <Modal
         open={confirming !== null}
@@ -270,6 +307,68 @@ export function CounterProductList({
         }}
       />
     </div>
+  );
+}
+
+/** A category section moves up and down, never sideways. */
+const upAndDownOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
+
+/**
+ * One category: its red header (with a grip, for the owner or an admin) and
+ * its products. The grip alone starts a drag, for the same reason as on a row:
+ * the rest of the section has to scroll the page and take taps as normal.
+ */
+function SortableSection({
+  group,
+  label,
+  canMove,
+  children,
+}: {
+  group: CategoryGroup<PosProduct>;
+  label: string;
+  canMove: boolean;
+  children: ReactNode;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: group.categoryId ?? group.key, disabled: !canMove });
+
+  return (
+    <section
+      ref={setNodeRef}
+      aria-label={label}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={`@container relative ${
+        isDragging ? "z-20 rounded-card bg-page shadow-2xl ring-2 ring-gold" : ""
+      }`}
+    >
+      {group.title !== null ? (
+        <h3 className={`${HEADING_BOX} mb-2 flex items-center gap-1.5 text-sm font-semibold tracking-tight`}>
+          {canMove ? (
+            // Pulled into the box's own padding so the title sits where an
+            // unmovable header's would, and the grip is still 36px tall.
+            <button
+              type="button"
+              ref={setActivatorNodeRef}
+              {...attributes}
+              {...listeners}
+              aria-label={`Move the category ${group.title}`}
+              className="-my-2 -ml-2 flex h-9 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-control opacity-80 hover:opacity-100 active:cursor-grabbing"
+            >
+              <GripIcon />
+            </button>
+          ) : null}
+          <span>{group.title}</span>
+        </h3>
+      ) : null}
+      {children}
+    </section>
   );
 }
 
@@ -1062,9 +1161,15 @@ export function ManageCategoriesDialog({
   onClose,
   onSave,
   onDelete,
+  onMove,
 }: {
   open: boolean;
   categories: PosCategory[];
+  /**
+   * Moves a category one place (to where `overId` is) - the same order the
+   * grip on a red header sets, for when dragging a tall section is awkward.
+   */
+  onMove?: (activeId: string, overId: string) => void;
   /** How many products are in a category, for the delete warning. */
   countFor: (id: string) => number;
   onClose: () => void;
@@ -1162,11 +1267,35 @@ export function ManageCategoriesDialog({
             <p className="text-sm text-muted">No categories yet. Add the first one below.</p>
           ) : (
             <ul className="space-y-2" aria-label="Categories">
-              {categories.map((category) => {
+              {categories.map((category, index) => {
                 const typed = names[category.id] ?? category.name;
                 const changed = typed.trim() !== category.name;
+                const above = categories[index - 1];
+                const below = categories[index + 1];
                 return (
                   <li key={category.id} className="flex items-center gap-2">
+                    {onMove ? (
+                      <div className="flex shrink-0 flex-col">
+                        <button
+                          type="button"
+                          disabled={!above || saving}
+                          onClick={() => above && onMove(category.id, above.id)}
+                          aria-label={`Move ${category.name} up`}
+                          className="flex h-6 w-8 items-center justify-center rounded-control text-muted hover:bg-ink/10 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <span aria-hidden="true">▲</span>
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!below || saving}
+                          onClick={() => below && onMove(category.id, below.id)}
+                          aria-label={`Move ${category.name} down`}
+                          className="flex h-6 w-8 items-center justify-center rounded-control text-muted hover:bg-ink/10 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+                        >
+                          <span aria-hidden="true">▼</span>
+                        </button>
+                      </div>
+                    ) : null}
                     <Input
                       value={typed}
                       aria-label={`Name of ${category.name}`}

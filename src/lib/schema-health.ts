@@ -366,6 +366,17 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0027_product_categories",
     breaks: "putting a product in a category",
   },
+  {
+    /*
+      0028 adds a column to a table 0027 created, and creates no relation. The
+      Counter falls back to listing categories by name without it, so nothing
+      else would notice it was missing.
+    */
+    name: "product_categories",
+    column: "sort_order",
+    migration: "0028_product_category_order",
+    breaks: "moving the categories into your own order",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */

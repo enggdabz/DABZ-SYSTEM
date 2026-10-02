@@ -178,17 +178,25 @@ export interface ProductCategory {
 }
 
 /**
- * The owner's product categories (0027), by name.
+ * The owner's product categories (0027), in the order the owner put them in
+ * (0028), by name where two share a place.
  *
  * Null - not an empty list - when the table cannot be read: "no categories
  * yet" and "the database is behind" are different things to tell the owner.
  */
 export const getProductCategories = cache(async (): Promise<ProductCategory[] | null> => {
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
+  const first = await supabase
     .from("product_categories")
     .select("id, name")
+    .order("sort_order")
     .order("name");
+
+  // A database still waiting for 0028 has no `sort_order`: by name, as before.
+  const { data, error } =
+    first.error && isColumnMissingFromApi(first.error)
+      ? await supabase.from("product_categories").select("id, name").order("name")
+      : first;
 
   if (error || !data) return null;
   return data.map((row) => ({ id: row.id, name: row.name }));
