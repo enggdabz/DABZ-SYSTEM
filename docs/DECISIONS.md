@@ -1605,6 +1605,25 @@ to ask:
      by name - so nothing jumped when `0028` arrived.
   4. **If the save fails, the category goes back** and a message says so, as
      with products. Staff see no grip and no arrows.
+- **A sales line on the Overview** (your request, 2 October 2026), under
+  Today's target, with Daily, Weekly, Monthly and Yearly buttons. What I
+  decided:
+  1. **"Sales" is money taken in that counts as earnings** - the same figure as
+     "taken in" on the target card. Borrowed money and owner capital are left
+     out (a loan would otherwise be the best day the shop ever had), and voided
+     sales are taken back.
+  2. **How far back each view goes:** 30 days, 12 weeks, 12 months, 5 years.
+     Weeks start on the day set in Settings. To change a length, edit
+     `TREND_LENGTH` and `TREND_RANGE_WORDS` in `src/lib/sales-trend.ts`.
+  3. **The newest point is still filling up**, so the last stretch of line is
+     dashed and the figure says "(so far)" - a solid line dropping to half a
+     day would read as a bad day.
+  4. **Owner and Admin only**, like the ledger it reads. Staff with the daily
+     sales report permission still see Collected today, not the line.
+  5. **The chosen view is in the address** (`/overview?sales=weekly`), so only
+     that range is read from the ledger. No migration: it adds up ledger rows
+     each time, like Reports. If five busy years ever exceed 50,000 entries the
+     card says the oldest points are too low rather than drawing a false dip.
 - **Bills: monthly or one-time, priority bills, sorted by due date, and part
   payments** (your requests, 2 October 2026). Migrations
   `0029_bill_frequency.sql` and `0030_bill_partial_payments.sql`. What I

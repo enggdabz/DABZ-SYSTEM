@@ -54,17 +54,27 @@ import {
   startOfWeek,
 } from "@/lib/period";
 import { computeDailyTarget, targetProgress } from "@/lib/target";
+import { getSalesTrend } from "@/lib/data/sales-trend";
+import {
+  TREND_RANGE_WORDS,
+  TREND_VIEWS,
+  TREND_VIEW_LABELS,
+  parseTrendView,
+  trendSummary,
+  type TrendView,
+} from "@/lib/sales-trend";
+import { SalesTrendChart } from "./SalesTrendChart";
 
 export const metadata = { title: "Overview · Dabz System" };
 
 export default async function HomePage({
   searchParams,
 }: {
-  searchParams: Promise<{ denied?: string; password_changed?: string }>;
+  searchParams: Promise<{ denied?: string; password_changed?: string; sales?: string }>;
 }) {
   await connection();
 
-  const { denied, password_changed: passwordChanged } = await searchParams;
+  const { denied, password_changed: passwordChanged, sales } = await searchParams;
   const user = await requireUser();
   const settings = await getSettings();
 
@@ -110,7 +120,11 @@ export default async function HomePage({
       */}
       {isOwnerOrAdmin(user) ? <SchemaBanner /> : null}
 
-      {isOwnerOrAdmin(user) ? <OwnerOverview /> : <StaffHome user={user} />}
+      {isOwnerOrAdmin(user) ? (
+        <OwnerOverview trendView={parseTrendView(sales)} />
+      ) : (
+        <StaffHome user={user} />
+      )}
 
       {/*
         The day's takings, for whoever is allowed to see them: Owner, Admin, or
@@ -194,7 +208,7 @@ async function SchemaBanner() {
 }
 
 /** The Overview from spec 15.1, as far as Phase 2 can fill it in. */
-async function OwnerOverview() {
+async function OwnerOverview({ trendView }: { trendView: TrendView }) {
   const settings = await getSettings();
   const period = currentPeriod();
   const today = manilaToday();
@@ -429,6 +443,11 @@ async function OwnerOverview() {
           )}
         </div>
       </Card>
+
+      <SalesTrendCard
+        view={trendView}
+        weekStartsOn={settings.weekStartsOn}
+      />
 
       {checklist.items.length > 0 ? (
         <Card>
@@ -822,6 +841,92 @@ async function OwnerOverview() {
  * incomplete total, and the card says so rather than letting it read as the
  * whole day.
  */
+/**
+ * Sales over time, by day, week, month or year.
+ *
+ * The view is in the URL (`?sales=weekly`) rather than in the browser's
+ * memory, so only the range being looked at is read from the ledger - five
+ * years of entries are not fetched to draw thirty days - and a link to the
+ * weekly view stays the weekly view. Owner/Admin only, like the ledger it
+ * reads.
+ */
+async function SalesTrendCard({
+  view,
+  weekStartsOn,
+}: {
+  view: TrendView;
+  weekStartsOn: "monday" | "sunday";
+}) {
+  const trend = await getSalesTrend(view, manilaToday(), weekStartsOn);
+  const summary = trendSummary(trend.points);
+  const unit = { daily: "day", weekly: "week", monthly: "month", yearly: "year" }[view];
+
+  return (
+    <Card>
+      <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>Sales</h2>
+
+      <nav aria-label="Sales chart period" className="mt-4 flex flex-wrap gap-2">
+        {TREND_VIEWS.map((option) => (
+          <Link
+            key={option}
+            href={option === "daily" ? "/overview" : `/overview?sales=${option}`}
+            scroll={false}
+            aria-current={option === view ? "page" : undefined}
+            className={`rounded-full px-3 py-1.5 text-sm ring-1 transition-colors ${
+              option === view
+                ? "bg-accent text-on-accent ring-accent"
+                : "bg-surface text-ink ring-line hover:ring-accent/50"
+            }`}
+          >
+            {TREND_VIEW_LABELS[option]}
+          </Link>
+        ))}
+      </nav>
+
+      <div className="mt-5">
+        {trend.failed ? (
+          <Notice tone="attention" title="The sales line could not be read">
+            <p>
+              The ledger did not answer, so there is no line to draw. This is
+              not the same as no sales - try opening the page again.
+            </p>
+          </Notice>
+        ) : summary.totalCentavos === 0 ? (
+          <Notice tone="info" title={`No sales recorded over ${TREND_RANGE_WORDS[view]}`}>
+            <p>The line fills in by itself as sales are completed at the counter.</p>
+          </Notice>
+        ) : (
+          <>
+            {trend.truncated ? (
+              <div className="mb-4">
+                <Notice tone="attention" title="The oldest points on this line are too low">
+                  <p>
+                    There were too many entries to read at once, so the earliest
+                    ones were left out. Reports has the full figures.
+                  </p>
+                </Notice>
+              </div>
+            ) : null}
+            <SalesTrendChart points={trend.points} rangeWords={TREND_RANGE_WORDS[view]} />
+            <p className="mt-4 text-sm text-muted">
+              {formatPesos(summary.totalCentavos)} taken in over{" "}
+              {TREND_RANGE_WORDS[view]}
+              {summary.best ? (
+                <>
+                  {" "}&middot; best {unit}: {summary.best.label},{" "}
+                  {formatPesos(summary.best.centavos)}
+                </>
+              ) : null}
+              . Earnings only &mdash; borrowed money and owner capital are left out,
+              and voided sales are taken back.
+            </p>
+          </>
+        )}
+      </div>
+    </Card>
+  );
+}
+
 async function CollectedToday({
   user,
 }: {
