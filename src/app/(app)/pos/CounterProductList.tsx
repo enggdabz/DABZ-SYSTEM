@@ -36,11 +36,11 @@ import { useId, useRef, useState, type KeyboardEvent, type RefObject } from "rea
 
 import { Modal } from "@/components/Modal";
 import { Button, Field, Input, Notice, TAP_AREA } from "@/components/ui";
-import { checkNewProduct, cleanQuantity, rowPrice } from "@/lib/counter-list";
-import { formatPesos } from "@/lib/money";
+import { checkNewProduct, checkProductEdit, cleanQuantity, rowPrice } from "@/lib/counter-list";
+import { centavosToDecimalString, formatPesos } from "@/lib/money";
 import { PHOTO_ACCEPT, photoFileProblem } from "@/lib/product-photo";
 
-import type { AddCounterProductResult } from "./actions";
+import type { AddCounterProductResult, UpdateCounterProductResult } from "./actions";
 import type { PosProduct } from "./PosScreen";
 import type { ListNotice } from "./useCounterProducts";
 
@@ -58,6 +58,7 @@ export function CounterProductList({
   onChangePhoto,
   onRemovePhoto,
   onDelete,
+  onEdit,
   photoBusy,
   photoErrors,
   notice,
@@ -75,6 +76,7 @@ export function CounterProductList({
   onChangePhoto: (id: string, file: File) => void;
   onRemovePhoto: (id: string) => void;
   onDelete: (id: string) => void;
+  onEdit: (id: string, form: FormData) => Promise<UpdateCounterProductResult>;
   photoBusy: Record<string, boolean>;
   photoErrors: Record<string, string>;
   notice: ListNotice | null;
@@ -95,6 +97,7 @@ export function CounterProductList({
   const dndId = useId();
   const quantityBoxes = useRef(new Map<string, HTMLInputElement>());
   const [confirming, setConfirming] = useState<PosProduct | null>(null);
+  const [editing, setEditing] = useState<PosProduct | null>(null);
   const [photoMenu, setPhotoMenu] = useState<PosProduct | null>(null);
 
   function handleDragEnd(event: DragEndEvent) {
@@ -166,6 +169,7 @@ export function CounterProductList({
                 photoError={photoErrors[product.id] ?? ""}
                 onPhoto={(file) => onChangePhoto(product.id, file)}
                 onPhotoMenu={() => setPhotoMenu(product)}
+                onAskEdit={() => setEditing(product)}
                 onAskDelete={() => setConfirming(product)}
               />
             ))}
@@ -195,6 +199,16 @@ export function CounterProductList({
           </Button>
         </div>
       </Modal>
+
+      {editing ? (
+        <EditProductDialog
+          key={editing.id}
+          product={editing}
+          otherNames={items.filter((entry) => entry.id !== editing.id).map((entry) => entry.name)}
+          onClose={() => setEditing(null)}
+          onSave={(form) => onEdit(editing.id, form)}
+        />
+      ) : null}
 
       <PhotoMenu
         product={photoMenu}
@@ -226,6 +240,7 @@ function SortableRow({
   photoError,
   onPhoto,
   onPhotoMenu,
+  onAskEdit,
   onAskDelete,
 }: {
   product: PosProduct;
@@ -241,6 +256,7 @@ function SortableRow({
   photoError: string;
   onPhoto: (file: File) => void;
   onPhotoMenu: () => void;
+  onAskEdit: () => void;
   onAskDelete: () => void;
 }) {
   const {
@@ -299,9 +315,25 @@ function SortableRow({
         />
 
         <div className="min-w-0 flex-1">
-          <p className="line-clamp-2 text-sm font-medium leading-snug break-words">
-            {product.name}
-          </p>
+          {canManage ? (
+            <button
+              type="button"
+              onClick={onAskEdit}
+              aria-label={`Edit ${product.name}`}
+              className="-my-1 flex max-w-full items-start gap-1.5 py-1 text-left hover:text-gold"
+            >
+              <span className="line-clamp-2 text-sm font-medium leading-snug break-words">
+                {product.name}
+              </span>
+              <span className="mt-0.5 shrink-0 text-muted" aria-hidden="true">
+                <PencilIcon />
+              </span>
+            </button>
+          ) : (
+            <p className="line-clamp-2 text-sm font-medium leading-snug break-words">
+              {product.name}
+            </p>
+          )}
           {unpriced ? (
             <label className="mt-1 flex items-center gap-1 text-xs text-muted">
               <span>₱</span>
@@ -714,6 +746,114 @@ export function NewCounterProductDialog({
         </div>
       </form>
     </Modal>
+  );
+}
+
+/**
+ * Rename or reprice a product (owner's request, 2 Oct 2026). Owner/Admin
+ * only, like every other product edit. A new price applies from the next
+ * sale: every past sale keeps the name and price it was rung up with.
+ */
+function EditProductDialog({
+  product,
+  otherNames,
+  onClose,
+  onSave,
+}: {
+  product: PosProduct;
+  otherNames: string[];
+  onClose: () => void;
+  onSave: (form: FormData) => Promise<UpdateCounterProductResult>;
+}) {
+  const [name, setName] = useState(product.name);
+  const [price, setPrice] = useState(
+    product.priceCentavos === null ? "" : centavosToDecimalString(product.priceCentavos),
+  );
+  const [errors, setErrors] = useState<{ name?: string; price?: string }>({});
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function save() {
+    setError(null);
+    const checked = checkProductEdit({ name, price }, otherNames);
+    if (!checked.ok) {
+      setErrors(checked.fieldErrors);
+      return;
+    }
+    setErrors({});
+
+    const form = new FormData();
+    form.set("name", checked.name);
+    form.set("price", price);
+
+    setSaving(true);
+    const result = await onSave(form);
+    setSaving(false);
+
+    if (result.fieldErrors) setErrors(result.fieldErrors);
+    else if (result.error) setError(result.error);
+    else onClose();
+  }
+
+  return (
+    <Modal open title={`Edit ${product.name}`} onClose={onClose} busy={saving}>
+      <form
+        className="space-y-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void save();
+        }}
+      >
+        <Field label="Product name" error={errors.name}>
+          <Input value={name} autoFocus onChange={(event) => setName(event.target.value)} />
+        </Field>
+        <Field
+          label="Price each (₱)"
+          hint="Leave it empty to type the price at the counter each time."
+          error={errors.price}
+        >
+          <Input
+            inputMode="decimal"
+            value={price}
+            placeholder="0.00"
+            onChange={(event) => setPrice(event.target.value)}
+          />
+        </Field>
+        <p className="text-xs text-muted">
+          Past sales keep the name and price they were sold at. The change
+          applies from the next sale.
+        </p>
+
+        {error ? <Notice tone="attention" title={error} /> : null}
+
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="quiet" onClick={onClose} disabled={saving}>
+            Cancel
+          </Button>
+          <Button type="submit" disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+function PencilIcon() {
+  return (
+    <svg
+      width="13"
+      height="13"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 20h4L19 9l-4-4L4 16z" />
+      <path d="M13.5 6.5l4 4" />
+    </svg>
   );
 }
 
