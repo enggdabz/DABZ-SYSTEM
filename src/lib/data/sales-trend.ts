@@ -1,15 +1,17 @@
 import "server-only";
 
 /**
- * Reading the ledger for the Overview's sales line.
+ * Reading the ledger for the Overview's sales and expenses lines.
  *
  * Through the ordinary server client, so RLS decides: the ledger is Owner/Admin
  * only, and anybody else would get an empty line rather than the books.
  */
 import { manilaDayRangeUtc, type CivilDate, type WeekStart } from "@/lib/period";
 import {
+  TREND_MEASURE_DIRECTION,
   buildSalesTrend,
   trendBuckets,
+  type TrendMeasure,
   type TrendEntry,
   type TrendPoint,
   type TrendView,
@@ -37,6 +39,7 @@ export async function getSalesTrend(
   view: TrendView,
   today: CivilDate,
   weekStartsOn: WeekStart,
+  measure: TrendMeasure = "sales",
 ): Promise<SalesTrend> {
   const buckets = trendBuckets(view, today, weekStartsOn);
   const from = manilaDayRangeUtc(buckets[0].start).from;
@@ -52,12 +55,12 @@ export async function getSalesTrend(
       break;
     }
 
-    // Only money in, only live rows, only the five columns the line needs.
+    // Only the one direction, only live rows, only the five columns the line needs.
     // Newest first, so a cap cuts off the OLD end, not today.
     const { data, error } = await supabase
       .from("ledger_entries")
       .select("occurred_at, direction, category, amount_centavos, voided_at")
-      .eq("direction", "in")
+      .eq("direction", TREND_MEASURE_DIRECTION[measure])
       .is("voided_at", null)
       .gte("occurred_at", from)
       .lt("occurred_at", to)
@@ -66,7 +69,7 @@ export async function getSalesTrend(
       .range(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE - 1);
 
     if (error || !data) {
-      return { points: buildSalesTrend([], buckets), truncated: false, failed: true };
+      return { points: buildSalesTrend([], buckets, measure), truncated: false, failed: true };
     }
 
     for (const row of data) {
@@ -82,5 +85,5 @@ export async function getSalesTrend(
     if (data.length < PAGE_SIZE) break;
   }
 
-  return { points: buildSalesTrend(entries, buckets), truncated, failed: false };
+  return { points: buildSalesTrend(entries, buckets, measure), truncated, failed: false };
 }

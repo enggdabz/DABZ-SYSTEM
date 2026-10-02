@@ -5,6 +5,7 @@ import {
   buildSalesTrend,
   formatAxisPesos,
   niceAxisMax,
+  overviewTrendHref,
   parseTrendView,
   trendBuckets,
   trendSummary,
@@ -169,5 +170,43 @@ describe("formatAxisPesos", () => {
     expect(formatAxisPesos(parsePesos("500"))).toBe("₱500");
     expect(formatAxisPesos(parsePesos("2500"))).toBe("₱2.5K");
     expect(formatAxisPesos(parsePesos("1250000"))).toBe("₱1.25M");
+  });
+});
+
+describe("expenses", () => {
+  const buckets = trendBuckets("daily", TODAY, "monday");
+
+  it("adds up shop costs and leaves out money in and owner withdrawals", () => {
+    const points = buildSalesTrend(
+      [
+        entry({ direction: "out", category: "materials_supplies", amountCentavos: parsePesos("60") }),
+        entry({ direction: "out", category: "fixed_bills", amountCentavos: parsePesos("0.25") }),
+        entry({ direction: "out", category: "owner_withdrawal" }),
+        entry({ direction: "out", category: "materials_supplies", voidedAt: "2026-10-02T03:00:00Z" }),
+        entry(),
+      ],
+      buckets,
+      "expenses",
+    );
+    expect(points[29].centavos).toBe(parsePesos("60.25"));
+  });
+
+  it("still defaults to sales", () => {
+    const points = buildSalesTrend(
+      [entry(), entry({ direction: "out", category: "materials_supplies" })],
+      buckets,
+    );
+    expect(points[29].centavos).toBe(parsePesos("500"));
+  });
+});
+
+describe("overviewTrendHref", () => {
+  it("keeps each line's own view and leaves daily out", () => {
+    expect(overviewTrendHref({ sales: "daily", expenses: "daily" })).toBe("/overview");
+    expect(overviewTrendHref({ sales: "weekly", expenses: "daily" })).toBe("/overview?sales=weekly");
+    expect(overviewTrendHref({ sales: "daily", expenses: "yearly" })).toBe("/overview?expenses=yearly");
+    expect(overviewTrendHref({ sales: "monthly", expenses: "weekly" })).toBe(
+      "/overview?sales=monthly&expenses=weekly",
+    );
   });
 });
