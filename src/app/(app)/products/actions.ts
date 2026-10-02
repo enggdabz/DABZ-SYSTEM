@@ -10,14 +10,10 @@ import { revalidatePath } from "next/cache";
 
 import { recordAudit, diffFields } from "@/lib/audit";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
-import {
-  deleteRefusal,
-  deleteVanished,
-  historyCheckUnavailable,
-} from "@/lib/deletable";
+import { deleteRefusal } from "@/lib/deletable";
+import { removeProduct } from "@/lib/data/product-photos";
 import { DIVISION_IDS } from "@/lib/divisions";
 import { formatPesos, parsePesos } from "@/lib/money";
-import { isFunctionMissingFromApi } from "@/lib/postgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface ProductActionState {
@@ -272,73 +268,20 @@ export async function deleteProductAction(
   formData: FormData,
 ): Promise<ProductActionState> {
   const actor = await requireOwnerOrAdmin();
-
   const productId = String(formData.get("productId") ?? "");
-  const supabase = await createSupabaseServerClient();
 
-  const { data: product } = await supabase
-    .from("products")
-    .select(
-      "name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active",
-    )
-    .eq("id", productId)
-    .maybeSingle();
+  // The same removal the Counter's bin uses, except that a product that has
+  // been sold is REFUSED here: this screen has its own Hide button, and the
+  // owner pressed Delete.
+  const result = await removeProduct(actor, productId, "refuse");
 
-  if (!product) return { error: "That product no longer exists." };
-
-  /*
-    The bulk price rules go with the product - they cascade. They are the
-    owner's own rules rather than a record of money, so taking them is right,
-    but they have to be written down first: after the delete there is nothing
-    left to reconstruct them from.
-  */
-  const { data: tiers } = await supabase
-    .from("product_price_tiers")
-    .select("min_quantity, unit_price_centavos")
-    .eq("product_id", productId);
-
-  const { data: hasHistory, error: historyError } = await supabase.rpc(
-    "product_has_history",
-    { p_product_id: productId },
-  );
-
-  if (historyError) {
-    return {
-      error: isFunctionMissingFromApi(historyError)
-        ? historyCheckUnavailable("product_has_history")
-        : `Could not check whether it has been sold: ${historyError.message}`,
-    };
+  if (!result.ok) {
+    return { error: "sold" in result ? deleteRefusal("product", true)! : result.error };
   }
-
-  const refusal = deleteRefusal("product", hasHistory === true);
-  if (refusal) return { error: refusal };
-
-  const { data: removed, error } = await supabase
-    .from("products")
-    .delete()
-    .eq("id", productId)
-    .select("id");
-
-  if (error) return { error: `Could not delete it: ${error.message}` };
-  if (!removed || removed.length === 0) return { error: deleteVanished("product") };
-
-  await recordAudit({
-    actorId: actor.id,
-    actorUsername: actor.username,
-    action: "delete",
-    entity: "products",
-    entityId: productId,
-    summary: `Deleted the product "${product.name}"${
-      tiers && tiers.length > 0
-        ? ` and its ${tiers.length} bulk price rule${tiers.length === 1 ? "" : "s"}`
-        : ""
-    }`,
-    before: { ...product, price_tiers: tiers ?? [] },
-  });
 
   revalidatePath("/products");
   revalidatePath("/pos");
   revalidatePath("/checklist");
 
-  return { success: `Deleted ${product.name}.` };
+  return { success: `Deleted ${result.name}.` };
 }

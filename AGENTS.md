@@ -292,9 +292,20 @@ round trip is the one thing that must be tried against a real project.
 
 ## Counter rules (built in Phase 4)
 
-- **A sale always starts blank** (spec 6). Nothing is added by tapping a preset
-  alone: the quantity, and the price where there is no fixed one, is confirmed
-  first.
+- **A sale always starts blank** (spec 6). Every quantity box on the saved
+  products list is empty, and nothing is recorded until Complete sale - typing
+  the number IS the confirmation (owner's request, 2 Oct 2026).
+- **A quantity belongs to a product ID, never a position.** `useCounterProducts`
+  keeps quantities and typed prices in their own records keyed by id, so a
+  drag, a photo change, an add or a fresh copy from the server cannot move one
+  onto the wrong product. Keep them out of the product list itself.
+- **The product order is saved whole, by `reorder_products` (0026)**, in one
+  statement, through the ordinary update policy (it is SECURITY INVOKER on
+  purpose). Never save a drag as one update per row.
+- **Counter photos live in `product-images` under `counter/`**, through
+  `src/lib/data/product-photos.ts`. A photo file is removed only AFTER the row
+  stops pointing at it, and with the product only when the product is really
+  deleted - a sold product is hidden and keeps its photo.
 - **The server re-derives every total.** `completeSaleAction` never trusts the
   figures the browser sends; it rebuilds them with `src/lib/pos.ts` and writes
   those. The screen's totals are a preview, not the record.

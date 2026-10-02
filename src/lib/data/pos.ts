@@ -18,6 +18,7 @@ import {
   parseISODate,
   type CivilDate,
 } from "@/lib/period";
+import { isColumnMissingFromApi } from "@/lib/postgrest";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export interface Product {
@@ -32,6 +33,8 @@ export interface Product {
   sortOrder: number;
   incomeCategory: string;
   active: boolean;
+  /** The photo in the product-images bucket (0026). Null: no photo. */
+  imagePath: string | null;
   /** Carries the row id too, so a rule can be removed again. */
   tiers: (PriceTier & { id: string })[];
 }
@@ -51,24 +54,49 @@ export const SECTION_LABELS: Record<string, string> = {
   other: "Saved products",
 };
 
-export const getProducts = cache(async (): Promise<Product[]> => {
+/*
+  `image_path` arrives with 0026. Until that migration reaches the database,
+  asking for it fails the WHOLE read - and an empty product list on the
+  Counter reads as "the shop has no products", which is the confident wrong
+  answer schema-health.ts exists to prevent. So the read is tried with it and,
+  if the column is missing, again without; the Counter then shows no photos
+  and offers no dragging, and the System check names the migration.
+*/
+const PRODUCT_COLUMNS =
+  "id, name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active";
+const PRODUCT_COLUMNS_WITH_PHOTO = `${PRODUCT_COLUMNS}, image_path`;
+
+async function readProducts(
+  activeOnly: boolean,
+): Promise<{ products: Product[]; photosReady: boolean }> {
   const supabase = await createSupabaseServerClient();
 
-  const [{ data, error }, { data: tierRows }] = await Promise.all([
-    supabase
-      .from("products")
-      .select(
-        "id, name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active",
-      )
-      .eq("active", true)
-      .order("sort_order")
-      .order("name"),
+  // Written out twice rather than built from a variable, so that
+  // `npm run check:schema` can read both column lists.
+  const query = (withPhoto: boolean) => {
+    let builder = withPhoto
+      ? supabase.from("products").select(PRODUCT_COLUMNS_WITH_PHOTO)
+      : supabase.from("products").select(PRODUCT_COLUMNS);
+    if (activeOnly) builder = builder.eq("active", true);
+    else builder = builder.order("active", { ascending: false });
+    return builder.order("sort_order").order("name");
+  };
+
+  const [first, { data: tierRows }] = await Promise.all([
+    query(true),
     supabase
       .from("product_price_tiers")
       .select("id, product_id, min_quantity, unit_price_centavos"),
   ]);
 
-  if (error || !data) return [];
+  let { data, error } = first;
+  let photosReady = true;
+  if (error && isColumnMissingFromApi(error)) {
+    photosReady = false;
+    ({ data, error } = await query(false));
+  }
+
+  if (error || !data) return { products: [], photosReady };
 
   const tiersByProduct = new Map<string, (PriceTier & { id: string })[]>();
   for (const row of tierRows ?? []) {
@@ -81,66 +109,51 @@ export const getProducts = cache(async (): Promise<Product[]> => {
     tiersByProduct.set(row.product_id, list);
   }
 
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    division: row.division as DivisionId,
-    priceCentavos: row.price_centavos === null ? null : Number(row.price_centavos),
-    manualPrice: row.manual_price,
-    unit: row.unit,
-    section: row.section,
-    sortOrder: Number(row.sort_order),
-    incomeCategory: row.income_category,
-    active: row.active,
-    tiers: tiersByProduct.get(row.id) ?? [],
-  }));
-});
+  const rows = data as unknown as ProductRow[];
+  return {
+    photosReady,
+    products: rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      division: row.division as DivisionId,
+      priceCentavos: row.price_centavos === null ? null : Number(row.price_centavos),
+      manualPrice: row.manual_price,
+      unit: row.unit,
+      section: row.section,
+      sortOrder: Number(row.sort_order),
+      incomeCategory: row.income_category,
+      active: row.active,
+      imagePath: row.image_path ?? null,
+      tiers: tiersByProduct.get(row.id) ?? [],
+    })),
+  };
+}
+
+interface ProductRow {
+  id: string;
+  name: string;
+  division: string;
+  price_centavos: number | string | null;
+  manual_price: boolean;
+  unit: string | null;
+  section: string;
+  sort_order: number | string;
+  income_category: string;
+  active: boolean;
+  image_path?: string | null;
+}
+
+/** The products the Counter shows, in the order the owner dragged them into. */
+export const getCounterProducts = cache(() => readProducts(true));
+
+export const getProducts = cache(
+  async (): Promise<Product[]> => (await readProducts(true)).products,
+);
 
 /** Every product, including deactivated ones, for the Products screen. */
-export const getAllProducts = cache(async (): Promise<Product[]> => {
-  const supabase = await createSupabaseServerClient();
-
-  const [{ data, error }, { data: tierRows }] = await Promise.all([
-    supabase
-      .from("products")
-      .select(
-        "id, name, division, price_centavos, manual_price, unit, section, sort_order, income_category, active",
-      )
-      .order("active", { ascending: false })
-      .order("sort_order")
-      .order("name"),
-    supabase
-      .from("product_price_tiers")
-      .select("id, product_id, min_quantity, unit_price_centavos"),
-  ]);
-
-  if (error || !data) return [];
-
-  const tiersByProduct = new Map<string, (PriceTier & { id: string })[]>();
-  for (const row of tierRows ?? []) {
-    const list = tiersByProduct.get(row.product_id) ?? [];
-    list.push({
-      id: row.id,
-      minQuantity: Number(row.min_quantity),
-      unitPriceCentavos: Number(row.unit_price_centavos),
-    });
-    tiersByProduct.set(row.product_id, list);
-  }
-
-  return data.map((row) => ({
-    id: row.id,
-    name: row.name,
-    division: row.division as DivisionId,
-    priceCentavos: row.price_centavos === null ? null : Number(row.price_centavos),
-    manualPrice: row.manual_price,
-    unit: row.unit,
-    section: row.section,
-    sortOrder: Number(row.sort_order),
-    incomeCategory: row.income_category,
-    active: row.active,
-    tiers: tiersByProduct.get(row.id) ?? [],
-  }));
-});
+export const getAllProducts = cache(
+  async (): Promise<Product[]> => (await readProducts(false)).products,
+);
 
 /**
  * Which products have been sold, so the Products screen knows which ones may

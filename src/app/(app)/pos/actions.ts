@@ -12,14 +12,28 @@ import { revalidatePath } from "next/cache";
 
 import { orderTotals, splitPaymentByCategory } from "@/lib/apparel";
 import { recordAudit } from "@/lib/audit";
-import { getSettings, requirePermission, requireUser } from "@/lib/auth/dal";
+import {
+  getSettings,
+  requireOwnerOrAdmin,
+  requirePermission,
+  requireUser,
+  type SignedInUser,
+} from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { checkPaymentAmount } from "@/lib/collections";
+import { checkNewProduct } from "@/lib/counter-list";
 import { getApparelOrder } from "@/lib/data/apparel";
+import {
+  removePhotoFile,
+  removeProduct,
+  uploadProductPhoto,
+} from "@/lib/data/product-photos";
 import { getRepairTicket } from "@/lib/data/repairs";
 import { DIVISION_IDS, type DivisionId } from "@/lib/divisions";
 import { MONEY_SOURCES } from "@/lib/ledger";
 import { formatPesos, parsePesos } from "@/lib/money";
+import { productImageUrl } from "@/lib/online/storage";
+import { isColumnMissingFromApi, isFunctionMissingFromApi } from "@/lib/postgrest";
 import { splitTicketPayment } from "@/lib/repairs";
 import {
   computeCashPayment,
@@ -156,8 +170,16 @@ export async function completeSaleAction(
   let referenceNumber: string | null = null;
 
   if (paymentMethod === "cash") {
+    /*
+      A blank "Money given" means the customer handed over the exact amount
+      (the owner's request, 2 Oct 2026: type the quantities, press Complete
+      sale). Recorded as exactly the total with no change, which is what
+      happened - it is not a guess at a figure, and the drawer is counted from
+      the sale totals either way.
+    */
+    const rawGiven = String(formData.get("moneyGiven") ?? "").trim();
     try {
-      moneyGivenCentavos = parsePesos(String(formData.get("moneyGiven") ?? "0"));
+      moneyGivenCentavos = rawGiven === "" ? totals.totalCentavos : parsePesos(rawGiven);
     } catch {
       return { fieldErrors: { moneyGiven: "Enter the money given, like 500." } };
     }
@@ -493,59 +515,332 @@ export async function takeOrderPaymentAction(
 }
 
 /** Saves a product from the counter (spec 7.2). */
-export async function saveProductAction(
-  _previous: PosState,
+// ---------------------------------------------------------------------------
+// The Counter's product list (the owner's request, 2 Oct 2026)
+// ---------------------------------------------------------------------------
+
+/** A product as the Counter's list shows it - sent back after an add. */
+export interface CounterProductPayload {
+  id: string;
+  name: string;
+  division: DivisionId;
+  priceCentavos: number | null;
+  manualPrice: boolean;
+  unit: string | null;
+  section: string;
+  incomeCategory: string;
+  tiers: { minQuantity: number; unitPriceCentavos: number }[];
+  imageUrl: string | null;
+}
+
+export interface AddCounterProductResult {
+  error?: string;
+  fieldErrors?: { name?: string; price?: string; photo?: string };
+  product?: CounterProductPayload;
+  /** The product was saved but its photo was not. */
+  photoError?: string;
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The photo in a form, if one was attached. */
+function photoFrom(formData: FormData): File | null {
+  const value = formData.get("photo");
+  return value instanceof File && value.size > 0 ? value : null;
+}
+
+/**
+ * "+ New product" on the Counter: a name, a price, and an optional photo.
+ *
+ * Anybody who may sell may add one (spec 7.2, and `products_insert` says the
+ * same). A photo is an Owner/Admin thing, because the bucket's write policy
+ * is: a staff member's form has no photo box, and a photo sent anyway is
+ * refused rather than silently dropped.
+ *
+ * The product goes to the BOTTOM of the list - one past the highest position
+ * in use - and comes back to the screen so it can appear without a reload.
+ */
+export async function addCounterProductAction(
   formData: FormData,
-): Promise<PosState> {
+): Promise<AddCounterProductResult> {
   const user = await requirePermission("add_sales");
-
-  const name = String(formData.get("name") ?? "").trim();
-  if (name === "") return { fieldErrors: { name: "Give the product a name." } };
-
-  const division = String(formData.get("division") ?? "printshoppe");
-  if (!(DIVISION_IDS as readonly string[]).includes(division)) {
-    return { fieldErrors: { division: "Choose a division." } };
-  }
-
-  let priceCentavos: number | null = null;
-  const rawPrice = String(formData.get("price") ?? "").trim();
-  if (rawPrice !== "") {
-    try {
-      priceCentavos = parsePesos(rawPrice);
-      if (priceCentavos < 0) throw new Error("negative");
-    } catch {
-      return { fieldErrors: { price: "Enter a price like 25 or 25.00." } };
-    }
-  }
-
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.from("products").insert({
-    name,
-    division,
-    price_centavos: priceCentavos,
-    // No price means the counter asks for it every time.
-    manual_price: priceCentavos === null,
-    section: "other",
-    created_by: user.id,
-  });
 
-  if (error) return { error: `Could not save the product: ${error.message}` };
+  const photo = photoFrom(formData);
+  if (photo && !isOwnerOrAdmin(user)) {
+    return { fieldErrors: { photo: "Only the owner or an admin can add a photo." } };
+  }
+
+  // The duplicate check is against the products the Counter shows. A hidden
+  // product with the same name is not "in the list".
+  const { data: existing, error: readError } = await supabase
+    .from("products")
+    .select("name, sort_order")
+    .eq("active", true);
+  if (readError) return { error: `Could not read the product list: ${readError.message}` };
+
+  const checked = checkNewProduct(
+    { name: String(formData.get("name") ?? ""), price: String(formData.get("price") ?? "") },
+    (existing ?? []).map((row) => row.name as string),
+  );
+  if (!checked.ok) return { fieldErrors: checked.fieldErrors };
+
+  const { data: last } = await supabase
+    .from("products")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  // sort_order is a smallint; a list that has somehow reached the top stays there.
+  const sortOrder = Math.min(Number(last?.sort_order ?? 0) + 1, 32767);
+
+  const { data: inserted, error } = await supabase
+    .from("products")
+    .insert({
+      name: checked.name,
+      division: "printshoppe",
+      price_centavos: checked.priceCentavos,
+      manual_price: false,
+      section: "other",
+      sort_order: sortOrder,
+      created_by: user.id,
+    })
+    .select("id, name, division, price_centavos, manual_price, unit, section, income_category")
+    .single();
+
+  if (error || !inserted) {
+    return { error: `Could not save the product: ${error?.message ?? "nothing came back"}` };
+  }
 
   await recordAudit({
     actorId: user.id,
     actorUsername: user.username,
     action: "create",
     entity: "products",
-    summary: `Saved a new product "${name}"${
-      priceCentavos === null ? " with no fixed price" : ` at ${formatPesos(priceCentavos)}`
-    }`,
-    after: { name, division, price_centavos: priceCentavos },
+    entityId: inserted.id,
+    summary: `Added "${checked.name}" at ${formatPesos(checked.priceCentavos)} from the counter`,
+    after: { name: checked.name, price_centavos: checked.priceCentavos, sort_order: sortOrder },
   });
+
+  // The product is saved whatever happens to its photo: the owner's typing is
+  // not thrown away because a picture would not upload.
+  let imageUrl: string | null = null;
+  let photoError: string | undefined;
+  if (photo) {
+    const stored = await attachPhoto(user, inserted.id, checked.name, photo, null);
+    if (stored.error) photoError = stored.error;
+    else imageUrl = stored.imageUrl ?? null;
+  }
 
   revalidatePath("/pos");
   revalidatePath("/products");
 
+  return {
+    photoError,
+    product: {
+      id: inserted.id,
+      name: inserted.name,
+      division: inserted.division as DivisionId,
+      priceCentavos: inserted.price_centavos === null ? null : Number(inserted.price_centavos),
+      manualPrice: inserted.manual_price,
+      unit: inserted.unit,
+      section: inserted.section,
+      incomeCategory: inserted.income_category,
+      tiers: [],
+      imageUrl,
+    },
+  };
+}
+
+/**
+ * Saves the Counter's product order after a row is dropped.
+ *
+ * The whole list, in one database statement (`reorder_products`, 0026), so
+ * the order is never half saved. Owner/Admin only - the function checks that
+ * itself, and its update runs under the ordinary products policy.
+ */
+export async function reorderCounterProductsAction(
+  ids: string[],
+): Promise<{ error?: string }> {
+  await requireOwnerOrAdmin();
+
+  if (!Array.isArray(ids) || ids.length === 0 || ids.length > 32000) {
+    return { error: "The new order could not be read." };
+  }
+  if (!ids.every((id) => typeof id === "string" && UUID.test(id))) {
+    return { error: "The new order could not be read." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase.rpc("reorder_products", { p_ids: ids });
+
+  if (error) {
+    return {
+      error: isFunctionMissingFromApi(error)
+        ? "The database is behind: the new order cannot be saved until migration 0026 is applied (npm run db:push)."
+        : `The new order was not saved: ${error.message}`,
+    };
+  }
+
+  revalidatePath("/pos");
+  revalidatePath("/products");
   return {};
+}
+
+/**
+ * Puts a new photo on a product, then removes the one it replaces. In that
+ * order: if anything fails before the product points at the new file, the
+ * old photo is still there and still shown.
+ */
+async function attachPhoto(
+  user: SignedInUser,
+  productId: string,
+  productName: string,
+  photo: File,
+  previousPath: string | null,
+): Promise<{ error?: string; imageUrl?: string }> {
+  const supabase = await createSupabaseServerClient();
+
+  const uploaded = await uploadProductPhoto(supabase, productId, photo);
+  if (!uploaded.ok) return { error: uploaded.error };
+
+  const { data: updated, error } = await supabase
+    .from("products")
+    .update({ image_path: uploaded.path })
+    .eq("id", productId)
+    .select("id");
+
+  if (error || !updated || updated.length === 0) {
+    await removePhotoFile(supabase, uploaded.path);
+    return {
+      error: error && isColumnMissingFromApi(error)
+        ? "The database is behind: photos can be saved once migration 0026 is applied (npm run db:push)."
+        : `The photo was not saved${error ? `: ${error.message}` : "."}`,
+    };
+  }
+
+  await removePhotoFile(supabase, previousPath);
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "update",
+    entity: "products",
+    entityId: productId,
+    summary: `${previousPath ? "Replaced" : "Added"} the photo of "${productName}"`,
+    before: { image_path: previousPath },
+    after: { image_path: uploaded.path },
+  });
+
+  return { imageUrl: productImageUrl(uploaded.path) ?? undefined };
+}
+
+/** Adds or replaces a product's photo, from its thumbnail on the Counter. */
+export async function setCounterProductPhotoAction(
+  formData: FormData,
+): Promise<{ error?: string; imageUrl?: string }> {
+  const user = await requireOwnerOrAdmin();
+
+  const productId = String(formData.get("productId") ?? "");
+  if (!UUID.test(productId)) return { error: "That product could not be found." };
+
+  const photo = photoFrom(formData);
+  if (!photo) return { error: "Choose a photo first." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: product, error } = await supabase
+    .from("products")
+    .select("name, image_path")
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      error: isColumnMissingFromApi(error)
+        ? "The database is behind: photos can be saved once migration 0026 is applied (npm run db:push)."
+        : `Could not read the product: ${error.message}`,
+    };
+  }
+  if (!product) return { error: "That product no longer exists." };
+
+  const result = await attachPhoto(user, productId, product.name, photo, product.image_path);
+  if (!result.error) {
+    revalidatePath("/pos");
+  }
+  return result;
+}
+
+/** Takes a product's photo off, back to the placeholder. */
+export async function removeCounterProductPhotoAction(
+  productId: string,
+): Promise<{ error?: string }> {
+  const user = await requireOwnerOrAdmin();
+  if (typeof productId !== "string" || !UUID.test(productId)) {
+    return { error: "That product could not be found." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: product } = await supabase
+    .from("products")
+    .select("name, image_path")
+    .eq("id", productId)
+    .maybeSingle();
+
+  if (!product) return { error: "That product no longer exists." };
+  if (!product.image_path) return {};
+
+  const { data: updated, error } = await supabase
+    .from("products")
+    .update({ image_path: null })
+    .eq("id", productId)
+    .select("id");
+
+  if (error || !updated || updated.length === 0) {
+    return { error: `The photo was not removed${error ? `: ${error.message}` : "."}` };
+  }
+
+  await removePhotoFile(supabase, product.image_path);
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "update",
+    entity: "products",
+    entityId: productId,
+    summary: `Removed the photo of "${product.name}"`,
+    before: { image_path: product.image_path },
+    after: { image_path: null },
+  });
+
+  revalidatePath("/pos");
+  return {};
+}
+
+/**
+ * The bin on a Counter row.
+ *
+ * A product that has never been sold is deleted, photo and all. One that has
+ * been sold cannot be (0011's delete policy) and is hidden instead, keeping
+ * its photo - it can be shown again from the Products screen. Either way old
+ * sales are untouched: every sale line keeps its own name and price.
+ */
+export async function deleteCounterProductAction(
+  productId: string,
+): Promise<{ error?: string; outcome?: "deleted" | "archived" }> {
+  const user = await requireOwnerOrAdmin();
+  if (typeof productId !== "string" || !UUID.test(productId)) {
+    return { error: "That product could not be found." };
+  }
+
+  const result = await removeProduct(user, productId, "archive");
+  if (!result.ok) {
+    return { error: "error" in result ? result.error : "That product could not be removed." };
+  }
+
+  revalidatePath("/pos");
+  revalidatePath("/products");
+  revalidatePath("/checklist");
+  return { outcome: result.outcome };
 }
 
 /** Adds a customer from the pop-up at the counter (spec 5). */
