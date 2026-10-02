@@ -13,6 +13,7 @@ import {
   quantityOf,
   reconcileProducts,
   rowPrice,
+  stepQuantity,
   type ListProduct,
 } from "./counter-list";
 import { computeSale } from "./pos";
@@ -402,5 +403,23 @@ describe("checkCategoryName", () => {
 
   it("refuses a name over 60 characters", () => {
     expect(checkCategoryName("x".repeat(61), []).ok).toBe(false);
+  });
+});
+
+describe("stepQuantity", () => {
+  it("adds one, starting from an empty box", () => {
+    expect(stepQuantity("", 1)).toBe("1");
+    expect(stepQuantity(undefined, 1)).toBe("1");
+    expect(stepQuantity("9", 1)).toBe("10");
+  });
+
+  it("takes one off, and 1 goes back to an empty box rather than 0", () => {
+    expect(stepQuantity("3", -1)).toBe("2");
+    expect(stepQuantity("1", -1)).toBe("");
+    expect(stepQuantity("", -1)).toBe("");
+  });
+
+  it("stops at the largest quantity a box takes", () => {
+    expect(stepQuantity(String(MAX_QUANTITY), 1)).toBe(String(MAX_QUANTITY));
   });
 });

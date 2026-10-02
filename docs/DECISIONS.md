@@ -1547,3 +1547,13 @@ to ask:
      make two columns appear sooner or later.
   8. **Sales do not change.** A sale line records the product's name and price,
      never its category, so nothing in Sales, End of day or Reports moves.
+- **Each quantity box has a − and a + beside it** (your request, 2 October
+  2026). + adds one (an empty box goes to 1); − takes one off, and 1 goes back
+  to an EMPTY box rather than showing 0, because empty is what "not in this
+  sale" looks like everywhere else on the Counter. − is greyed out on an empty
+  box. Typing a number still works, and + carries on from whatever was typed.
+  Each button is 36 × 44px, over the 24px the design rules ask for. To fit the
+  two buttons without squeezing the product name, a narrow row (a phone, a
+  half-width column) puts the box and the line total on a second line under
+  the name; a wide row keeps everything on one line. The rule is
+  `stepQuantity` in `src/lib/counter-list.ts`.

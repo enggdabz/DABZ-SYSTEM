@@ -51,6 +51,16 @@ export function quantityOf(raw: string | undefined): number {
   return cleaned === "" ? 0 : Number(cleaned);
 }
 
+/**
+ * The quantity after the − or + beside the box. Never below empty (0) and
+ * never above `MAX_QUANTITY`; whatever was typed is read the same way the
+ * box reads it, so "007" then + is 8.
+ */
+export function stepQuantity(raw: string | undefined, delta: 1 | -1): string {
+  const next = Math.min(Math.max(quantityOf(raw) + delta, 0), MAX_QUANTITY);
+  return next === 0 ? "" : String(next);
+}
+
 export type RowPrice =
   /** Nothing typed in the quantity box. */
   | { kind: "empty" }

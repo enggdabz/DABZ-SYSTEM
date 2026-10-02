@@ -144,6 +144,49 @@ describe("the saved products list", () => {
     expect(actions.completeSaleAction).not.toHaveBeenCalled();
   });
 
+  it("counts up and down with the + and − beside each box", async () => {
+    const user = userEvent.setup();
+    renderCounter();
+
+    const plus = screen.getByRole("button", { name: "One more Xerox" });
+    const minus = screen.getByRole("button", { name: "One fewer Xerox" }) as HTMLButtonElement;
+
+    // Nothing to take off an empty box.
+    expect(minus.disabled).toBe(true);
+
+    await user.click(plus);
+    await user.click(plus);
+    await user.click(plus);
+    expect(quantityBox("Xerox").value).toBe("3");
+    const footer = completeButton().closest("div.sticky") as HTMLElement;
+    expect(within(footer).getByText("₱9.00")).toBeTruthy();
+
+    await user.click(minus);
+    expect(quantityBox("Xerox").value).toBe("2");
+
+    // Typing still works alongside the buttons, and + carries on from it.
+    await user.clear(quantityBox("Xerox"));
+    await user.type(quantityBox("Xerox"), "10");
+    await user.click(plus);
+    expect(quantityBox("Xerox").value).toBe("11");
+
+    // Down to one, then − empties the box rather than showing 0.
+    await user.clear(quantityBox("Xerox"));
+    await user.type(quantityBox("Xerox"), "1");
+    await user.click(minus);
+    expect(quantityBox("Xerox").value).toBe("");
+    expect(completeButton().disabled).toBe(true);
+  });
+
+  it("keeps the + and − on each row only for that row", async () => {
+    const user = userEvent.setup();
+    renderCounter();
+
+    await user.click(screen.getByRole("button", { name: "One more ID PHOTO PACKAGE" }));
+    expect(quantityBox("ID PHOTO PACKAGE").value).toBe("1");
+    expect(quantityBox("Xerox").value).toBe("");
+  });
+
   it("moves to the next row's box when Enter is pressed", async () => {
     const user = userEvent.setup();
     renderCounter();

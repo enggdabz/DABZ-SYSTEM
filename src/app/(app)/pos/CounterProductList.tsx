@@ -48,6 +48,7 @@ import {
   cleanQuantity,
   groupByCategory,
   rowPrice,
+  stepQuantity,
   type CategoryGroup,
 } from "@/lib/counter-list";
 import { centavosToDecimalString, formatPesos } from "@/lib/money";
@@ -334,7 +335,22 @@ function SortableRow({
             : "bg-surface ring-line/60"
       }`}
     >
-      <div className="flex items-center gap-2 py-2 pr-1 pl-1 sm:gap-3 sm:pr-2">
+      {/*
+        Two shapes, chosen by how wide the ROW is (a container query), not the
+        screen:
+
+          narrow   ⋮⋮ [photo] name / price               🗑
+                              [ − | qty | + ]     total
+
+          wide     ⋮⋮ [photo] name / price   [ − | qty | + ]   total   🗑
+
+        A phone row, a half-width column and the list beside the payment panel
+        are all narrow; the quantity box with its two buttons would leave the
+        name a few letters wide on one line, so it moves under the name there.
+        In the wide shape the wrapper is `display: contents`, so the box and
+        the total become cells of the same grid row.
+      */}
+      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 py-2 pr-1 pl-1 @lg/row:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto] @lg/row:gap-x-3 @lg/row:pr-2">
         {canManage ? (
           <button
             type="button"
@@ -342,25 +358,27 @@ function SortableRow({
             {...attributes}
             {...listeners}
             aria-label={`Move ${product.name}`}
-            className={`flex h-11 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-control text-muted hover:text-ink active:cursor-grabbing ${
+            className={`row-span-2 flex h-11 w-7 cursor-grab touch-none items-center justify-center rounded-control text-muted hover:text-ink active:cursor-grabbing @lg/row:row-span-1 ${
               isDragging ? "text-ink" : ""
             }`}
           >
             <GripIcon />
           </button>
         ) : (
-          <span className="w-1 shrink-0" aria-hidden="true" />
+          <span className="row-span-2 w-1 @lg/row:row-span-1" aria-hidden="true" />
         )}
 
-        <ProductThumb
-          product={product}
-          canManage={canManage}
-          busy={photoBusy}
-          onPhoto={onPhoto}
-          onPhotoMenu={onPhotoMenu}
-        />
+        <div className="row-span-2 self-start @lg/row:row-span-1 @lg/row:self-center">
+          <ProductThumb
+            product={product}
+            canManage={canManage}
+            busy={photoBusy}
+            onPhoto={onPhoto}
+            onPhotoMenu={onPhotoMenu}
+          />
+        </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           {canManage ? (
             <button
               type="button"
@@ -407,57 +425,66 @@ function SortableRow({
               {product.unit ? ` / ${product.unit}` : ""}
             </p>
           )}
-          {/*
-            The line total sits under the name wherever the ROW is narrow - a
-            phone, a half-width column, the list beside the payment panel - and
-            in a column of its own once the row itself has the room.
-          */}
-          <p
-            className={`mt-0.5 text-xs font-semibold @md/row:hidden ${
-              price.kind === "needs-price" ? "text-attention" : ""
-            }`}
-            aria-hidden="true"
-          >
-            {price.kind === "priced" ? `= ${lineTotal}` : price.kind === "needs-price" ? "⚠ Type the price" : ""}
-          </p>
         </div>
 
-        <input
-          ref={registerBox}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          enterKeyHint={isLast ? "done" : "next"}
-          autoComplete="off"
-          value={quantity}
-          placeholder="0"
-          onChange={(event) => onQuantity(product.id, cleanQuantity(event.target.value))}
-          onKeyDown={(event) => onEnter(event, product.id)}
-          onFocus={(event) => event.currentTarget.select()}
-          aria-label={`Quantity of ${product.name}`}
-          className={`h-11 w-14 shrink-0 rounded-control px-1 text-center text-base font-semibold tabular-nums ring-1 placeholder:font-normal placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-ink/60 sm:w-16 ${
-            chosen ? "bg-surface ring-gold" : "bg-surface-sunken ring-line"
-          }`}
-        />
+        <div className="col-span-2 col-start-3 row-start-2 flex items-center justify-between gap-3 @lg/row:contents">
+          <div
+            className={`flex h-11 shrink-0 items-stretch overflow-hidden rounded-control ring-1 focus-within:ring-2 focus-within:ring-ink/60 ${
+              chosen ? "bg-surface ring-gold" : "bg-surface-sunken ring-line"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => onQuantity(product.id, stepQuantity(quantity, -1))}
+              disabled={!chosen}
+              aria-label={`One fewer ${product.name}`}
+              className="flex w-9 items-center justify-center text-lg font-semibold text-muted hover:bg-ink/10 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <span aria-hidden="true">&minus;</span>
+            </button>
+            <input
+              ref={registerBox}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              enterKeyHint={isLast ? "done" : "next"}
+              autoComplete="off"
+              value={quantity}
+              placeholder="0"
+              onChange={(event) => onQuantity(product.id, cleanQuantity(event.target.value))}
+              onKeyDown={(event) => onEnter(event, product.id)}
+              onFocus={(event) => event.currentTarget.select()}
+              aria-label={`Quantity of ${product.name}`}
+              className="w-12 bg-transparent px-0.5 text-center text-base font-semibold tabular-nums placeholder:font-normal placeholder:text-muted focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => onQuantity(product.id, stepQuantity(quantity, 1))}
+              aria-label={`One more ${product.name}`}
+              className="flex w-9 items-center justify-center text-lg font-semibold text-muted hover:bg-ink/10 hover:text-ink"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
 
-        <p
-          className={`hidden w-24 shrink-0 text-right text-sm tabular-nums @md/row:block ${
-            price.kind === "priced"
-              ? "font-semibold"
-              : price.kind === "needs-price"
-                ? "text-attention"
-                : "text-muted"
-          }`}
-          aria-live="off"
-        >
-          {price.kind === "needs-price" ? (
-            <>
-              <span aria-hidden="true">{"⚠"} </span>Price?
-            </>
-          ) : (
-            lineTotal
-          )}
-        </p>
+          <p
+            className={`text-right text-sm tabular-nums @lg/row:w-24 ${
+              price.kind === "priced"
+                ? "font-semibold"
+                : price.kind === "needs-price"
+                  ? "text-attention"
+                  : "text-muted"
+            }`}
+          >
+            {price.kind === "needs-price" ? (
+              <>
+                <span aria-hidden="true">{"⚠"} </span>Price?
+              </>
+            ) : (
+              lineTotal
+            )}
+          </p>
+        </div>
 
         {canManage ? (
           <button
@@ -465,7 +492,7 @@ function SortableRow({
             onClick={onAskDelete}
             aria-label={`Delete ${product.name}`}
             title="Delete"
-            className="ml-1 flex h-11 w-8 shrink-0 items-center justify-center rounded-control text-muted hover:text-attention sm:ml-2"
+            className="col-start-4 row-start-1 flex h-11 w-8 items-center justify-center self-start rounded-control text-muted hover:text-attention @lg/row:col-start-6 @lg/row:self-center"
           >
             <TrashIcon />
           </button>
