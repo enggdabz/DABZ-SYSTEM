@@ -11,7 +11,7 @@
 import { revalidatePath } from "next/cache";
 
 import { orderTotals, splitPaymentByCategory } from "@/lib/apparel";
-import { recordAudit } from "@/lib/audit";
+import { diffFields, recordAudit } from "@/lib/audit";
 import {
   getSettings,
   requireOwnerOrAdmin,
@@ -21,7 +21,7 @@ import {
 } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { checkPaymentAmount } from "@/lib/collections";
-import { checkNewProduct } from "@/lib/counter-list";
+import { checkNewProduct, checkProductEdit } from "@/lib/counter-list";
 import { getApparelOrder } from "@/lib/data/apparel";
 import {
   removePhotoFile,
@@ -648,6 +648,103 @@ export async function addCounterProductAction(
       incomeCategory: inserted.income_category,
       tiers: [],
       imageUrl,
+    },
+  };
+}
+
+export interface UpdateCounterProductResult {
+  error?: string;
+  fieldErrors?: { name?: string; price?: string };
+  product?: { id: string; name: string; priceCentavos: number | null; manualPrice: boolean };
+}
+
+/**
+ * The pencil on a Counter row: rename or reprice a product.
+ *
+ * Owner/Admin only - `products_update` already says so, and this re-checks
+ * because a Server Action is a public endpoint. Past sales are untouched:
+ * every sale line keeps its own copy of the name and the price it was sold
+ * at, so a new price applies from the next sale on.
+ */
+export async function updateCounterProductAction(
+  formData: FormData,
+): Promise<UpdateCounterProductResult> {
+  const user = await requireOwnerOrAdmin();
+
+  const productId = String(formData.get("productId") ?? "");
+  if (!UUID.test(productId)) return { error: "That product could not be found." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: rows, error: readError } = await supabase
+    .from("products")
+    .select("id, name, price_centavos, manual_price")
+    .eq("active", true);
+  if (readError) return { error: `Could not read the product list: ${readError.message}` };
+
+  const before = (rows ?? []).find((row) => row.id === productId);
+  if (!before) return { error: "That product is no longer in the list." };
+
+  const checked = checkProductEdit(
+    { name: String(formData.get("name") ?? ""), price: String(formData.get("price") ?? "") },
+    (rows ?? []).filter((row) => row.id !== productId).map((row) => row.name as string),
+  );
+  if (!checked.ok) return { fieldErrors: checked.fieldErrors };
+
+  const values = {
+    name: checked.name,
+    price_centavos: checked.priceCentavos,
+    // No price means the counter asks for it each time - the same pairing
+    // the Products screen writes.
+    manual_price: checked.priceCentavos === null,
+  };
+
+  const { data: updated, error } = await supabase
+    .from("products")
+    .update(values)
+    .eq("id", productId)
+    .select("id");
+
+  if (error) return { error: `Could not save the change: ${error.message}` };
+  if (!updated || updated.length === 0) {
+    return { error: "Nothing was saved. Only the owner or an admin can change a product." };
+  }
+
+  const changed = diffFields(
+    {
+      name: before.name,
+      price_centavos: before.price_centavos === null ? null : Number(before.price_centavos),
+      manual_price: before.manual_price,
+    } as Record<string, unknown>,
+    values as Record<string, unknown>,
+  );
+
+  if (changed.changedKeys.length > 0) {
+    await recordAudit({
+      actorId: user.id,
+      actorUsername: user.username,
+      action: "update",
+      entity: "products",
+      entityId: productId,
+      summary: changed.changedKeys.includes("price_centavos")
+        ? `Changed "${checked.name}" to ${
+            checked.priceCentavos === null ? "ask the price each time" : formatPesos(checked.priceCentavos)
+          } from the counter`
+        : `Renamed "${before.name}" to "${checked.name}" from the counter`,
+      before: changed.before,
+      after: changed.after,
+    });
+  }
+
+  revalidatePath("/pos");
+  revalidatePath("/products");
+  revalidatePath("/checklist");
+
+  return {
+    product: {
+      id: productId,
+      name: checked.name,
+      priceCentavos: checked.priceCentavos,
+      manualPrice: checked.priceCentavos === null,
     },
   };
 }

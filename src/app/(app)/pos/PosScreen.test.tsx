@@ -22,6 +22,7 @@ const actions = vi.hoisted(() => ({
   setCounterProductPhotoAction: vi.fn(),
   removeCounterProductPhotoAction: vi.fn(),
   deleteCounterProductAction: vi.fn(),
+  updateCounterProductAction: vi.fn(),
 }));
 vi.mock("./actions", () => actions);
 
@@ -202,6 +203,7 @@ describe("what staff see", () => {
     expect(screen.queryByRole("button", { name: /^Move / })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Delete / })).toBeNull();
     expect(screen.queryByRole("button", { name: /photo of/i })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Edit / })).toBeNull();
   });
 });
 
@@ -362,6 +364,91 @@ describe("a product's photo", () => {
     expect(await screen.findByText(/The old photo was kept/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Change the photo of Xerox" })).toBeTruthy();
     expect(quantityBox("ID PHOTO PACKAGE").value).toBe("4");
+  });
+});
+
+describe("editing a product", () => {
+  function editDialog() {
+    return screen.getByRole("dialog", { name: "Edit Xerox" });
+  }
+
+  it("opens with the current name and price filled in", async () => {
+    const user = userEvent.setup();
+    renderCounter();
+
+    await user.click(screen.getByRole("button", { name: "Edit Xerox" }));
+    expect((within(editDialog()).getByLabelText(/Product name/) as HTMLInputElement).value).toBe(
+      "Xerox",
+    );
+    expect((within(editDialog()).getByLabelText(/Price each/) as HTMLInputElement).value).toBe(
+      "3.00",
+    );
+  });
+
+  it("saves a new name and price, and a typed quantity follows the new price", async () => {
+    actions.updateCounterProductAction.mockImplementation(async () => ({
+      product: { id: XEROX.id, name: "Xerox (A4)", priceCentavos: 350, manualPrice: false },
+    }));
+    const user = userEvent.setup();
+    renderCounter();
+
+    await user.type(quantityBox("Xerox"), "10");
+    await user.click(screen.getByRole("button", { name: "Edit Xerox" }));
+    const name = within(editDialog()).getByLabelText(/Product name/);
+    await user.clear(name);
+    await user.type(name, "Xerox (A4)");
+    const price = within(editDialog()).getByLabelText(/Price each/);
+    await user.clear(price);
+    await user.type(price, "3.50");
+    await user.click(within(editDialog()).getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    const form = actions.updateCounterProductAction.mock.calls[0][0] as FormData;
+    expect(form.get("productId")).toBe(XEROX.id);
+    expect(form.get("name")).toBe("Xerox (A4)");
+    expect(form.get("price")).toBe("3.50");
+
+    // Same row, same quantity, new name and new line total.
+    expect(quantityBox("Xerox (A4)").value).toBe("10");
+    const footer = completeButton().closest("div.sticky") as HTMLElement;
+    expect(within(footer).getByText("₱35.00")).toBeTruthy();
+  });
+
+  it("refuses another product's name and a zero price before asking the server", async () => {
+    const user = userEvent.setup();
+    renderCounter();
+
+    await user.click(screen.getByRole("button", { name: "Edit Xerox" }));
+    const name = within(editDialog()).getByLabelText(/Product name/);
+    await user.clear(name);
+    await user.type(name, "id photo package");
+    const price = within(editDialog()).getByLabelText(/Price each/);
+    await user.clear(price);
+    await user.type(price, "0");
+    await user.click(within(editDialog()).getByRole("button", { name: "Save changes" }));
+
+    expect(within(editDialog()).getByText(/already in the list/)).toBeTruthy();
+    expect(within(editDialog()).getByText("Enter a price greater than zero.")).toBeTruthy();
+    expect(actions.updateCounterProductAction).not.toHaveBeenCalled();
+  });
+
+  it("keeps the dialog open and the row unchanged when the save fails", async () => {
+    actions.updateCounterProductAction.mockImplementation(async () => ({
+      error: "Nothing was saved. Only the owner or an admin can change a product.",
+    }));
+    const user = userEvent.setup();
+    renderCounter();
+
+    await user.click(screen.getByRole("button", { name: "Edit Xerox" }));
+    const price = within(editDialog()).getByLabelText(/Price each/);
+    await user.clear(price);
+    await user.type(price, "9");
+    await user.click(within(editDialog()).getByRole("button", { name: "Save changes" }));
+
+    expect(await within(editDialog()).findByText(/Nothing was saved/)).toBeTruthy();
+    await user.click(within(editDialog()).getByRole("button", { name: "Cancel" }));
+    const row = quantityBox("Xerox").closest("li")!;
+    expect(within(row).getAllByText(/₱3\.00/).length).toBeGreaterThan(0);
   });
 });
 

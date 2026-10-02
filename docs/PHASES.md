@@ -2730,6 +2730,9 @@ The owner's request, inside Phase 4's Counter. Waiting for the owner to try it.
   same. See `docs/DECISIONS.md` for this and the other choices made.
 - Migration `0026_counter_product_list.sql`: `products.image_path` and
   `reorder_products`.
+- Owners and admins can rename or reprice a product by tapping its name on the
+  Counter (added 2 Oct 2026, no migration). Past sales keep the name and price
+  they were sold at.
 
 **How it is verified**
 

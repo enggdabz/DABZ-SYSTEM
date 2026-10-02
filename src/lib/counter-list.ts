@@ -239,6 +239,39 @@ export function checkNewProduct(
   return { ok: true, name, priceCentavos };
 }
 
+export type ProductEditCheck =
+  | { ok: true; name: string; priceCentavos: Centavos | null }
+  | { ok: false; fieldErrors: { name?: string; price?: string } };
+
+/**
+ * Renaming or repricing a product from the Counter (owner's request, 2 Oct
+ * 2026).
+ *
+ * The same rules as a new product - a name, not one already in the list, a
+ * price above zero - with one difference: the price box may be left EMPTY,
+ * which keeps the product asking for its price at the counter each time. A
+ * product added on the Products screen can already be in that state, and an
+ * edit to its name must not force somebody to invent a price for it. Zero is
+ * still refused: empty means "ask", zero would mean "free".
+ *
+ * `otherNames` is every OTHER product in the list, so keeping a name as it is
+ * - or changing only its capitals - is not "already in the list".
+ */
+export function checkProductEdit(
+  input: { name: string; price: string },
+  otherNames: readonly string[],
+): ProductEditCheck {
+  if (input.price.trim() === "") {
+    const named = checkNewProduct({ name: input.name, price: "1" }, otherNames);
+    return named.ok
+      ? { ok: true, name: named.name, priceCentavos: null }
+      : { ok: false, fieldErrors: { name: named.fieldErrors.name } };
+  }
+
+  const checked = checkNewProduct(input, otherNames);
+  return checked.ok ? { ok: true, name: checked.name, priceCentavos: checked.priceCentavos } : checked;
+}
+
 /**
  * The list to show when the server sends a fresh copy of the products.
  *

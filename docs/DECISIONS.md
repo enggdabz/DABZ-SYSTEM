@@ -1494,3 +1494,22 @@ to ask:
   9. **The drag library is `@dnd-kit`** (`core`, `sortable`, `utilities`),
      approved by you on 2 October 2026. Dragging starts only from the grip, so
      scrolling and tapping a quantity box on a phone work as normal.
+- **A product's name and price can be edited from the Counter** (your request,
+  2 October 2026). Owners and admins tap the product name (it carries a small
+  pencil) to change either. Staff do not see it - editing a product has been
+  Owner/Admin since spec 7.2, and the database's `products_update` policy says
+  the same, so no rule changed and there is no migration. What I decided:
+  1. **The same checks as a new product**: a name, not one already in the list
+     (another product's - keeping its own name is fine), and a price above
+     zero.
+  2. **The price may be left empty**, which makes the counter ask for it each
+     time - the state a product added on the Products screen can already be
+     in. Zero is still refused: empty means "ask", zero would mean "free".
+  3. **Past sales do not change.** Every sale line keeps its own copy of the
+     name and price it was sold at, so a new price applies from the next sale.
+     A quantity already typed in the row stays, and its total follows the new
+     price.
+  4. **Every change is written to the audit log** with the old and new values,
+     the same as an edit on the Products screen. The check is
+     `checkProductEdit` in `src/lib/counter-list.ts`; the save is
+     `updateCounterProductAction` in `src/app/(app)/pos/actions.ts`.

@@ -242,6 +242,7 @@ export function PosScreen({
               onChangePhoto={(id, file) => void list.changePhoto(id, file)}
               onRemovePhoto={(id) => void list.removePhoto(id)}
               onDelete={(id) => void list.remove(id)}
+              onEdit={list.edit}
               photoBusy={list.photoBusy}
               photoErrors={list.photoErrors}
               notice={list.notice}

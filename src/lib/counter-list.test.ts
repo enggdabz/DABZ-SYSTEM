@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_QUANTITY,
   checkNewProduct,
+  checkProductEdit,
   cleanQuantity,
   listSale,
   moveId,
@@ -279,5 +280,50 @@ describe("reconcileProducts", () => {
   it("never brings back a product this screen just removed", () => {
     expect(reconcileProducts([a, c], [a, b, c], new Set(["b"]), true)).toEqual([a, c]);
     expect(reconcileProducts([a, c], [a, b, c], new Set(["b"]), false)).toEqual([a, c]);
+  });
+});
+
+describe("checkProductEdit", () => {
+  const others = ["Xerox", "Lamination"];
+
+  it("accepts a new name and a new price", () => {
+    expect(checkProductEdit({ name: " ID photo  package ", price: "55.50" }, others)).toEqual({
+      ok: true,
+      name: "ID photo package",
+      priceCentavos: 5550,
+    });
+  });
+
+  it("keeps the product asking for its price when the price is left empty", () => {
+    expect(checkProductEdit({ name: "Mug", price: "  " }, others)).toEqual({
+      ok: true,
+      name: "Mug",
+      priceCentavos: null,
+    });
+  });
+
+  it("refuses an empty name, even with the price left empty", () => {
+    const result = checkProductEdit({ name: "", price: "" }, others);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors.name).toMatch(/name/);
+  });
+
+  it("refuses a zero or negative price", () => {
+    for (const price of ["0", "-1"]) {
+      const result = checkProductEdit({ name: "Mug", price }, others);
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.fieldErrors.price).toBe("Enter a price greater than zero.");
+    }
+  });
+
+  it("refuses the name of ANOTHER product in the list", () => {
+    const result = checkProductEdit({ name: "xerox", price: "3" }, others);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.fieldErrors.name).toMatch(/already in the list/);
+  });
+
+  it("lets a product keep its own name - only the others are compared", () => {
+    // The caller leaves the product being edited out of `otherNames`.
+    expect(checkProductEdit({ name: "XEROX", price: "3.50" }, ["Lamination"]).ok).toBe(true);
   });
 });

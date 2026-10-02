@@ -25,7 +25,9 @@ import {
   removeCounterProductPhotoAction,
   reorderCounterProductsAction,
   setCounterProductPhotoAction,
+  updateCounterProductAction,
   type AddCounterProductResult,
+  type UpdateCounterProductResult,
 } from "./actions";
 import type { PosProduct } from "./PosScreen";
 
@@ -250,6 +252,37 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
     return result;
   }
 
+  /**
+   * A new name or price. Shown once the server has saved it - the dialog
+   * waits for the answer, so the row never shows a price that is not real.
+   * Any quantity already typed stays, and its line total follows the new price.
+   */
+  async function edit(id: string, form: FormData): Promise<UpdateCounterProductResult> {
+    form.set("productId", id);
+    const result = await saving(() =>
+      updateCounterProductAction(form).catch(() => ({
+        error: "Nothing was saved - the connection dropped.",
+      })),
+    );
+
+    const saved = "product" in result ? result.product : undefined;
+    if (saved) {
+      setItems((current) =>
+        current.map((product) =>
+          product.id === id
+            ? {
+                ...product,
+                name: saved.name,
+                priceCentavos: saved.priceCentavos,
+                manualPrice: saved.manualPrice,
+              }
+            : product,
+        ),
+      );
+    }
+    return result;
+  }
+
   return {
     items,
     quantities,
@@ -262,6 +295,7 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
     removePhoto,
     remove,
     add,
+    edit,
     photoBusy,
     photoErrors,
     notice,
