@@ -4,7 +4,7 @@ import { Notice } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getPayableJobs } from "@/lib/data/collections";
-import { getCounterProducts, getCustomers } from "@/lib/data/pos";
+import { getCounterProducts, getCustomers, getProductCategories } from "@/lib/data/pos";
 import { getProjects } from "@/lib/data/projects";
 import { productImageUrl } from "@/lib/online/storage";
 import { payableProjects, type FindableProject } from "@/lib/project-find";
@@ -32,8 +32,9 @@ export default async function PosPage() {
   const canTakeApparel = can(user, "apparel_job_orders");
   const canTakeRepairs = can(user, "dabztech_tickets");
 
-  const [{ products, photosReady }, customers, payableJobs] = await Promise.all([
+  const [{ products, photosReady, categoriesReady }, categories, customers, payableJobs] = await Promise.all([
     getCounterProducts(),
+    getProductCategories(),
     getCustomers(),
     getPayableJobs({
       apparel: canTakeApparel,
@@ -98,6 +99,18 @@ export default async function PosPage() {
               </Notice>
             ) : null}
 
+            {ownerOrAdmin && photosReady && (!categoriesReady || categories === null) ? (
+              <Notice tone="attention" title="The database is behind: categories are off">
+                <p>
+                  Migration <strong>0027</strong> has not been applied yet, so
+                  products cannot be put into categories. Selling works as
+                  normal. Run <code>npm run db:push</code> (or paste
+                  <code> 0027_product_categories.sql</code> into the Supabase SQL
+                  editor) and reload this page.
+                </p>
+              </Notice>
+            ) : null}
+
             {ownerOrAdmin && !photosReady ? (
               <Notice tone="attention" title="The database is behind: photos and dragging are off">
                 <p>
@@ -138,7 +151,12 @@ export default async function PosPage() {
                 incomeCategory: product.incomeCategory,
                 tiers: product.tiers,
                 imageUrl: productImageUrl(product.imagePath),
+                categoryId: product.categoryId,
               }))}
+              // Categories only once 0027 has reached the database - both the
+              // table and the products' column. Until then the Counter is
+              // one list, as it was.
+              categories={categoriesReady ? categories : null}
               customers={customers.map((customer) => ({
                 id: customer.id,
                 name: customer.name,

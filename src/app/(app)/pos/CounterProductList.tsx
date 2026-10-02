@@ -5,6 +5,12 @@
  *
  *   ⋮⋮  [photo]  name / price   [ qty ]   line total   🗑
  *
+ * Grouped under the owner's categories (0027), each with a red header, and
+ * laid out in two columns wherever the list has the room for two readable
+ * rows. "Where the list has the room" is a CONTAINER query, not a screen one:
+ * on a tablet in landscape the payment panel takes half the screen, and the
+ * list is narrower there than on a tablet held upright.
+ *
  * Staff type how many the customer wants straight into the row - there is no
  * tap-then-confirm step any more, because the box IS the confirmation: nothing
  * is sold until "Complete sale" is pressed.
@@ -22,33 +28,39 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-  type Modifier,
 } from "@dnd-kit/core";
 import {
   SortableContext,
+  rectSortingStrategy,
   sortableKeyboardCoordinates,
   useSortable,
-  verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import Image from "next/image";
 import { useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 
 import { Modal } from "@/components/Modal";
-import { Button, Field, Input, Notice, TAP_AREA } from "@/components/ui";
-import { checkNewProduct, checkProductEdit, cleanQuantity, rowPrice } from "@/lib/counter-list";
+import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import {
+  checkCategoryName,
+  checkNewProduct,
+  checkProductEdit,
+  cleanQuantity,
+  groupByCategory,
+  rowPrice,
+  stepQuantity,
+  type CategoryGroup,
+} from "@/lib/counter-list";
 import { centavosToDecimalString, formatPesos } from "@/lib/money";
 import { PHOTO_ACCEPT, photoFileProblem } from "@/lib/product-photo";
 
 import type { AddCounterProductResult, UpdateCounterProductResult } from "./actions";
-import type { PosProduct } from "./PosScreen";
+import type { PosCategory, PosProduct } from "./PosScreen";
 import type { ListNotice } from "./useCounterProducts";
-
-/** A row moves up and down, never sideways. */
-const upAndDownOnly: Modifier = ({ transform }) => ({ ...transform, x: 0 });
 
 export function CounterProductList({
   items,
+  categories,
   quantities,
   prices,
   canManage,
@@ -66,13 +78,16 @@ export function CounterProductList({
   afterLastRow,
 }: {
   items: PosProduct[];
+  /** The owner's categories, by name. Null: the database has none yet (0027). */
+  categories: PosCategory[] | null;
   quantities: Record<string, string>;
   prices: Record<string, string>;
   /** Owner/Admin, with 0026 applied: drag, photos and the bin. */
   canManage: boolean;
   onQuantity: (id: string, value: string) => void;
   onPrice: (id: string, value: string) => void;
-  onReorder: (activeId: string, overId: string) => void;
+  /** `groupIds`: the category the row was dragged within. */
+  onReorder: (activeId: string, overId: string, groupIds: string[]) => void;
   onChangePhoto: (id: string, file: File) => void;
   onRemovePhoto: (id: string) => void;
   onDelete: (id: string) => void;
@@ -100,17 +115,21 @@ export function CounterProductList({
   const [editing, setEditing] = useState<PosProduct | null>(null);
   const [photoMenu, setPhotoMenu] = useState<PosProduct | null>(null);
 
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event;
-    if (over && active.id !== over.id) onReorder(String(active.id), String(over.id));
-  }
+  // Owners and admins see an empty category too - they need to know it is
+  // there to put something in it. Staff see only what they can sell.
+  const groups: CategoryGroup<PosProduct>[] = categories
+    ? groupByCategory(items, categories, { includeEmpty: canManage })
+    : [{ key: "none", categoryId: null, title: null, items }];
+
+  // The order the rows are SHOWN in, which Enter follows.
+  const shown = groups.flatMap((group) => group.items);
 
   /** Enter moves to the next row's box, in the order the rows are shown NOW. */
   function nextBox(event: KeyboardEvent<HTMLInputElement>, id: string) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    const index = items.findIndex((product) => product.id === id);
-    const next = items[index + 1];
+    const index = shown.findIndex((product) => product.id === id);
+    const next = shown[index + 1];
     if (next) {
       const box = quantityBoxes.current.get(next.id);
       box?.focus();
@@ -123,7 +142,7 @@ export function CounterProductList({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-5">
       {notice ? (
         <div aria-live="polite">
           <Notice tone={notice.tone} title={notice.text}>
@@ -138,44 +157,71 @@ export function CounterProductList({
         </div>
       ) : null}
 
-      <DndContext
-        id={dndId}
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[upAndDownOnly]}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={items.map((product) => product.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <ul className="space-y-2" aria-label="Saved products">
-            {items.map((product, index) => (
-              <SortableRow
-                key={product.id}
-                product={product}
-                isLast={index === items.length - 1}
-                quantity={quantities[product.id] ?? ""}
-                typedPrice={prices[product.id] ?? ""}
-                canManage={canManage}
-                onQuantity={onQuantity}
-                onPrice={onPrice}
-                onEnter={nextBox}
-                registerBox={(element) => {
-                  if (element) quantityBoxes.current.set(product.id, element);
-                  else quantityBoxes.current.delete(product.id);
+      {groups.map((group, groupIndex) => {
+        const ids = group.items.map((product) => product.id);
+        const label = group.title ?? "Saved products";
+        return (
+          <section key={group.key} aria-label={label} className="@container">
+            {group.title !== null ? (
+              <h3 className="mb-2 rounded-control bg-accent px-3 py-2 text-sm font-semibold tracking-tight text-on-accent">
+                {group.title}
+              </h3>
+            ) : null}
+
+            {group.items.length === 0 ? (
+              <p className="rounded-control px-3 py-2 text-sm text-muted ring-1 ring-line/60">
+                Nothing in this category yet. Tap a product&rsquo;s name to move it here.
+              </p>
+            ) : (
+              /*
+                One drag area per category: a row moves among its own
+                category's rows and cannot be dropped into another. Its
+                category is changed from the edit dialog, where the choice is
+                deliberate rather than the side effect of a slipped finger.
+              */
+              <DndContext
+                id={`${dndId}-${groupIndex}`}
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={(event: DragEndEvent) => {
+                  const { active, over } = event;
+                  if (over && active.id !== over.id) {
+                    onReorder(String(active.id), String(over.id), ids);
+                  }
                 }}
-                photoBusy={photoBusy[product.id] ?? false}
-                photoError={photoErrors[product.id] ?? ""}
-                onPhoto={(file) => onChangePhoto(product.id, file)}
-                onPhotoMenu={() => setPhotoMenu(product)}
-                onAskEdit={() => setEditing(product)}
-                onAskDelete={() => setConfirming(product)}
-              />
-            ))}
-          </ul>
-        </SortableContext>
-      </DndContext>
+              >
+                <SortableContext items={ids} strategy={rectSortingStrategy}>
+                  <ul className="grid gap-2 @xl:grid-cols-2" aria-label={label}>
+                    {group.items.map((product) => (
+                      <SortableRow
+                        key={product.id}
+                        product={product}
+                        isLast={product.id === shown[shown.length - 1]?.id}
+                        quantity={quantities[product.id] ?? ""}
+                        typedPrice={prices[product.id] ?? ""}
+                        canManage={canManage}
+                        onQuantity={onQuantity}
+                        onPrice={onPrice}
+                        onEnter={nextBox}
+                        registerBox={(element) => {
+                          if (element) quantityBoxes.current.set(product.id, element);
+                          else quantityBoxes.current.delete(product.id);
+                        }}
+                        photoBusy={photoBusy[product.id] ?? false}
+                        photoError={photoErrors[product.id] ?? ""}
+                        onPhoto={(file) => onChangePhoto(product.id, file)}
+                        onPhotoMenu={() => setPhotoMenu(product)}
+                        onAskEdit={() => setEditing(product)}
+                        onAskDelete={() => setConfirming(product)}
+                      />
+                    ))}
+                  </ul>
+                </SortableContext>
+              </DndContext>
+            )}
+          </section>
+        );
+      })}
 
       <Modal
         open={confirming !== null}
@@ -204,6 +250,7 @@ export function CounterProductList({
         <EditProductDialog
           key={editing.id}
           product={editing}
+          categories={categories}
           otherNames={items.filter((entry) => entry.id !== editing.id).map((entry) => entry.name)}
           onClose={() => setEditing(null)}
           onSave={(form) => onEdit(editing.id, form)}
@@ -280,7 +327,7 @@ function SortableRow({
     <li
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`relative rounded-control ring-1 transition-shadow ${
+      className={`@container/row relative rounded-control ring-1 transition-shadow ${
         isDragging
           ? "z-10 bg-surface shadow-xl ring-2 ring-gold"
           : chosen
@@ -288,7 +335,22 @@ function SortableRow({
             : "bg-surface ring-line/60"
       }`}
     >
-      <div className="flex items-center gap-2 py-2 pr-1 pl-1 sm:gap-3 sm:pr-2">
+      {/*
+        Two shapes, chosen by how wide the ROW is (a container query), not the
+        screen:
+
+          narrow   ⋮⋮ [photo] name / price               🗑
+                              [ − | qty | + ]     total
+
+          wide     ⋮⋮ [photo] name / price   [ − | qty | + ]   total   🗑
+
+        A phone row, a half-width column and the list beside the payment panel
+        are all narrow; the quantity box with its two buttons would leave the
+        name a few letters wide on one line, so it moves under the name there.
+        In the wide shape the wrapper is `display: contents`, so the box and
+        the total become cells of the same grid row.
+      */}
+      <div className="grid grid-cols-[auto_auto_minmax(0,1fr)_auto] items-center gap-x-2 gap-y-1.5 py-2 pr-1 pl-1 @lg/row:grid-cols-[auto_auto_minmax(0,1fr)_auto_auto_auto] @lg/row:gap-x-3 @lg/row:pr-2">
         {canManage ? (
           <button
             type="button"
@@ -296,25 +358,27 @@ function SortableRow({
             {...attributes}
             {...listeners}
             aria-label={`Move ${product.name}`}
-            className={`flex h-11 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-control text-muted hover:text-ink active:cursor-grabbing ${
+            className={`row-span-2 flex h-11 w-7 cursor-grab touch-none items-center justify-center rounded-control text-muted hover:text-ink active:cursor-grabbing @lg/row:row-span-1 ${
               isDragging ? "text-ink" : ""
             }`}
           >
             <GripIcon />
           </button>
         ) : (
-          <span className="w-1 shrink-0" aria-hidden="true" />
+          <span className="row-span-2 w-1 @lg/row:row-span-1" aria-hidden="true" />
         )}
 
-        <ProductThumb
-          product={product}
-          canManage={canManage}
-          busy={photoBusy}
-          onPhoto={onPhoto}
-          onPhotoMenu={onPhotoMenu}
-        />
+        <div className="row-span-2 self-start @lg/row:row-span-1 @lg/row:self-center">
+          <ProductThumb
+            product={product}
+            canManage={canManage}
+            busy={photoBusy}
+            onPhoto={onPhoto}
+            onPhotoMenu={onPhotoMenu}
+          />
+        </div>
 
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0">
           {canManage ? (
             <button
               type="button"
@@ -361,57 +425,66 @@ function SortableRow({
               {product.unit ? ` / ${product.unit}` : ""}
             </p>
           )}
-          {/*
-            The line total sits under the name wherever the row is narrow: on a
-            phone, and from lg to xl, where the payment panel beside the list
-            and the sidebar leave the list column only ~360px.
-          */}
-          <p
-            className={`mt-0.5 text-xs font-semibold sm:hidden lg:block xl:hidden ${
-              price.kind === "needs-price" ? "text-attention" : ""
-            }`}
-            aria-hidden="true"
-          >
-            {price.kind === "priced" ? `= ${lineTotal}` : price.kind === "needs-price" ? "⚠ Type the price" : ""}
-          </p>
         </div>
 
-        <input
-          ref={registerBox}
-          type="text"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          enterKeyHint={isLast ? "done" : "next"}
-          autoComplete="off"
-          value={quantity}
-          placeholder="0"
-          onChange={(event) => onQuantity(product.id, cleanQuantity(event.target.value))}
-          onKeyDown={(event) => onEnter(event, product.id)}
-          onFocus={(event) => event.currentTarget.select()}
-          aria-label={`Quantity of ${product.name}`}
-          className={`h-11 w-14 shrink-0 rounded-control px-1 text-center text-base font-semibold tabular-nums ring-1 placeholder:font-normal placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-ink/60 sm:w-16 ${
-            chosen ? "bg-surface ring-gold" : "bg-surface-sunken ring-line"
-          }`}
-        />
+        <div className="col-span-2 col-start-3 row-start-2 flex items-center justify-between gap-3 @lg/row:contents">
+          <div
+            className={`flex h-11 shrink-0 items-stretch overflow-hidden rounded-control ring-1 focus-within:ring-2 focus-within:ring-ink/60 ${
+              chosen ? "bg-surface ring-gold" : "bg-surface-sunken ring-line"
+            }`}
+          >
+            <button
+              type="button"
+              onClick={() => onQuantity(product.id, stepQuantity(quantity, -1))}
+              disabled={!chosen}
+              aria-label={`One fewer ${product.name}`}
+              className="flex w-9 items-center justify-center text-lg font-semibold text-muted hover:bg-ink/10 hover:text-ink disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <span aria-hidden="true">&minus;</span>
+            </button>
+            <input
+              ref={registerBox}
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              enterKeyHint={isLast ? "done" : "next"}
+              autoComplete="off"
+              value={quantity}
+              placeholder="0"
+              onChange={(event) => onQuantity(product.id, cleanQuantity(event.target.value))}
+              onKeyDown={(event) => onEnter(event, product.id)}
+              onFocus={(event) => event.currentTarget.select()}
+              aria-label={`Quantity of ${product.name}`}
+              className="w-12 bg-transparent px-0.5 text-center text-base font-semibold tabular-nums placeholder:font-normal placeholder:text-muted focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => onQuantity(product.id, stepQuantity(quantity, 1))}
+              aria-label={`One more ${product.name}`}
+              className="flex w-9 items-center justify-center text-lg font-semibold text-muted hover:bg-ink/10 hover:text-ink"
+            >
+              <span aria-hidden="true">+</span>
+            </button>
+          </div>
 
-        <p
-          className={`hidden w-24 shrink-0 text-right text-sm tabular-nums sm:block lg:hidden xl:block ${
-            price.kind === "priced"
-              ? "font-semibold"
-              : price.kind === "needs-price"
-                ? "text-attention"
-                : "text-muted"
-          }`}
-          aria-live="off"
-        >
-          {price.kind === "needs-price" ? (
-            <>
-              <span aria-hidden="true">{"⚠"} </span>Price?
-            </>
-          ) : (
-            lineTotal
-          )}
-        </p>
+          <p
+            className={`text-right text-sm tabular-nums @lg/row:w-24 ${
+              price.kind === "priced"
+                ? "font-semibold"
+                : price.kind === "needs-price"
+                  ? "text-attention"
+                  : "text-muted"
+            }`}
+          >
+            {price.kind === "needs-price" ? (
+              <>
+                <span aria-hidden="true">{"⚠"} </span>Price?
+              </>
+            ) : (
+              lineTotal
+            )}
+          </p>
+        </div>
 
         {canManage ? (
           <button
@@ -419,7 +492,7 @@ function SortableRow({
             onClick={onAskDelete}
             aria-label={`Delete ${product.name}`}
             title="Delete"
-            className="ml-1 flex h-11 w-8 shrink-0 items-center justify-center rounded-control text-muted hover:text-attention sm:ml-2"
+            className="col-start-4 row-start-1 flex h-11 w-8 items-center justify-center self-start rounded-control text-muted hover:text-attention @lg/row:col-start-6 @lg/row:self-center"
           >
             <TrashIcon />
           </button>
@@ -580,26 +653,39 @@ export function NewCounterProductDialog({
   open,
   existingNames,
   canAddPhoto,
+  categories,
   onClose,
   onAdd,
 }: {
   open: boolean;
   existingNames: string[];
+  /** Owner/Admin: a photo, and a new category on the way. */
   canAddPhoto: boolean;
+  /** Null: the database has no categories yet (0027), so no box for one. */
+  categories: PosCategory[] | null;
   onClose: () => void;
   onAdd: (form: FormData) => Promise<AddCounterProductResult>;
 }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
+  const [category, setCategory] = useState("");
+  const [newCategory, setNewCategory] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [errors, setErrors] = useState<{ name?: string; price?: string; photo?: string }>({});
+  const [errors, setErrors] = useState<{
+    name?: string;
+    price?: string;
+    photo?: string;
+    category?: string;
+  }>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   function reset() {
     setName("");
     setPrice("");
+    setCategory("");
+    setNewCategory("");
     choosePhoto(null);
     setErrors({});
     setError(null);
@@ -632,6 +718,11 @@ export function NewCounterProductDialog({
     form.set("name", checked.name);
     form.set("price", price);
     if (photo) form.set("photo", photo);
+    const categoryProblem = putCategory(form, categories, category, newCategory);
+    if (categoryProblem) {
+      setErrors({ category: categoryProblem });
+      return;
+    }
 
     setSaving(true);
     const result = await onAdd(form);
@@ -678,6 +769,16 @@ export function NewCounterProductDialog({
             onChange={(event) => setPrice(event.target.value)}
           />
         </Field>
+
+        <CategoryField
+          categories={categories}
+          canCreate={canAddPhoto}
+          value={category}
+          onChange={setCategory}
+          newName={newCategory}
+          onNewName={setNewCategory}
+          error={errors.category}
+        />
 
         {canAddPhoto ? (
           <div>
@@ -756,11 +857,13 @@ export function NewCounterProductDialog({
  */
 function EditProductDialog({
   product,
+  categories,
   otherNames,
   onClose,
   onSave,
 }: {
   product: PosProduct;
+  categories: PosCategory[] | null;
   otherNames: string[];
   onClose: () => void;
   onSave: (form: FormData) => Promise<UpdateCounterProductResult>;
@@ -769,7 +872,14 @@ function EditProductDialog({
   const [price, setPrice] = useState(
     product.priceCentavos === null ? "" : centavosToDecimalString(product.priceCentavos),
   );
-  const [errors, setErrors] = useState<{ name?: string; price?: string }>({});
+  // A category that has since been deleted reads as none.
+  const [category, setCategory] = useState(
+    product.categoryId && categories?.some((entry) => entry.id === product.categoryId)
+      ? product.categoryId
+      : "",
+  );
+  const [newCategory, setNewCategory] = useState("");
+  const [errors, setErrors] = useState<{ name?: string; price?: string; category?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -785,6 +895,11 @@ function EditProductDialog({
     const form = new FormData();
     form.set("name", checked.name);
     form.set("price", price);
+    const categoryProblem = putCategory(form, categories, category, newCategory);
+    if (categoryProblem) {
+      setErrors({ category: categoryProblem });
+      return;
+    }
 
     setSaving(true);
     const result = await onSave(form);
@@ -819,6 +934,15 @@ function EditProductDialog({
             onChange={(event) => setPrice(event.target.value)}
           />
         </Field>
+        <CategoryField
+          categories={categories}
+          canCreate
+          value={category}
+          onChange={setCategory}
+          newName={newCategory}
+          onNewName={setNewCategory}
+          error={errors.category}
+        />
         <p className="text-xs text-muted">
           Past sales keep the name and price they were sold at. The change
           applies from the next sale.
@@ -854,6 +978,266 @@ function PencilIcon() {
       <path d="M4 20h4L19 9l-4-4L4 16z" />
       <path d="M13.5 6.5l4 4" />
     </svg>
+  );
+}
+
+/**
+ * The category part of a product form. "" is none, an id is that category,
+ * "new" makes one from the typed name. Returns what is wrong, or null - and
+ * says nothing about the category at all when the database has no categories
+ * yet, so the server leaves the product's category alone.
+ */
+function putCategory(
+  form: FormData,
+  categories: PosCategory[] | null,
+  choice: string,
+  newName: string,
+): string | null {
+  if (categories === null) return null;
+  form.set("categoryId", choice);
+  if (choice !== "new") return null;
+
+  const checked = checkCategoryName(newName, categories.map((entry) => entry.name));
+  if (!checked.ok) return checked.error;
+  form.set("newCategory", checked.name);
+  return null;
+}
+
+function CategoryField({
+  categories,
+  canCreate,
+  value,
+  onChange,
+  newName,
+  onNewName,
+  error,
+}: {
+  categories: PosCategory[] | null;
+  /** Owner/Admin only - the table's insert policy says the same. */
+  canCreate: boolean;
+  value: string;
+  onChange: (value: string) => void;
+  newName: string;
+  onNewName: (value: string) => void;
+  error?: string;
+}) {
+  // Nothing to choose from and no way to make one: no box at all.
+  if (categories === null || (categories.length === 0 && !canCreate)) return null;
+
+  return (
+    <div className="space-y-3">
+      <Field label="Category" error={value === "new" ? undefined : error}>
+        <Select value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="">No category</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+          {canCreate ? <option value="new">+ New category…</option> : null}
+        </Select>
+      </Field>
+      {value === "new" ? (
+        <Field label="New category name" error={error}>
+          <Input
+            value={newName}
+            autoFocus
+            placeholder="e.g. ID photo"
+            onChange={(event) => onNewName(event.target.value)}
+          />
+        </Field>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * Making, renaming and deleting categories (Owner/Admin). Deleting one never
+ * deletes a product: its products move to "Other".
+ */
+export function ManageCategoriesDialog({
+  open,
+  categories,
+  countFor,
+  onClose,
+  onSave,
+  onDelete,
+}: {
+  open: boolean;
+  categories: PosCategory[];
+  /** How many products are in a category, for the delete warning. */
+  countFor: (id: string) => number;
+  onClose: () => void;
+  onSave: (form: FormData) => Promise<{ error?: string }>;
+  onDelete: (id: string) => Promise<{ error?: string }>;
+}) {
+  const [names, setNames] = useState<Record<string, string>>({});
+  const [newName, setNewName] = useState("");
+  const [deleting, setDeleting] = useState<PosCategory | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  async function run(work: () => Promise<{ error?: string }>): Promise<boolean> {
+    setError(null);
+    setSaving(true);
+    const result = await work();
+    setSaving(false);
+    if (result.error) setError(result.error);
+    return !result.error;
+  }
+
+  async function add() {
+    const checked = checkCategoryName(newName, categories.map((entry) => entry.name));
+    if (!checked.ok) {
+      setError(checked.error);
+      return;
+    }
+    const form = new FormData();
+    form.set("name", checked.name);
+    if (await run(() => onSave(form))) setNewName("");
+  }
+
+  async function rename(category: PosCategory) {
+    const typed = names[category.id] ?? category.name;
+    const checked = checkCategoryName(
+      typed,
+      categories.filter((entry) => entry.id !== category.id).map((entry) => entry.name),
+    );
+    if (!checked.ok) {
+      setError(checked.error);
+      return;
+    }
+    const form = new FormData();
+    form.set("id", category.id);
+    form.set("name", checked.name);
+    if (await run(() => onSave(form))) {
+      setNames((current) => {
+        const next = { ...current };
+        delete next[category.id];
+        return next;
+      });
+    }
+  }
+
+  function close() {
+    if (saving) return;
+    setNames({});
+    setNewName("");
+    setDeleting(null);
+    setError(null);
+    onClose();
+  }
+
+  return (
+    <Modal open={open} title="Categories" onClose={close} busy={saving}>
+      {deleting ? (
+        <div>
+          <p className="font-medium">Delete {deleting.name}?</p>
+          <p className="mt-1 text-sm text-muted">
+            {countFor(deleting.id) === 0
+              ? "No products are in it."
+              : `Its ${countFor(deleting.id)} product${countFor(deleting.id) === 1 ? "" : "s"} will move to Other. No product is deleted.`}
+          </p>
+          {error ? <div className="mt-3"><Notice tone="attention" title={error} /></div> : null}
+          <div className="mt-6 flex justify-end gap-2">
+            <Button type="button" variant="quiet" onClick={() => setDeleting(null)} disabled={saving}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={saving}
+              onClick={async () => {
+                const id = deleting.id;
+                if (await run(() => onDelete(id))) setDeleting(null);
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {categories.length === 0 ? (
+            <p className="text-sm text-muted">No categories yet. Add the first one below.</p>
+          ) : (
+            <ul className="space-y-2" aria-label="Categories">
+              {categories.map((category) => {
+                const typed = names[category.id] ?? category.name;
+                const changed = typed.trim() !== category.name;
+                return (
+                  <li key={category.id} className="flex items-center gap-2">
+                    <Input
+                      value={typed}
+                      aria-label={`Name of ${category.name}`}
+                      onChange={(event) =>
+                        setNames((current) => ({ ...current, [category.id]: event.target.value }))
+                      }
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          void rename(category);
+                        }
+                      }}
+                    />
+                    {changed ? (
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={saving}
+                        onClick={() => void rename(category)}
+                      >
+                        Save
+                      </Button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError(null);
+                        setDeleting(category);
+                      }}
+                      aria-label={`Delete the category ${category.name}`}
+                      className="flex h-10 w-9 shrink-0 items-center justify-center rounded-control text-muted hover:text-attention"
+                    >
+                      <TrashIcon />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          <form
+            className="flex items-end gap-2 border-t border-line/60 pt-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void add();
+            }}
+          >
+            <div className="flex-1">
+              <Field label="New category">
+                <Input
+                  value={newName}
+                  placeholder="e.g. ID photo"
+                  onChange={(event) => setNewName(event.target.value)}
+                />
+              </Field>
+            </div>
+            <Button type="submit" disabled={saving}>
+              Add
+            </Button>
+          </form>
+
+          {error ? <Notice tone="attention" title={error} /> : null}
+
+          <div className="flex justify-end">
+            <Button type="button" variant="quiet" onClick={close} disabled={saving}>
+              Done
+            </Button>
+          </div>
+        </div>
+      )}
+    </Modal>
   );
 }
 

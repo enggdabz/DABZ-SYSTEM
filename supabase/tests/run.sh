@@ -72,6 +72,8 @@ quiet "$HERE/../migrations/0025_project_deletion_refund.sql"
 # 0026 is the Counter's product list: a photo per product and its order - 22
 # tests it.
 quiet "$HERE/../migrations/0026_counter_product_list.sql"
+# 0027 is the owner's product categories - 23 tests it.
+quiet "$HERE/../migrations/0027_product_categories.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -98,3 +100,4 @@ run "$HERE/19_projects_rls.test.sql"
 run "$HERE/20_project_deletion_rls.test.sql"
 run "$HERE/21_project_deletion_refund.test.sql"
 run "$HERE/22_counter_product_list.test.sql"
+run "$HERE/23_product_categories.test.sql"

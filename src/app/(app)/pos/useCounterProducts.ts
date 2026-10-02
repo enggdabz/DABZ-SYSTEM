@@ -15,29 +15,42 @@
  */
 import { useCallback, useState } from "react";
 
-import { moveId, reconcileProducts } from "@/lib/counter-list";
+import { moveId, moveWithinGroup, reconcileProducts } from "@/lib/counter-list";
 import { squarePhoto } from "@/lib/photo-resize";
 import { photoFileProblem } from "@/lib/product-photo";
 
 import {
   addCounterProductAction,
   deleteCounterProductAction,
+  deleteProductCategoryAction,
   removeCounterProductPhotoAction,
   reorderCounterProductsAction,
+  saveProductCategoryAction,
   setCounterProductPhotoAction,
   updateCounterProductAction,
   type AddCounterProductResult,
   type UpdateCounterProductResult,
 } from "./actions";
-import type { PosProduct } from "./PosScreen";
+import type { PosCategory, PosProduct } from "./PosScreen";
 
 export interface ListNotice {
   tone: "attention" | "info";
   text: string;
 }
 
-export function useCounterProducts(serverProducts: PosProduct[]) {
+/** Categories in the order the Counter shows them: by name, as the database sorts. */
+function byName(categories: PosCategory[]): PosCategory[] {
+  return [...categories].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+}
+
+export function useCounterProducts(
+  serverProducts: PosProduct[],
+  /** Null when the database has no categories table yet (0027). */
+  serverCategories: PosCategory[] | null = null,
+) {
   const [items, setItems] = useState<PosProduct[]>(serverProducts);
+  const [categories, setCategories] = useState<PosCategory[] | null>(serverCategories);
+  const [seenCategories, setSeenCategories] = useState(serverCategories);
   const [seen, setSeen] = useState(serverProducts);
   const [busy, setBusy] = useState(0);
   const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set());
@@ -54,6 +67,13 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
     Taken in during render rather than in an effect, so there is never a frame
     showing the old list beside the new props.
   */
+  // Categories are a short list changed only through this screen's own
+  // dialogs, so a fresh copy simply replaces the old one.
+  if (serverCategories !== seenCategories) {
+    setSeenCategories(serverCategories);
+    setCategories(serverCategories);
+  }
+
   if (serverProducts !== seen) {
     setSeen(serverProducts);
     setItems((current) => reconcileProducts(current, serverProducts, gone, busy > 0));
@@ -86,13 +106,16 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
     setPrices({});
   }, []);
 
-  async function reorder(activeId: string, overId: string) {
+  /**
+   * `groupIds` is the category the row was dragged within: only those rows
+   * change places, and every other product keeps its spot in the saved order.
+   */
+  async function reorder(activeId: string, overId: string, groupIds?: readonly string[]) {
     const before = items;
-    const ids = moveId(
-      before.map((product) => product.id),
-      activeId,
-      overId,
-    );
+    const allIds = before.map((product) => product.id);
+    const ids = groupIds
+      ? moveWithinGroup(allIds, groupIds, activeId, overId)
+      : moveId(allIds, activeId, overId);
     const byId = new Map(before.map((product) => [product.id, product]));
     setItems(ids.map((id) => byId.get(id)!));
     setNotice(null);
@@ -241,6 +264,7 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
       })),
     );
 
+    rememberCategory("createdCategory" in result ? result.createdCategory : undefined);
     const product = "product" in result ? result.product : undefined;
     if (product) {
       // At the bottom, as the server placed it - unless the fresh list from
@@ -265,6 +289,7 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
       })),
     );
 
+    rememberCategory("createdCategory" in result ? result.createdCategory : undefined);
     const saved = "product" in result ? result.product : undefined;
     if (saved) {
       setItems((current) =>
@@ -275,6 +300,7 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
                 name: saved.name,
                 priceCentavos: saved.priceCentavos,
                 manualPrice: saved.manualPrice,
+                categoryId: saved.categoryId === undefined ? product.categoryId : saved.categoryId,
               }
             : product,
         ),
@@ -283,8 +309,58 @@ export function useCounterProducts(serverProducts: PosProduct[]) {
     return result;
   }
 
+  /** A category made on the way, from "+ New category" in a product form. */
+  function rememberCategory(category: PosCategory | undefined) {
+    if (!category) return;
+    setCategories((current) =>
+      current === null || current.some((entry) => entry.id === category.id)
+        ? current
+        : byName([...current, category]),
+    );
+  }
+
+  /** Makes a category, or renames one. Shown once the server has saved it. */
+  async function saveCategory(form: FormData): Promise<{ error?: string }> {
+    const result = await saving(() =>
+      saveProductCategoryAction(form).catch(() => ({
+        error: "Nothing was saved - the connection dropped.",
+        category: undefined,
+      })),
+    );
+    const category = result.category;
+    if (category) {
+      setCategories((current) =>
+        current === null
+          ? current
+          : byName([...current.filter((entry) => entry.id !== category.id), category]),
+      );
+    }
+    return { error: result.error };
+  }
+
+  /** Deletes a category. Its products stay, with no category. */
+  async function deleteCategory(id: string): Promise<{ error?: string }> {
+    const result = await saving(() =>
+      deleteProductCategoryAction(id).catch(() => ({
+        error: "Nothing was deleted - the connection dropped.",
+      })),
+    );
+    if (!result.error) {
+      setCategories((current) => current?.filter((entry) => entry.id !== id) ?? current);
+      setItems((current) =>
+        current.map((product) =>
+          product.categoryId === id ? { ...product, categoryId: null } : product,
+        ),
+      );
+    }
+    return result;
+  }
+
   return {
     items,
+    categories,
+    saveCategory,
+    deleteCategory,
     quantities,
     prices,
     setQuantity,

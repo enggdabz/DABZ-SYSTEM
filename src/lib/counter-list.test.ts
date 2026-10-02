@@ -2,14 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAX_QUANTITY,
+  checkCategoryName,
   checkNewProduct,
   checkProductEdit,
   cleanQuantity,
+  groupByCategory,
   listSale,
   moveId,
+  moveWithinGroup,
   quantityOf,
   reconcileProducts,
   rowPrice,
+  stepQuantity,
   type ListProduct,
 } from "./counter-list";
 import { computeSale } from "./pos";
@@ -325,5 +329,97 @@ describe("checkProductEdit", () => {
   it("lets a product keep its own name - only the others are compared", () => {
     // The caller leaves the product being edited out of `otherNames`.
     expect(checkProductEdit({ name: "XEROX", price: "3.50" }, ["Lamination"]).ok).toBe(true);
+  });
+});
+
+describe("groupByCategory", () => {
+  const categories = [
+    { id: "c-id", name: "ID photo" },
+    { id: "c-print", name: "Printing" },
+    { id: "c-mugs", name: "Mugs" },
+  ];
+  const a = { id: "a", categoryId: "c-print" };
+  const b = { id: "b", categoryId: null };
+  const c = { id: "c", categoryId: "c-id" };
+  const d = { id: "d", categoryId: "c-print" };
+  const gone = { id: "e", categoryId: "c-deleted" };
+
+  it("puts each product under its category, in the dragged order, with Other last", () => {
+    const groups = groupByCategory([a, b, c, d, gone], categories, { includeEmpty: false });
+    expect(groups.map((g) => [g.title, g.items.map((i) => i.id)])).toEqual([
+      ["ID photo", ["c"]],
+      ["Printing", ["a", "d"]],
+      ["Other", ["b", "e"]],
+    ]);
+  });
+
+  it("shows an empty category only to the people who can fill it", () => {
+    expect(groupByCategory([a], categories, { includeEmpty: true }).map((g) => g.title)).toEqual([
+      "ID photo",
+      "Printing",
+      "Mugs",
+    ]);
+    expect(groupByCategory([a], categories, { includeEmpty: false }).map((g) => g.title)).toEqual([
+      "Printing",
+    ]);
+  });
+
+  it("has one group and no header when there are no categories", () => {
+    expect(groupByCategory([a, b], [], { includeEmpty: true })).toEqual([
+      { key: "none", categoryId: null, title: null, items: [a, b] },
+    ]);
+  });
+});
+
+describe("moveWithinGroup", () => {
+  it("moves rows only among their own category, leaving every other product in place", () => {
+    // Printing is p1, p2, p3, spread among x and y from other categories.
+    const all = ["p1", "x", "p2", "y", "p3"];
+    expect(moveWithinGroup(all, ["p1", "p2", "p3"], "p3", "p1")).toEqual([
+      "p3",
+      "x",
+      "p1",
+      "y",
+      "p2",
+    ]);
+  });
+
+  it("changes nothing for a drop on itself", () => {
+    expect(moveWithinGroup(["a", "b"], ["a", "b"], "a", "a")).toEqual(["a", "b"]);
+  });
+});
+
+describe("checkCategoryName", () => {
+  it("tidies the spacing", () => {
+    expect(checkCategoryName("  ID   photo ", [])).toEqual({ ok: true, name: "ID photo" });
+  });
+
+  it("refuses an empty name and one already used, whatever its capitals", () => {
+    expect(checkCategoryName("   ", []).ok).toBe(false);
+    const taken = checkCategoryName("printing", ["Printing"]);
+    expect(taken.ok).toBe(false);
+    if (!taken.ok) expect(taken.error).toMatch(/already a category/);
+  });
+
+  it("refuses a name over 60 characters", () => {
+    expect(checkCategoryName("x".repeat(61), []).ok).toBe(false);
+  });
+});
+
+describe("stepQuantity", () => {
+  it("adds one, starting from an empty box", () => {
+    expect(stepQuantity("", 1)).toBe("1");
+    expect(stepQuantity(undefined, 1)).toBe("1");
+    expect(stepQuantity("9", 1)).toBe("10");
+  });
+
+  it("takes one off, and 1 goes back to an empty box rather than 0", () => {
+    expect(stepQuantity("3", -1)).toBe("2");
+    expect(stepQuantity("1", -1)).toBe("");
+    expect(stepQuantity("", -1)).toBe("");
+  });
+
+  it("stops at the largest quantity a box takes", () => {
+    expect(stepQuantity(String(MAX_QUANTITY), 1)).toBe(String(MAX_QUANTITY));
   });
 });

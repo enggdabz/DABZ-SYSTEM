@@ -191,6 +191,11 @@ export const REQUIRED_RELATIONS: readonly RequiredRelation[] = [
     migration: "0023_project_deletion_requests",
     breaks: "the bell in the top bar",
   })),
+  ...["product_categories"].map((name) => ({
+    name,
+    migration: "0027_product_categories",
+    breaks: "the product categories on the Counter",
+  })),
 ];
 
 /*
@@ -348,6 +353,18 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     column: "image_path",
     migration: "0026_counter_product_list",
     breaks: "product photos on the Counter, and dragging the products into order",
+  },
+  {
+    /*
+      0027 also adds a column to `products`, which 0005 created. The table
+      probe above would see `product_categories` arrive while this column was
+      somehow missing - and the Counter would quietly show every product as
+      uncategorised. One question each.
+    */
+    name: "products",
+    column: "category_id",
+    migration: "0027_product_categories",
+    breaks: "putting a product in a category",
   },
 ];
 

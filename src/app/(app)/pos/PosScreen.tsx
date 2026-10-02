@@ -20,7 +20,11 @@ import {
 } from "@/lib/pos";
 
 import { completeSaleAction, saveCustomerAction, type PosState } from "./actions";
-import { CounterProductList, NewCounterProductDialog } from "./CounterProductList";
+import {
+  CounterProductList,
+  ManageCategoriesDialog,
+  NewCounterProductDialog,
+} from "./CounterProductList";
 import { useCounterProducts } from "./useCounterProducts";
 
 export interface PosProduct {
@@ -35,6 +39,13 @@ export interface PosProduct {
   tiers: (PriceTier & { id?: string })[];
   /** The product photo's public address, or null for the placeholder. */
   imageUrl: string | null;
+  /** The owner's category (0027), or null for none. */
+  categoryId: string | null;
+}
+
+export interface PosCategory {
+  id: string;
+  name: string;
 }
 
 export interface PosCustomer {
@@ -65,6 +76,7 @@ export function PosScreen({
   customers,
   canDiscount,
   canManageProducts,
+  categories = null,
   discountLimitPercent,
   discountLimitCentavos,
 }: {
@@ -73,6 +85,8 @@ export function PosScreen({
   canDiscount: boolean;
   /** Owner/Admin with 0026 applied: drag, photos and delete. */
   canManageProducts: boolean;
+  /** The owner's categories (0027), by name. Null: the database has none yet. */
+  categories?: PosCategory[] | null;
   discountLimitPercent: number;
   discountLimitCentavos: number;
 }) {
@@ -82,7 +96,7 @@ export function PosScreen({
     {},
   );
 
-  const list = useCounterProducts(products);
+  const list = useCounterProducts(products, categories);
   const [extraLines, setExtraLines] = useState<ExtraLine[]>([]);
   const [discountKind, setDiscountKind] = useState<"none" | "amount" | "percent">("none");
   const [discountValue, setDiscountValue] = useState("");
@@ -91,6 +105,7 @@ export function PosScreen({
   const [showCustomer, setShowCustomer] = useState(false);
   const [customerId, setCustomerId] = useState<string>("");
   const [showNewProduct, setShowNewProduct] = useState(false);
+  const [showCategories, setShowCategories] = useState(false);
   /*
     `useActionState` holds its result until the NEXT submit, so nothing the
     screen does - a refresh included - takes the completed sale away by itself.
@@ -223,22 +238,36 @@ export function PosScreen({
             <h2 id="saved-products" className="text-sm font-medium text-muted">
               Saved products
             </h2>
-            {canManageProducts && list.items.length > 1 ? (
-              <p className="text-xs text-muted">
-                Drag <span aria-hidden="true">⋮⋮</span> to put the best sellers at the top.
-              </p>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              {canManageProducts && list.items.length > 1 ? (
+                <p className="text-xs text-muted">
+                  Drag <span aria-hidden="true">⋮⋮</span> to put the best sellers at the top.
+                </p>
+              ) : null}
+              {canManageProducts && list.categories !== null ? (
+                <button
+                  type="button"
+                  onClick={() => setShowCategories(true)}
+                  className={`text-xs font-medium text-ink underline hover:text-gold ${TAP_AREA}`}
+                >
+                  Manage categories
+                </button>
+              ) : null}
+            </div>
           </div>
 
           <div className="mt-3">
             <CounterProductList
               items={list.items}
+              categories={list.categories}
               quantities={list.quantities}
               prices={list.prices}
               canManage={canManageProducts}
               onQuantity={list.setQuantity}
               onPrice={list.setPrice}
-              onReorder={(activeId, overId) => void list.reorder(activeId, overId)}
+              onReorder={(activeId, overId, groupIds) =>
+                void list.reorder(activeId, overId, groupIds)
+              }
               onChangePhoto={(id, file) => void list.changePhoto(id, file)}
               onRemovePhoto={(id) => void list.removePhoto(id)}
               onDelete={(id) => void list.remove(id)}
@@ -528,9 +557,21 @@ export function PosScreen({
         open={showNewProduct}
         existingNames={list.items.map((product) => product.name)}
         canAddPhoto={canManageProducts}
+        categories={list.categories}
         onClose={() => setShowNewProduct(false)}
         onAdd={list.add}
       />
+
+      {list.categories !== null ? (
+        <ManageCategoriesDialog
+          open={showCategories}
+          categories={list.categories}
+          countFor={(id) => list.items.filter((product) => product.categoryId === id).length}
+          onClose={() => setShowCategories(false)}
+          onSave={list.saveCategory}
+          onDelete={list.deleteCategory}
+        />
+      ) : null}
     </div>
   );
 }

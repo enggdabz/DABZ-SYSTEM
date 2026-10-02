@@ -1513,3 +1513,47 @@ to ask:
      the same as an edit on the Products screen. The check is
      `checkProductEdit` in `src/lib/counter-list.ts`; the save is
      `updateCounterProductAction` in `src/app/(app)/pos/actions.ts`.
+- **Products can be put into categories, shown under red headers, in two
+  columns** (your requests, 2 October 2026). Migration
+  `0027_product_categories.sql` adds a `product_categories` table and
+  `products.category_id`. What I decided:
+  1. **Categories are yours to name**, in their own table, rather than the old
+     fixed `section` (Printing / Photocopy / Mugs / Other), which the code
+     invented. Renaming a category renames it on every product at once. The
+     old `section` is left as it is; the Products screen still shows it.
+  2. **A product is in one category, or in none.** Products with none sit
+     under an **Other** header at the end. With no categories at all there are
+     no headers - one red "Other" box over everything would say nothing.
+  3. **Categories are listed by name.** The products inside each keep the
+     order you drag them into. To order the categories by hand instead, they
+     would need a position of their own - say if you want that.
+  4. **Dragging moves a row within its own category only.** A product changes
+     category from its edit dialog (tap its name), so a slipped finger cannot
+     move it. Every other product keeps its place in the saved order.
+  5. **Owners and admins make, rename and delete categories** (**Manage
+     categories**, beside "Saved products") and can make one on the way from
+     the edit or new-product dialog. Staff see the categories and can put a
+     new product into an existing one, but not make one - the same split as
+     editing products. Staff do not see an empty category; owners and admins
+     do, so they know it is there to fill.
+  6. **Deleting a category never deletes a product.** Its products move to
+     Other, the dialog says how many, and the audit log keeps which products
+     it held.
+  7. **Two columns appear where the LIST has room for two readable rows**, not
+     at a screen width: a tablet held upright and a wide desktop get two; a
+     phone and a tablet on its side (where the payment panel takes half the
+     screen) get one, because two would squash the names. It is a container
+     query (`@xl:grid-cols-2` in `CounterProductList.tsx`) - change `@xl` to
+     make two columns appear sooner or later.
+  8. **Sales do not change.** A sale line records the product's name and price,
+     never its category, so nothing in Sales, End of day or Reports moves.
+- **Each quantity box has a − and a + beside it** (your request, 2 October
+  2026). + adds one (an empty box goes to 1); − takes one off, and 1 goes back
+  to an EMPTY box rather than showing 0, because empty is what "not in this
+  sale" looks like everywhere else on the Counter. − is greyed out on an empty
+  box. Typing a number still works, and + carries on from whatever was typed.
+  Each button is 36 × 44px, over the 24px the design rules ask for. To fit the
+  two buttons without squeezing the product name, a narrow row (a phone, a
+  half-width column) puts the box and the line total on a second line under
+  the name; a wide row keeps everything on one line. The rule is
+  `stepQuantity` in `src/lib/counter-list.ts`.

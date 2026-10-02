@@ -21,8 +21,9 @@ import {
 } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { checkPaymentAmount } from "@/lib/collections";
-import { checkNewProduct, checkProductEdit } from "@/lib/counter-list";
+import { checkCategoryName, checkNewProduct, checkProductEdit } from "@/lib/counter-list";
 import { getApparelOrder } from "@/lib/data/apparel";
+import type { ProductCategory } from "@/lib/data/pos";
 import {
   removePhotoFile,
   removeProduct,
@@ -531,12 +532,15 @@ export interface CounterProductPayload {
   incomeCategory: string;
   tiers: { minQuantity: number; unitPriceCentavos: number }[];
   imageUrl: string | null;
+  categoryId: string | null;
 }
 
 export interface AddCounterProductResult {
   error?: string;
-  fieldErrors?: { name?: string; price?: string; photo?: string };
+  fieldErrors?: { name?: string; price?: string; photo?: string; category?: string };
   product?: CounterProductPayload;
+  /** A category made on the way, from "+ New category" in the form. */
+  createdCategory?: ProductCategory;
   /** The product was saved but its photo was not. */
   photoError?: string;
 }
@@ -547,6 +551,95 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function photoFrom(formData: FormData): File | null {
   const value = formData.get("photo");
   return value instanceof File && value.size > 0 ? value : null;
+}
+
+type CategoryChoice =
+  | { ok: true; given: false }
+  | { ok: true; given: true; categoryId: string | null; created?: ProductCategory }
+  | { ok: false; error: string };
+
+/**
+ * The category a product form chose (0027).
+ *
+ * `categoryId` is "" for none, an id, or "new" with the name in
+ * `newCategory`. A form that sends no `categoryId` at all leaves the
+ * product's category alone - that is how the Counter behaves while the
+ * database is still waiting for 0027.
+ *
+ * Making a category is Owner/Admin (the table's insert policy says so too);
+ * putting a product into one that exists is open to whoever may save the
+ * product.
+ */
+async function categoryFromForm(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  user: SignedInUser,
+  formData: FormData,
+): Promise<CategoryChoice> {
+  if (!formData.has("categoryId")) return { ok: true, given: false };
+  const choice = String(formData.get("categoryId") ?? "");
+
+  if (choice === "") return { ok: true, given: true, categoryId: null };
+
+  if (choice === "new") {
+    if (!isOwnerOrAdmin(user)) {
+      return { ok: false, error: "Only the owner or an admin can make a new category." };
+    }
+    const created = await createCategory(supabase, user, String(formData.get("newCategory") ?? ""));
+    return created.ok
+      ? { ok: true, given: true, categoryId: created.category.id, created: created.category }
+      : { ok: false, error: created.error };
+  }
+
+  if (!UUID.test(choice)) return { ok: false, error: "Choose a category from the list." };
+  const { data } = await supabase
+    .from("product_categories")
+    .select("id")
+    .eq("id", choice)
+    .maybeSingle();
+  if (!data) return { ok: false, error: "That category no longer exists. Choose another." };
+  return { ok: true, given: true, categoryId: choice };
+}
+
+async function createCategory(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  user: SignedInUser,
+  rawName: string,
+): Promise<{ ok: true; category: ProductCategory } | { ok: false; error: string }> {
+  const { data: existing, error: readError } = await supabase
+    .from("product_categories")
+    .select("name");
+  if (readError) return { ok: false, error: `Could not read the categories: ${readError.message}` };
+
+  const checked = checkCategoryName(rawName, (existing ?? []).map((row) => row.name as string));
+  if (!checked.ok) return { ok: false, error: checked.error };
+
+  const { data, error } = await supabase
+    .from("product_categories")
+    .insert({ name: checked.name, created_by: user.id })
+    .select("id, name")
+    .single();
+
+  if (error || !data) {
+    return {
+      ok: false,
+      error:
+        error?.code === "23505"
+          ? `There is already a category called "${checked.name}".`
+          : `Could not make the category: ${error?.message ?? "nothing came back"}`,
+    };
+  }
+
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "create",
+    entity: "product_categories",
+    entityId: data.id,
+    summary: `Made the product category "${checked.name}"`,
+    after: { name: checked.name },
+  });
+
+  return { ok: true, category: { id: data.id, name: data.name } };
 }
 
 /**
@@ -585,6 +678,9 @@ export async function addCounterProductAction(
   );
   if (!checked.ok) return { fieldErrors: checked.fieldErrors };
 
+  const category = await categoryFromForm(supabase, user, formData);
+  if (!category.ok) return { fieldErrors: { category: category.error } };
+
   const { data: last } = await supabase
     .from("products")
     .select("sort_order")
@@ -604,6 +700,8 @@ export async function addCounterProductAction(
       section: "other",
       sort_order: sortOrder,
       created_by: user.id,
+      // Only when the form picked a category - a database without 0027 has no such column.
+      ...(category.given ? { category_id: category.categoryId } : {}),
     })
     .select("id, name, division, price_centavos, manual_price, unit, section, income_category")
     .single();
@@ -637,6 +735,7 @@ export async function addCounterProductAction(
 
   return {
     photoError,
+    createdCategory: category.given ? category.created : undefined,
     product: {
       id: inserted.id,
       name: inserted.name,
@@ -648,14 +747,23 @@ export async function addCounterProductAction(
       incomeCategory: inserted.income_category,
       tiers: [],
       imageUrl,
+      categoryId: category.given ? category.categoryId : null,
     },
   };
 }
 
 export interface UpdateCounterProductResult {
   error?: string;
-  fieldErrors?: { name?: string; price?: string };
-  product?: { id: string; name: string; priceCentavos: number | null; manualPrice: boolean };
+  fieldErrors?: { name?: string; price?: string; category?: string };
+  product?: {
+    id: string;
+    name: string;
+    priceCentavos: number | null;
+    manualPrice: boolean;
+    /** Undefined when the form did not touch the category. */
+    categoryId?: string | null;
+  };
+  createdCategory?: ProductCategory;
 }
 
 /**
@@ -675,13 +783,22 @@ export async function updateCounterProductAction(
   if (!UUID.test(productId)) return { error: "That product could not be found." };
 
   const supabase = await createSupabaseServerClient();
-  const { data: rows, error: readError } = await supabase
-    .from("products")
-    .select("id, name, price_centavos, manual_price")
-    .eq("active", true);
+  // The category is read only when the form sends one: a database without
+  // 0027 has no such column, and asking for it would fail the whole edit.
+  const { data: rows, error: readError } = formData.has("categoryId")
+    ? await supabase
+        .from("products")
+        .select("id, name, price_centavos, manual_price, category_id")
+        .eq("active", true)
+    : await supabase
+        .from("products")
+        .select("id, name, price_centavos, manual_price")
+        .eq("active", true);
   if (readError) return { error: `Could not read the product list: ${readError.message}` };
 
-  const before = (rows ?? []).find((row) => row.id === productId);
+  const before = (rows ?? []).find((row) => row.id === productId) as
+    | { id: string; name: string; price_centavos: number | null; manual_price: boolean; category_id?: string | null }
+    | undefined;
   if (!before) return { error: "That product is no longer in the list." };
 
   const checked = checkProductEdit(
@@ -690,12 +807,16 @@ export async function updateCounterProductAction(
   );
   if (!checked.ok) return { fieldErrors: checked.fieldErrors };
 
-  const values = {
+  const category = await categoryFromForm(supabase, user, formData);
+  if (!category.ok) return { fieldErrors: { category: category.error } };
+
+  const values: Record<string, unknown> = {
     name: checked.name,
     price_centavos: checked.priceCentavos,
     // No price means the counter asks for it each time - the same pairing
     // the Products screen writes.
     manual_price: checked.priceCentavos === null,
+    ...(category.given ? { category_id: category.categoryId } : {}),
   };
 
   const { data: updated, error } = await supabase
@@ -714,8 +835,9 @@ export async function updateCounterProductAction(
       name: before.name,
       price_centavos: before.price_centavos === null ? null : Number(before.price_centavos),
       manual_price: before.manual_price,
+      ...(category.given ? { category_id: before.category_id ?? null } : {}),
     } as Record<string, unknown>,
-    values as Record<string, unknown>,
+    values,
   );
 
   if (changed.changedKeys.length > 0) {
@@ -729,7 +851,11 @@ export async function updateCounterProductAction(
         ? `Changed "${checked.name}" to ${
             checked.priceCentavos === null ? "ask the price each time" : formatPesos(checked.priceCentavos)
           } from the counter`
-        : `Renamed "${before.name}" to "${checked.name}" from the counter`,
+        : changed.changedKeys.includes("name")
+          ? `Renamed "${before.name}" to "${checked.name}" from the counter`
+          : `Moved "${checked.name}" to ${
+              category.given && category.categoryId ? "another category" : "no category"
+            } from the counter`,
       before: changed.before,
       after: changed.after,
     });
@@ -745,8 +871,138 @@ export async function updateCounterProductAction(
       name: checked.name,
       priceCentavos: checked.priceCentavos,
       manualPrice: checked.priceCentavos === null,
+      categoryId: category.given ? category.categoryId : undefined,
     },
+    createdCategory: category.given ? category.created : undefined,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Product categories (0027)
+// ---------------------------------------------------------------------------
+
+/**
+ * Makes a category, or renames one (with `id`). Owner/Admin - the table's
+ * policies refuse anybody else, and this re-checks first.
+ */
+export async function saveProductCategoryAction(
+  formData: FormData,
+): Promise<{ error?: string; category?: ProductCategory }> {
+  const user = await requireOwnerOrAdmin();
+  const supabase = await createSupabaseServerClient();
+
+  const id = String(formData.get("id") ?? "");
+  const name = String(formData.get("name") ?? "");
+
+  if (id === "") {
+    const created = await createCategory(supabase, user, name);
+    if (!created.ok) return { error: created.error };
+    revalidatePath("/pos");
+    return { category: created.category };
+  }
+
+  if (!UUID.test(id)) return { error: "That category could not be found." };
+
+  const { data: all, error: readError } = await supabase
+    .from("product_categories")
+    .select("id, name");
+  if (readError) return { error: `Could not read the categories: ${readError.message}` };
+
+  const before = (all ?? []).find((row) => row.id === id);
+  if (!before) return { error: "That category no longer exists." };
+
+  const checked = checkCategoryName(
+    name,
+    (all ?? []).filter((row) => row.id !== id).map((row) => row.name as string),
+  );
+  if (!checked.ok) return { error: checked.error };
+
+  const { data: updated, error } = await supabase
+    .from("product_categories")
+    .update({ name: checked.name })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    return {
+      error:
+        error.code === "23505"
+          ? `There is already a category called "${checked.name}".`
+          : `Could not rename it: ${error.message}`,
+    };
+  }
+  if (!updated || updated.length === 0) {
+    return { error: "Nothing was saved. Only the owner or an admin can rename a category." };
+  }
+
+  if (before.name !== checked.name) {
+    await recordAudit({
+      actorId: user.id,
+      actorUsername: user.username,
+      action: "update",
+      entity: "product_categories",
+      entityId: id,
+      summary: `Renamed the product category "${before.name}" to "${checked.name}"`,
+      before: { name: before.name },
+      after: { name: checked.name },
+    });
+  }
+
+  revalidatePath("/pos");
+  return { category: { id, name: checked.name } };
+}
+
+/**
+ * Deletes a category. Its products are NOT deleted - they go back to having
+ * none (`on delete set null`, 0027), which the confirmation says. A category
+ * is a label, not a record of money, so there is no "has history" rule here.
+ */
+export async function deleteProductCategoryAction(id: string): Promise<{ error?: string }> {
+  const user = await requireOwnerOrAdmin();
+  if (typeof id !== "string" || !UUID.test(id)) return { error: "That category could not be found." };
+
+  const supabase = await createSupabaseServerClient();
+  const { data: category } = await supabase
+    .from("product_categories")
+    .select("name")
+    .eq("id", id)
+    .maybeSingle();
+  if (!category) return { error: "That category no longer exists." };
+
+  const { data: members } = await supabase
+    .from("products")
+    .select("id, name")
+    .eq("category_id", id);
+
+  const { data: removed, error } = await supabase
+    .from("product_categories")
+    .delete()
+    .eq("id", id)
+    .select("id");
+
+  if (error) return { error: `Could not delete it: ${error.message}` };
+  if (!removed || removed.length === 0) {
+    return { error: "Nothing was deleted. Only the owner or an admin can delete a category." };
+  }
+
+  // Which products it held, so the category could be put back together from
+  // the log - afterwards nothing else remembers.
+  await recordAudit({
+    actorId: user.id,
+    actorUsername: user.username,
+    action: "delete",
+    entity: "product_categories",
+    entityId: id,
+    summary: `Deleted the product category "${category.name}"${
+      members && members.length > 0
+        ? `; its ${members.length} product${members.length === 1 ? "" : "s"} now have no category`
+        : ""
+    }`,
+    before: { name: category.name, products: members ?? [] },
+  });
+
+  revalidatePath("/pos");
+  return {};
 }
 
 /**
