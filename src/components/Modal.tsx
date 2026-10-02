@@ -14,6 +14,7 @@
  */
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { HEADING_BOX } from "@/components/ui";
 
 export function Modal({
   open,
@@ -56,7 +57,7 @@ export function Modal({
         className="absolute inset-0 bg-black/60"
       />
       <div className="relative max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface p-6 shadow-lg ring-1 ring-line/60">
-        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+        <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>{title}</h2>
         <div className="mt-4">{children}</div>
       </div>
     </div>,

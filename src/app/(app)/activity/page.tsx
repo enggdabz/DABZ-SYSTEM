@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { formatManilaDateTime } from "@/lib/datetime";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -81,7 +81,7 @@ export default async function ActivityPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Activity</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Activity</h1>
         <p className="mt-2 text-muted">
           Who did what, and when. Nothing here can be edited or deleted by
           anyone, including you - that is what makes it worth trusting.

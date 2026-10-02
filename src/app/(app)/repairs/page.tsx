@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getRepairTickets } from "@/lib/data/repairs";
@@ -54,8 +54,8 @@ export default async function RepairsPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">DabzTech Solutions</h1>
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>DabzTech Solutions</h1>
           <p className="mt-2 text-muted">
             {DIVISIONS.dabztech.tagline} &middot; Epson printers, laptops and
             desktop PCs.

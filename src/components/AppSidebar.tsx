@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Wordmark } from "./ui";
+import { HEADING_BOX, Wordmark } from "./ui";
 import { NAV_GROUPS, type NavSection } from "@/lib/auth/navigation";
 
 /**
@@ -65,7 +65,14 @@ function SectionLinks({
 
         return (
           <div key={group} className="flex flex-col">
-            <h2 className="px-6 pt-6 pb-2 text-[11px] font-semibold tracking-[0.08em] text-accent uppercase">
+            {/*
+              The same red box as every heading in the system, inset to the
+              rail's own margin so the links below still line up with the
+              text inside it.
+            */}
+            <h2
+              className={`${HEADING_BOX} mx-3 mt-6 mb-2 text-[11px] font-semibold tracking-[0.08em] uppercase`}
+            >
               {group}
             </h2>
             {inGroup.map((section) => {

@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getLedgerEntries, liveEntries } from "@/lib/data/money";
 import { divisionName } from "@/lib/divisions";
@@ -53,7 +53,7 @@ export default async function LedgerPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Money in and out</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Money in and out</h1>
         <p className="mt-2 text-muted">
           Every peso that moved, for {formatPeriod(period)}. Most entries appear
           here by themselves when a bill is paid or a loan payment is recorded.

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { DeleteButton } from "@/components/DeleteButton";
-import { Card, Disclosure, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Disclosure, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { billStatus, monthTotals, paidKey, type BillStatus } from "@/lib/bills";
 import {
@@ -94,7 +94,7 @@ export default async function BillsPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Bills</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Bills</h1>
         <p className="mt-2 text-muted">
           The fixed costs that have to be covered every month, and whether each
           one is settled.
@@ -166,7 +166,7 @@ export default async function BillsPage({
           ) : null}
         </div>
 
-        <h2 className="mt-5 text-2xl font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} mt-5 text-2xl font-semibold tracking-tight`}>
           {formatPeriod(period)}
         </h2>
 

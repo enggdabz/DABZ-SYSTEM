@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getPayables, getSuppliers } from "@/lib/data/expenses";
 import { payableStatus, payableTotals } from "@/lib/expenses";
@@ -36,7 +36,7 @@ export default async function PayablesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Owed to suppliers</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Owed to suppliers</h1>
         <p className="mt-2 text-muted">
           Stock you have received but not paid for yet. Receiving a delivery
           &ldquo;on account&rdquo; on the Stocks screen adds it here by itself.

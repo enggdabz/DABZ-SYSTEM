@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 
 import { DeleteButton } from "@/components/DeleteButton";
-import { Card, Disclosure, Notice, Tag } from "@/components/ui";
+import { Card, Disclosure, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getBills,
@@ -66,7 +66,7 @@ export default async function LoansPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Loans</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Loans</h1>
         <p className="mt-2 text-muted">
           What the shop owes, and whether each debt is actually shrinking.
         </p>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag, buttonClasses } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, buttonClasses, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { DatabaseBehind } from "@/components/DatabaseBehind";
@@ -156,7 +156,7 @@ export default async function ProjectsPage({
     if (isDatabaseBehind(error)) {
       return (
         <div className="space-y-6">
-          <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Projects</h1>
           <DatabaseBehind
             migration={error.migration}
             canOpenSystemCheck={isOwnerOrAdmin(user)}
@@ -205,8 +205,8 @@ export default async function ProjectsPage({
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Projects</h1>
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Projects</h1>
           <p className="mt-2 max-w-2xl text-muted">
             Jobs taken at the Counter with a down payment or the full price.
             Each one sits on the calendar on its due date. The balance stays on
@@ -494,7 +494,7 @@ function MonthCalendar({
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-lg font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} grow text-lg font-semibold tracking-tight`}>
           {formatPeriod(period)}
         </h2>
         <div className="flex flex-wrap items-center gap-4 text-sm">
@@ -627,8 +627,8 @@ function WeekCalendar({
   return (
     <Card>
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">
+        <div className="grow">
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>
             {formatWeekRange(weekStart)}
           </h2>
           <p className="mt-1 text-sm text-muted">

@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireUser } from "@/lib/auth/dal";
 import { getCustomers, getSales } from "@/lib/data/pos";
 import { formatManilaDateTime } from "@/lib/datetime";
@@ -33,7 +33,7 @@ export default async function CustomersPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Customers</h1>
         <p className="mt-2 text-muted">
           One list, shared by all three divisions. A quick walk-in sale does not
           need a customer at all.

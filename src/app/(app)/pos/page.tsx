@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Notice } from "@/components/ui";
+import { Notice, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { can, isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getPayableJobs } from "@/lib/data/collections";
@@ -64,8 +64,8 @@ export default async function PosPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Counter</h1>
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Counter</h1>
           <p className="mt-2 text-muted">
             Type how many of each product the customer wants, then press
             Complete sale. Nothing is saved until you do.

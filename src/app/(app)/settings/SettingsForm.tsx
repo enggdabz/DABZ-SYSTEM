@@ -2,7 +2,7 @@
 
 import { useActionState } from "react";
 
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, HEADING_BOX } from "@/components/ui";
 import { centavosToDecimalString } from "@/lib/money";
 import {
   RECEIPT_PAPERS,
@@ -23,7 +23,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
     <form action={submit} className="space-y-10">
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Work schedule</h2>
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>Work schedule</h2>
           <p className="mt-1 text-sm text-muted">
             Used to flag late arrivals and overtime from Phase 3, and to work out
             the daily target from Phase 2.
@@ -79,7 +79,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Staff limits</h2>
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>Staff limits</h2>
           <p className="mt-1 text-sm text-muted">
             Above these, a staff member needs your approval. Both discount
             limits apply at once, so whichever is reached first wins.
@@ -170,7 +170,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Receipts</h2>
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>Receipts</h2>
           <p className="mt-1 text-sm text-muted">
             Which paper the counter prints receipts on. Change this if you get a
             different printer.
@@ -190,7 +190,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>
             Your public page
           </h2>
           <p className="mt-1 text-sm text-muted">
@@ -278,7 +278,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">Dabz Apparel</h2>
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>Dabz Apparel</h2>
           <p className="mt-1 text-sm text-muted">
             How much of a job order you ask for up front. Leaving this empty is
             a real answer: the order screen then asks for whatever the customer
@@ -306,7 +306,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>
             The online shop
           </h2>
           <p className="mt-1 text-sm text-muted">
@@ -408,7 +408,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
 
       <section className="space-y-5">
         <div>
-          <h2 className="text-lg font-semibold tracking-tight">DabzTech repairs</h2>
+          <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>DabzTech repairs</h2>
           <p className="mt-1 text-sm text-muted">
             Set now, used from Phase 7. Confirm these against how you actually
             work (open decision 17.11).

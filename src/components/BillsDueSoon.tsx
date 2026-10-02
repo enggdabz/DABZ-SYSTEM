@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import { useEffect, useState } from "react";
 
-import { Button } from "@/components/ui";
+import { Button, HEADING_BOX } from "@/components/ui";
 
 export interface DueSoonBill {
   id: string;
@@ -70,7 +70,7 @@ export function BillsDueSoon({ bills }: { bills: DueSoonBill[] }) {
       aria-label="Bills due soon"
     >
       <div className="max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface p-6 shadow-lg ring-1 ring-line/60">
-        <h2 className="text-xl font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>
           {overdueCount > 0
             ? `${overdueCount} bill${overdueCount === 1 ? "" : "s"} already overdue`
             : "Bills due soon"}

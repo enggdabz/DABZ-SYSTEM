@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getExpensePresets, getExpenses, getSuppliers } from "@/lib/data/expenses";
@@ -38,7 +38,7 @@ export default async function ExpensesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Expenses</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Expenses</h1>
         <p className="mt-2 text-muted">
           Money that left the shop. Record one from the{" "}
           <span className="font-medium text-ink">+ Expense</span> button at the

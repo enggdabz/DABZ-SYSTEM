@@ -1,7 +1,7 @@
 import Image from "next/image";
 import { connection } from "next/server";
 
-import { Card, Disclosure, Notice, Tag } from "@/components/ui";
+import { Card, Disclosure, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getOnlineCategories, getOnlineProducts } from "@/lib/data/online";
 import { formatManilaDate } from "@/lib/datetime";
@@ -49,7 +49,7 @@ export default async function OnlineProductsPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Online shop</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Online shop</h1>
         <p className="mt-2 text-muted">
           What a customer can order from their phone. Products you add here
           appear on the shop right away.

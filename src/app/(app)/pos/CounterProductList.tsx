@@ -40,7 +40,7 @@ import Image from "next/image";
 import { useId, useRef, useState, type KeyboardEvent, type RefObject } from "react";
 
 import { Modal } from "@/components/Modal";
-import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import {
   checkCategoryName,
   checkNewProduct,
@@ -163,7 +163,7 @@ export function CounterProductList({
         return (
           <section key={group.key} aria-label={label} className="@container">
             {group.title !== null ? (
-              <h3 className="mb-2 rounded-control bg-accent px-3 py-2 text-sm font-semibold tracking-tight text-on-accent">
+              <h3 className={`${HEADING_BOX} mb-2 text-sm font-semibold tracking-tight`}>
                 {group.title}
               </h3>
             ) : null}

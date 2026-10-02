@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getAdvanceBalances, getPayrollWeeks, getStaff } from "@/lib/data/staff";
 import { formatPesos, sumCentavos } from "@/lib/money";
@@ -94,8 +94,8 @@ export default async function PayrollPage({
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Payroll</h1>
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Payroll</h1>
           <p className="mt-2 text-muted">
             Weekly wages at a daily rate. A half day pays half the rate, and
             overtime is your choice each day.

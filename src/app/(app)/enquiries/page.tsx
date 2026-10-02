@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getEnquiries } from "@/lib/data/enquiries";
 import { formatManilaDateTime } from "@/lib/datetime";
@@ -35,7 +35,7 @@ export default async function EnquiriesPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Messages</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Messages</h1>
         <p className="mt-2 text-muted">
           What customers sent from your public page. Answer them wherever they
           asked you to - Messenger, a text, a phone call - then record here that

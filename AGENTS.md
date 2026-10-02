@@ -154,6 +154,16 @@ receiving code.
   screen. The bill reminder hung 260px off the top of a phone that way. Use
   `createPortal(dialog, document.body)`, and check a new overlay in a browser -
   no unit test can see this.
+- **Every heading wears `HEADING_BOX`** from `src/components/ui.tsx` - a red
+  box with white text (owner's request, 2 Oct 2026). Page titles, card titles
+  (`Card` does it for you), section headings, dialog titles and the sidebar's
+  group labels; NOT the name of one record in a list, and not the customer
+  side, the sign-in screens or a printed document (it prints as plain text).
+  The box runs the full width of its row - give the wrapper `grow` beside a
+  button, never `w-fit` - because a red box sized to its words reads as a red
+  button. Nothing coloured goes inside it: muted, amber or accent text
+  vanishes on red. `src/components/heading-box.test.tsx` fails if a page title
+  forgets it.
 - Gentle, short motion only; `prefers-reduced-motion` is already respected in
   `globals.css`.
 - Sentence case on buttons and labels ("Mark paid", "Add to sale", "Time in").
