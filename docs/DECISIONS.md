@@ -1635,3 +1635,31 @@ to ask:
      be on screen together (`/overview?sales=weekly&expenses=monthly`).
   3. Under the line it says the **highest** day/week/month/year, not the
      "best" - a dear month is not a good one.
+- **Bills: monthly or one-time, priority bills, sorted by due date, and part
+  payments** (your requests, 2 October 2026). Migrations
+  `0029_bill_frequency.sql` and `0030_bill_partial_payments.sql`. What I
+  decided:
+  1. **Add a bill asks "Monthly or one time?"** and a month. For a monthly
+     bill it is the first month it counts; for a one-time bill it is the
+     month it is for. A one-time bill counts in the daily target for its own
+     month only. Bills that already existed start in the month they were
+     entered - earlier months are NOT treated as unpaid, because they were
+     never in the system. To change that, open Edit on the bill and pick an
+     earlier first month.
+  2. **A bill not paid by the end of its month moves into the next month as a
+     priority bill**, shown in its own section at the top of Bills with a
+     ⚠ Priority tag, and in the bill reminder. Every unpaid month is carried
+     (up to 12 months back), not only last month - an August bill still unpaid
+     in October is still owed. Each stays its own month: paying it records the
+     payment against the month it was owed in, so that month's own record
+     comes out right. A stopped bill is not carried.
+  3. **Bills are listed by due date**, earliest first; bills with no due day
+     go last.
+  4. **Mark paid now asks "In full" or "Part payment only".** After a part
+     payment the bill shows only the **remaining** amount (with "₱X paid so
+     far of ₱Y" in small print) until a payment marked "In full" settles it.
+     Whether a payment settles the bill is your choice on the form, not worked
+     out from the amounts, because a bill like electricity is not the same
+     every month. Each part payment writes its own ledger entry and, for a
+     loan installment, pays the loan down by exactly that part. **Undo** takes
+     back the latest payment of that month, one at a time.

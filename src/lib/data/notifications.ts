@@ -16,12 +16,21 @@ import "server-only";
  */
 import { cache } from "react";
 
-import { billsNeedingAttention, paidKey, type Bill } from "@/lib/bills";
+import {
+  CARRY_OVER_MONTHS,
+  billsNeedingAttention,
+  paidKey,
+  partPaidTotals,
+  type Bill,
+} from "@/lib/bills";
+import { billFromRow } from "@/lib/data/money";
 import { sumCentavos } from "@/lib/money";
 import type { DigestInput } from "@/lib/notifications";
 import {
+  addMonths,
   currentPeriod,
   manilaToday,
+  parseISODate,
   periodToMonthStartISO,
 } from "@/lib/period";
 import { unclaimedStatus, type TicketStatus } from "@/lib/repairs";
@@ -128,11 +137,13 @@ export async function readDigestInput(options?: {
   ] = await Promise.all([
     supabase
       .from("bills")
-      .select("id, name, amount_centavos, due_day, type, loan_id, active, note"),
+      .select("*"),
+    // Back to the carry-over window, so an unpaid earlier month is seen.
     supabase
       .from("bill_payments")
-      .select("bill_id, period_month")
-      .eq("period_month", periodToMonthStartISO(period)),
+      .select("*")
+      .gte("period_month", periodToMonthStartISO(addMonths(period, -CARRY_OVER_MONTHS)))
+      .lte("period_month", periodToMonthStartISO(addMonths(period, 1))),
     supabase
       .from("stock_items")
       .select(
@@ -152,21 +163,32 @@ export async function readDigestInput(options?: {
 
   // ---- Bills -------------------------------------------------------------
 
-  const bills: Bill[] = (billRows ?? []).map((row) => ({
-    id: String(row.id),
-    name: String(row.name),
-    amountCentavos: Number(row.amount_centavos),
-    dueDay: row.due_day === null ? null : Number(row.due_day),
-    type: row.type === "loan_installment" ? "loan_installment" : "operating",
-    loanId: (row.loan_id as string | null) ?? null,
-    active: Boolean(row.active),
-  }));
+  const bills: Bill[] = (billRows ?? []).map(billFromRow);
 
+  const payments = (paymentRows ?? []).flatMap((row) => {
+    const month = parseISODate(String(row.period_month));
+    if (!month) return [];
+    return [
+      {
+        key: paidKey(String(row.bill_id), month),
+        amountCentavos: Number(row.amount_centavos),
+        // Absent before 0030, when every payment settled its month.
+        isPartial: row.is_partial === true,
+      },
+    ];
+  });
   const paidKeys = new Set(
-    (paymentRows ?? []).map((row) => paidKey(String(row.bill_id), period)),
+    payments.filter((payment) => !payment.isPartial).map((payment) => payment.key),
   );
+  const partPaid = partPaidTotals(payments);
 
-  const attention = billsNeedingAttention({ bills, paidKeys, period, today });
+  const attention = billsNeedingAttention({
+    bills,
+    paidKeys,
+    partPaid,
+    period,
+    today,
+  });
   const overdue = attention.filter((entry) => entry.status.kind === "overdue");
   const dueSoon = attention.filter((entry) => entry.status.kind !== "overdue");
 

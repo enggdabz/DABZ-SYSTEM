@@ -76,6 +76,9 @@ quiet "$HERE/../migrations/0026_counter_product_list.sql"
 quiet "$HERE/../migrations/0027_product_categories.sql"
 # 0028 puts the categories in an order the owner chooses - 24 tests it.
 quiet "$HERE/../migrations/0028_product_category_order.sql"
+# 0029 is one-time bills and 0030 paying a bill in parts - 25 tests both.
+quiet "$HERE/../migrations/0029_bill_frequency.sql"
+quiet "$HERE/../migrations/0030_bill_partial_payments.sql"
 
 # 0011 and 0012 empty the bills, loans, products, apparel items and repair
 # services the earlier migrations seeded, so the tests that need a catalogue to
@@ -104,3 +107,4 @@ run "$HERE/21_project_deletion_refund.test.sql"
 run "$HERE/22_counter_product_list.test.sql"
 run "$HERE/23_product_categories.test.sql"
 run "$HERE/24_product_category_order.test.sql"
+run "$HERE/25_bill_frequency_and_parts.test.sql"

@@ -377,6 +377,28 @@ export const REQUIRED_COLUMNS: readonly RequiredRelation[] = [
     migration: "0028_product_category_order",
     breaks: "moving the categories into your own order",
   },
+  {
+    /*
+      0029 adds two columns to `bills`, which 0002 created, and no relation.
+      The Bills screen falls back to treating every bill as monthly without
+      them, so nothing else would notice they were missing.
+    */
+    name: "bills",
+    column: "frequency",
+    migration: "0029_bill_frequency",
+    breaks: "one-time bills, and carrying unpaid bills into the next month",
+  },
+  {
+    /*
+      0030 adds a column to `bill_payments`, which 0002 created. The Bills
+      screen falls back to treating every payment as a whole one without it,
+      so nothing else would notice part payments were unavailable.
+    */
+    name: "bill_payments",
+    column: "is_partial",
+    migration: "0030_bill_partial_payments",
+    breaks: "paying a bill in parts",
+  },
 ];
 
 /** Everything the System check screen asks about - relations and columns. */
