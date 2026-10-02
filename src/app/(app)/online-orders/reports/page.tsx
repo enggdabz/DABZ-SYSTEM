@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice } from "@/components/ui";
+import { Card, Notice, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { getReportData } from "@/lib/data/online";
 import { formatPesos } from "@/lib/money";
@@ -72,7 +72,7 @@ export default async function OnlineReportsPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Online shop reports</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Online shop reports</h1>
         <p className="mt-2 text-muted">
           What the shop has booked and what has actually come in. Worked out
           fresh every time this screen is opened, from the orders themselves.
@@ -88,7 +88,7 @@ export default async function OnlineReportsPage({
       ) : null}
 
       <section className="space-y-4">
-        <h2 className="text-xl font-semibold tracking-tight">{thisMonth.label}</h2>
+        <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>{thisMonth.label}</h2>
 
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <Tile

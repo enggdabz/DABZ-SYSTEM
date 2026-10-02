@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
 import { DeleteButton } from "@/components/DeleteButton";
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import {
   ORDER_FLOW,
   ORDER_STATUS_LABELS,
@@ -153,8 +153,8 @@ export default async function ApparelOrderPage({
           &larr; All job orders
         </Link>
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">
+          <div className="grow">
+            <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>
               {order.teamName ?? order.orderNumber}
             </h1>
             <p className="mt-1 text-muted">

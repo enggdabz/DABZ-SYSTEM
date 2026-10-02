@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { formatManilaDate } from "@/lib/datetime";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
@@ -38,7 +38,7 @@ export default async function StaffPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Accounts</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Accounts</h1>
         <p className="mt-2 text-muted">
           Who can sign in, and what each person is allowed to do. There is no
           public sign-up: every account is created here. Wages and employment
@@ -61,7 +61,7 @@ export default async function StaffPage() {
       </Card>
 
       <section className="space-y-5">
-        <h2 className="text-xl font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>
           Accounts ({rows.length})
         </h2>
 

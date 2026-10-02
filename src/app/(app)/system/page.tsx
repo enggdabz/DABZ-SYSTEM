@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA } from "@/components/ui";
+import { Card, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import { readSchemaHealth } from "@/lib/data/schema-health";
 import { probeKey, schemaAdvice, type RequiredRelation } from "@/lib/schema-health";
@@ -34,7 +34,7 @@ export default async function SystemPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">System check</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>System check</h1>
         <p className="mt-2 text-muted">
           Whether the database this system is connected to has everything the
           screens ask for. Nothing here is about your shop &mdash; it is about

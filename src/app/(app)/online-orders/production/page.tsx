@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA } from "@/components/ui";
+import { Card, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getOnlineOrders, getProductionStages } from "@/lib/data/online";
@@ -31,7 +31,7 @@ export default async function ProductionBoardPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Production board</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Production board</h1>
         <p className="mt-2 max-w-2xl text-muted">
           Every order sits in the step it is waiting for. Tap OK when that step
           is finished and the order moves to the next card. After Packaging it
@@ -61,13 +61,14 @@ export default async function ProductionBoardPage() {
               {column.eyebrow}
             </p>
 
-            <div className="mt-1 flex flex-wrap items-center gap-2">
+            <div className={`${HEADING_BOX} mt-1 flex flex-wrap items-center gap-2`}>
               <h2 className="font-semibold tracking-tight">{column.title}</h2>
+              {/* On the red bar: a white chip when orders wait, a faint one when none do. */}
               <span
                 className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-0.5 text-xs font-medium ${
                   column.orders.length > 0
-                    ? "bg-ink text-surface"
-                    : "bg-ink/5 text-muted"
+                    ? "bg-on-accent text-accent"
+                    : "bg-on-accent/20 text-on-accent"
                 }`}
               >
                 {column.orders.length}

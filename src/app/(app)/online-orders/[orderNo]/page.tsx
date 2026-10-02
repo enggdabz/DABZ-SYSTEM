@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 
-import { Card, Disclosure, Notice, TAP_AREA } from "@/components/ui";
+import { Card, Disclosure, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import {
@@ -102,7 +102,7 @@ export default async function OnlineOrderPage({
         </Link>
 
         <div className="mt-3 flex flex-wrap items-center gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">{order.orderNo}</h1>
+          <h1 className={`${HEADING_BOX} grow text-3xl font-semibold tracking-tight`}>{order.orderNo}</h1>
           <StatusBadge status={order.status} overdue={late} />
         </div>
 

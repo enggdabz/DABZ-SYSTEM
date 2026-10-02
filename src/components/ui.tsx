@@ -8,6 +8,31 @@
 import Image from "next/image";
 import type { ComponentProps, ReactNode } from "react";
 
+/*
+  A heading in a red box with white text - every page title and every section
+  heading in the signed-in system (owner's request, 2 Oct 2026, after seeing
+  the Counter's category headers).
+
+  It is a full-width bar on purpose. A primary button is also red with white
+  text, and the design rules warn that red must never read as a button; a bar
+  that runs the width of its card, page or column, with no hover and no
+  pointer, is a heading, while a button is sized to its own label. So a box
+  should never be shrunk to its text (`w-fit`, `inline-block`) - give the
+  wrapper `grow` instead when a heading sits beside a button.
+
+  Anything inside it inherits the white. A coloured child - an amber ⚠, a
+  `text-accent` icon - disappears against the red, so let it take
+  `currentColor`; a warning is still an icon AND words.
+
+  On paper it prints as plain black text: a page of red bars would empty the
+  ink on the first payslip.
+
+  `heading-box.test.ts` fails if a page title or a section heading is written
+  without it.
+*/
+export const HEADING_BOX =
+  "rounded-control bg-accent px-3 py-2 text-on-accent print:bg-transparent print:px-0 print:text-black";
+
 export function Card({
   title,
   description,
@@ -24,10 +49,10 @@ export function Card({
       className={`rounded-card bg-surface p-6 shadow-sm ring-1 ring-line/60 ${className}`}
     >
       {title ? (
-        <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+        <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>{title}</h2>
       ) : null}
       {description ? (
-        <p className="mt-1 text-sm text-muted">{description}</p>
+        <p className={`${title ? "mt-2" : "mt-1"} text-sm text-muted`}>{description}</p>
       ) : null}
       <div className={title || description ? "mt-5" : ""}>{children}</div>
     </section>

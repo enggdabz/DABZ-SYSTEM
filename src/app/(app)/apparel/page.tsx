@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag, buttonClasses } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, buttonClasses, HEADING_BOX } from "@/components/ui";
 import { ORDER_STATUS_LABELS, isOpenOrder } from "@/lib/apparel";
 import {
   scheduleAll,
@@ -43,7 +43,7 @@ function CalendarGlyph() {
       viewBox="0 0 18 18"
       fill="none"
       aria-hidden="true"
-      className="shrink-0 text-accent"
+      className="shrink-0"
     >
       <rect x="2" y="3.5" width="14" height="12" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
       <path d="M2 7.5h14M6 2v3M12 2v3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
@@ -65,7 +65,7 @@ function BenchGlyph() {
       viewBox="0 0 18 18"
       fill="none"
       aria-hidden="true"
-      className="shrink-0 text-accent"
+      className="shrink-0"
     >
       <path
         d="M2.5 5.25l1.5 1.5 2.5-2.75M2.5 12.25l1.5 1.5 2.5-2.75"
@@ -168,8 +168,8 @@ export default async function ApparelPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-semibold tracking-tight">Dabz Apparel</h1>
+        <div className="grow">
+          <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Dabz Apparel</h1>
           <p className="mt-2 text-muted">
             {DIVISIONS.apparel.tagline} &middot; job orders, name lists and what
             is still owed.
@@ -198,8 +198,8 @@ export default async function ApparelPage() {
       */}
       <div className="grid gap-6 lg:grid-cols-2">
         <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <div className="min-w-0 grow">
+            <h2 className={`${HEADING_BOX} flex items-center gap-2 text-lg font-semibold tracking-tight`}>
               <CalendarGlyph />
               Project calendar
             </h2>
@@ -220,8 +220,8 @@ export default async function ApparelPage() {
           next one is "how far has it got?".
         */}
         <Card className="flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
-          <div className="min-w-0">
-            <h2 className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <div className="min-w-0 grow">
+            <h2 className={`${HEADING_BOX} flex items-center gap-2 text-lg font-semibold tracking-tight`}>
               <BenchGlyph />
               Production report
             </h2>

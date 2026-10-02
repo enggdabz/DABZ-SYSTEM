@@ -2,7 +2,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 
 import { DeleteButton } from "@/components/DeleteButton";
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getApparelOptions,
@@ -46,7 +46,7 @@ export default async function ApparelPricesPage() {
         <Link href="/apparel" className={`text-sm text-muted underline ${TAP_AREA}`}>
           &larr; Back to job orders
         </Link>
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+        <h1 className={`${HEADING_BOX} mt-2 text-3xl font-semibold tracking-tight`}>
           Apparel prices
         </h1>
         <p className="mt-2 text-muted">

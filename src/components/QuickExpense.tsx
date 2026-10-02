@@ -15,7 +15,7 @@
 import { useActionState, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
-import { Button, Field, Input, Notice, Select } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, HEADING_BOX } from "@/components/ui";
 import { DIVISION_IDS, divisionName } from "@/lib/divisions";
 import {
   QUICK_EXPENSE_CATEGORIES,
@@ -131,8 +131,8 @@ function Dialog({
     >
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-card bg-surface p-6 shadow-lg ring-1 ring-line/60">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold tracking-tight">Record an expense</h2>
+          <div className="grow">
+            <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>Record an expense</h2>
             <p className="mt-1 text-sm text-muted">
               Money that left the shop. Tap a quick pick, type the amount, done.
             </p>

@@ -1557,3 +1557,36 @@ to ask:
   half-width column) puts the box and the line total on a second line under
   the name; a wide row keeps everything on one line. The rule is
   `stepQuantity` in `src/lib/counter-list.ts`.
+- **Every heading sits in a red box with white text** (your request, 2 October
+  2026: "all headers in every category must be in a red box with white text,
+  across the full system"). The Counter's category headers were the model.
+  What I decided:
+  1. **What counts as a heading:** every page title, every card title, every
+     section heading inside a screen (Settings' groups, a calendar's month,
+     the Counter's "This sale", the project form's "The job" / "The customer"
+     / "Payment today", the production board's columns, the division names on
+     Reports and End of day), the title of every pop-up, and the sidebar's
+     category labels (Daily, Money & people, Manage).
+  2. **What does not:** the NAME of a single record in a list - a bill, a loan,
+     a person, a product, a stock item, a message. Those are rows rather than
+     headings, and a red box on every row of a twenty-bill list would leave
+     nothing standing out. Small labels inside a record ("Allowed to", "Bulk
+     price") stay as they were too.
+  3. **The customer side is left alone:** the public page, the online shop and
+     the sign-in screens keep their own look (`docs/spec.md` sets the shop's).
+     So do printed documents - receipts, payslips, the job order sheet, the
+     printable report - and on paper every red box prints as plain black text,
+     so a payslip does not empty the ink.
+  4. **A box runs the full width of its page, card or column**, never just the
+     width of its words. A red button also has white text, and the design
+     rules warn that red must never read as a button; a full-width bar with no
+     hover is a heading, a button is sized to its label. Where a title sits
+     beside a button, the title stretches up to it.
+  5. **Anything inside a box turns white.** The amber ⚠ on the Overview's "still
+     to fill in" heading and the red calendar / bench icons on the Apparel
+     screen would vanish on red, so they take the box's white; a warning is
+     still an icon AND words.
+  The style is one line, `HEADING_BOX` in `src/components/ui.tsx`, so a change
+  of mind is one edit there. To take the box off a particular heading, remove
+  `${HEADING_BOX}` from its className. `src/components/heading-box.test.tsx`
+  fails if a page title is written without it.

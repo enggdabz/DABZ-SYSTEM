@@ -19,6 +19,7 @@
  */
 import type { UniformSummary } from "@/lib/uniforms";
 import { APPAREL_SIZES } from "@/lib/uniforms";
+import { HEADING_BOX } from "@/components/ui";
 
 /**
  * Only the sizes that are actually in use, plus a "not set" column when there
@@ -65,7 +66,11 @@ export function UniformSummaryGrids({
   return (
     <section className={frame}>
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h2 className={print ? "text-sm font-bold" : "text-lg font-semibold tracking-tight"}>
+        <h2
+          className={
+            print ? "text-sm font-bold" : `${HEADING_BOX} grow text-lg font-semibold tracking-tight`
+          }
+        >
           {title}
         </h2>
         {unsaved ? (

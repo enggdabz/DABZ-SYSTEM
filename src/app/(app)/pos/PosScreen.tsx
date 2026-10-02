@@ -3,7 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button, Field, Input, Notice, Select, TAP_AREA } from "@/components/ui";
+import { Button, Field, Input, Notice, Select, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { listSale } from "@/lib/counter-list";
 import type { DivisionId } from "@/lib/divisions";
 import { formatPesos, parsePesos } from "@/lib/money";
@@ -235,7 +235,7 @@ export function PosScreen({
       <div className="space-y-6">
         <section aria-labelledby="saved-products">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 id="saved-products" className="text-sm font-medium text-muted">
+            <h2 id="saved-products" className={`${HEADING_BOX} grow text-sm font-medium`}>
               Saved products
             </h2>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -360,7 +360,7 @@ export function PosScreen({
       {/* How the sale is paid. The items themselves are the rows on the left. */}
       <aside id="this-sale" className="space-y-4 lg:sticky lg:top-24 lg:self-start">
         <div className="rounded-card bg-surface p-5 shadow-sm ring-1 ring-line/60">
-          <h2 className="font-semibold tracking-tight">This sale</h2>
+          <h2 className={`${HEADING_BOX} font-semibold tracking-tight`}>This sale</h2>
 
           {totals.lines.length === 0 ? (
             <p className="mt-4 text-sm text-muted">
@@ -596,8 +596,8 @@ function Dialog({
     >
       <div className="max-h-[88vh] w-full max-w-md overflow-y-auto rounded-card bg-surface p-6 shadow-lg ring-1 ring-line/60">
         <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <div className="grow">
+            <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>{title}</h2>
             {description ? (
               <p className="mt-1 text-sm text-muted">{description}</p>
             ) : null}
@@ -664,7 +664,7 @@ function TarpaulinCalculator({
 
   return (
     <section className="rounded-card bg-surface p-5 ring-1 ring-line/60">
-      <h2 className="font-semibold tracking-tight">Tarpaulin</h2>
+      <h2 className={`${HEADING_BOX} font-semibold tracking-tight`}>Tarpaulin</h2>
       <p className="mt-1 text-sm text-muted">
         Works out the price. Use it to quote a customer without adding anything.
       </p>

@@ -1,6 +1,6 @@
 import { connection } from "next/server";
 
-import { Card, Notice, Tag } from "@/components/ui";
+import { Card, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { totalMonthlyBills } from "@/lib/bills";
 import { computeClosing } from "@/lib/closing";
@@ -80,7 +80,7 @@ export default async function ClosingPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">End of day</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>End of day</h1>
         <p className="mt-2 text-muted">{formatCivilDate(today)}</p>
       </div>
 
@@ -321,7 +321,7 @@ function DivisionBreakdown({
                 className="rounded-card bg-surface-sunken p-4 ring-1 ring-line/60"
               >
                 <div className="flex items-baseline justify-between gap-2">
-                  <h3 className="font-semibold">{entry.label}</h3>
+                  <h3 className={`${HEADING_BOX} grow font-semibold`}>{entry.label}</h3>
                   <span className="text-lg font-semibold tracking-tight">
                     {formatPesos(entry.totalCentavos)}
                   </span>

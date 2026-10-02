@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA, Tag } from "@/components/ui";
+import { Card, Notice, TAP_AREA, Tag, HEADING_BOX } from "@/components/ui";
 import { getSettings, requireUser } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getStaff, getTodaysAttendance } from "@/lib/data/staff";
@@ -84,7 +84,7 @@ export default async function TimeClockPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Time clock</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Time clock</h1>
         <p className="mt-2 text-muted">
           {formatCivilDate(today)} &middot; shop hours {settings.workDayStart}
           &ndash;{settings.workDayEnd}
@@ -155,7 +155,7 @@ export default async function TimeClockPage() {
 
           {me ? (
             <section>
-              <h2 className="text-xl font-semibold tracking-tight">Your day</h2>
+              <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>Your day</h2>
               <div className="mt-5 max-w-sm">
                 {rows
                   .filter(({ member }) => member.id === me.id)
@@ -189,7 +189,7 @@ export default async function TimeClockPage() {
 
           {canRecordForOthers && others.length > 0 ? (
             <section>
-              <h2 className="text-xl font-semibold tracking-tight">
+              <h2 className={`${HEADING_BOX} text-xl font-semibold tracking-tight`}>
                 Record for someone else
               </h2>
               <p className="mt-1 text-sm text-muted">

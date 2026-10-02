@@ -1,7 +1,7 @@
 import { connection } from "next/server";
 
 import { DeleteButton } from "@/components/DeleteButton";
-import { Card, Disclosure, Notice, Tag } from "@/components/ui";
+import { Card, Disclosure, Notice, Tag, HEADING_BOX } from "@/components/ui";
 import { requireOwnerOrAdmin } from "@/lib/auth/dal";
 import {
   getAllProducts,
@@ -33,7 +33,7 @@ export default async function ProductsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Products</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Products</h1>
         <p className="mt-2 text-muted">
           The buttons on the counter screen, and their prices.
         </p>

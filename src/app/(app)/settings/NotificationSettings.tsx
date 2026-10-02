@@ -16,7 +16,7 @@
  */
 import { useActionState, useState, useSyncExternalStore } from "react";
 
-import { Button, Notice, TAP_AREA } from "@/components/ui";
+import { Button, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 
 import {
   subscribeAction,
@@ -206,7 +206,7 @@ export function NotificationSettings({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="font-semibold tracking-tight">Notifications</h3>
+        <h3 className={`${HEADING_BOX} font-semibold tracking-tight`}>Notifications</h3>
         <p className="mt-1 text-sm text-muted">
           One summary each morning when the shop opens, listing what needs you
           &mdash; bills due, stock low, units not collected, messages waiting.

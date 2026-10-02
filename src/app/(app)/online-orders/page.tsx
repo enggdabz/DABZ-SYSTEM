@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Disclosure, Notice, TAP_AREA } from "@/components/ui";
+import { Card, Disclosure, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getOnlineOrders, getOnlineProducts, getProductionStages } from "@/lib/data/online";
@@ -58,7 +58,7 @@ export default async function OnlineOrdersPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Online orders</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Online orders</h1>
         <p className="mt-2 text-muted">
           What customers have ordered from the shop, and the Messenger and
           walk-in orders you have typed in.

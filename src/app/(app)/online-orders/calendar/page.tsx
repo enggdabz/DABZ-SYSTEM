@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { connection } from "next/server";
 
-import { Card, Notice, TAP_AREA } from "@/components/ui";
+import { Card, Notice, TAP_AREA, HEADING_BOX } from "@/components/ui";
 import { getSettings, requirePermission } from "@/lib/auth/dal";
 import { isOwnerOrAdmin } from "@/lib/auth/permissions";
 import { getOnlineOrders, getProductionStages } from "@/lib/data/online";
@@ -73,7 +73,7 @@ export default async function OrderCalendarPage({
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight">Order calendar</h1>
+        <h1 className={`${HEADING_BOX} text-3xl font-semibold tracking-tight`}>Order calendar</h1>
         <p className="mt-2 text-muted">
           When every online order is promised for.
         </p>
@@ -82,7 +82,7 @@ export default async function OrderCalendarPage({
       <OnlineTabs tabs={onlineTabs(isOwnerOrAdmin(user))} />
 
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <h2 className="text-xl font-semibold tracking-tight">
+        <h2 className={`${HEADING_BOX} grow text-xl font-semibold tracking-tight`}>
           {formatPeriod(period)}
         </h2>
         <div className="flex flex-wrap items-center gap-4 text-sm">
