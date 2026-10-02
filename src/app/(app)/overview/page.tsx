@@ -54,19 +54,18 @@ import {
   startOfWeek,
 } from "@/lib/period";
 import { computeDailyTarget, targetProgress } from "@/lib/target";
-import { getSalesTrend } from "@/lib/data/sales-trend";
+import { getMoneyTrend } from "@/lib/data/sales-trend";
 import {
   TREND_RANGE_WORDS,
-  TREND_MEASURE_LABELS,
   TREND_VIEWS,
   TREND_VIEW_LABELS,
   overviewTrendHref,
   parseTrendView,
   trendSummary,
-  type TrendMeasure,
+  type TrendChartId,
   type TrendView,
 } from "@/lib/sales-trend";
-import { SalesTrendChart } from "./SalesTrendChart";
+import { TrendChart } from "./TrendChart";
 
 export const metadata = { title: "Overview · Dabz System" };
 
@@ -76,8 +75,8 @@ export default async function HomePage({
   searchParams: Promise<{
     denied?: string;
     password_changed?: string;
-    sales?: string;
-    expenses?: string;
+    money?: string;
+    profit?: string;
   }>;
 }) {
   await connection();
@@ -85,8 +84,8 @@ export default async function HomePage({
   const {
     denied,
     password_changed: passwordChanged,
-    sales,
-    expenses,
+    money,
+    profit,
   } = await searchParams;
   const user = await requireUser();
   const settings = await getSettings();
@@ -135,7 +134,7 @@ export default async function HomePage({
 
       {isOwnerOrAdmin(user) ? (
         <OwnerOverview
-          trendViews={{ sales: parseTrendView(sales), expenses: parseTrendView(expenses) }}
+          trendViews={{ money: parseTrendView(money), profit: parseTrendView(profit) }}
         />
       ) : (
         <StaffHome user={user} />
@@ -226,7 +225,7 @@ async function SchemaBanner() {
 async function OwnerOverview({
   trendViews,
 }: {
-  trendViews: Record<TrendMeasure, TrendView>;
+  trendViews: Record<TrendChartId, TrendView>;
 }) {
   const settings = await getSettings();
   const period = currentPeriod();
@@ -463,17 +462,9 @@ async function OwnerOverview({
         </div>
       </Card>
 
-      <TrendCard
-        measure="sales"
-        views={trendViews}
-        weekStartsOn={settings.weekStartsOn}
-      />
+      <TrendCard chart="money" views={trendViews} weekStartsOn={settings.weekStartsOn} />
 
-      <TrendCard
-        measure="expenses"
-        views={trendViews}
-        weekStartsOn={settings.weekStartsOn}
-      />
+      <TrendCard chart="profit" views={trendViews} weekStartsOn={settings.weekStartsOn} />
 
       {checklist.items.length > 0 ? (
         <Card>
@@ -867,61 +858,56 @@ async function OwnerOverview({
  * incomplete total, and the card says so rather than letting it read as the
  * whole day.
  */
-/** What each line calls its money, in the sentences around the chart. */
-const TREND_WORDS: Record<
-  TrendMeasure,
-  { moved: string; best: string; none: string; fills: string; note: string }
-> = {
-  sales: {
-    moved: "taken in",
-    best: "best",
-    none: "No sales recorded",
-    fills: "The line fills in by itself as sales are completed at the counter.",
-    note: "Earnings only \u2014 borrowed money and owner capital are left out, and voided sales are taken back.",
-  },
-  expenses: {
-    moved: "spent",
-    best: "highest",
-    none: "No expenses recorded",
-    fills: "The line fills in by itself as expenses, bills, wages and stock bought are recorded.",
-    note: "Shop costs only \u2014 materials, bills, wages, loan payments and the rest. Owner withdrawals are left out, and voided entries are taken back.",
-  },
+const TREND_UNIT: Record<TrendView, string> = {
+  daily: "day",
+  weekly: "week",
+  monthly: "month",
+  yearly: "year",
 };
 
 /**
- * Sales or expenses over time, by day, week, month or year.
+ * Money over time, by day, week, month or year: sales and expenses on one
+ * graph, and profit - the gap between them - on its own.
  *
- * The view is in the URL (`?sales=weekly&expenses=monthly`) rather than in the
+ * Profit gets its own graph rather than a third line because it lives on a
+ * different scale: it goes below zero, and squeezed under two lines in the
+ * thousands a ₱300 loss and a ₱300 gain look the same.
+ *
+ * The view is in the URL (`?money=weekly&profit=monthly`) rather than in the
  * browser's memory, so only the range being looked at is read from the ledger
  * - five years of entries are not fetched to draw thirty days - and a link to
- * the weekly view stays the weekly view. Each line keeps its own choice.
+ * the weekly view stays the weekly view. Each graph keeps its own choice.
  * Owner/Admin only, like the ledger it reads.
  */
 async function TrendCard({
-  measure,
+  chart,
   views,
   weekStartsOn,
 }: {
-  measure: TrendMeasure;
-  views: Record<TrendMeasure, TrendView>;
+  chart: TrendChartId;
+  views: Record<TrendChartId, TrendView>;
   weekStartsOn: "monday" | "sunday";
 }) {
-  const view = views[measure];
-  const label = TREND_MEASURE_LABELS[measure];
-  const words = TREND_WORDS[measure];
-  const trend = await getSalesTrend(view, manilaToday(), weekStartsOn, measure);
-  const summary = trendSummary(trend.points);
-  const unit = { daily: "day", weekly: "week", monthly: "month", yearly: "year" }[view];
+  const view = views[chart];
+  const range = TREND_RANGE_WORDS[view];
+  const unit = TREND_UNIT[view];
+  const title = chart === "money" ? "Sales and expenses" : "Profit";
+  const trend = await getMoneyTrend(view, civilDateToISO(manilaToday()), weekStartsOn);
+
+  const sales = trendSummary(trend.sales);
+  const expenses = trendSummary(trend.expenses);
+  const profit = trendSummary(trend.profit);
+  const nothing = sales.totalCentavos === 0 && expenses.totalCentavos === 0;
 
   return (
     <Card>
-      <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>{label}</h2>
+      <h2 className={`${HEADING_BOX} text-lg font-semibold tracking-tight`}>{title}</h2>
 
-      <nav aria-label={`${label} chart period`} className="mt-4 flex flex-wrap gap-2">
+      <nav aria-label={`${title} chart period`} className="mt-4 flex flex-wrap gap-2">
         {TREND_VIEWS.map((option) => (
           <Link
             key={option}
-            href={overviewTrendHref({ ...views, [measure]: option })}
+            href={overviewTrendHref({ ...views, [chart]: option })}
             scroll={false}
             aria-current={option === view ? "page" : undefined}
             className={`rounded-full px-3 py-1.5 text-sm ring-1 transition-colors ${
@@ -937,21 +923,24 @@ async function TrendCard({
 
       <div className="mt-5">
         {trend.failed ? (
-          <Notice tone="attention" title={`The ${measure} line could not be read`}>
+          <Notice tone="attention" title="This graph could not be read">
             <p>
-              The ledger did not answer, so there is no line to draw. This is
+              The ledger did not answer, so there is nothing to draw. This is
               not the same as nothing recorded - try opening the page again.
             </p>
           </Notice>
-        ) : summary.totalCentavos === 0 ? (
-          <Notice tone="info" title={`${words.none} over ${TREND_RANGE_WORDS[view]}`}>
-            <p>{words.fills}</p>
+        ) : nothing ? (
+          <Notice tone="info" title={`Nothing recorded over ${range}`}>
+            <p>
+              The graph fills in by itself as sales are completed at the counter
+              and expenses, bills and wages are recorded.
+            </p>
           </Notice>
         ) : (
           <>
             {trend.truncated ? (
               <div className="mb-4">
-                <Notice tone="attention" title="The oldest points on this line are too low">
+                <Notice tone="attention" title="The oldest points on this graph are wrong">
                   <p>
                     There were too many entries to read at once, so the earliest
                     ones were left out. Reports has the full figures.
@@ -959,22 +948,49 @@ async function TrendCard({
                 </Notice>
               </div>
             ) : null}
-            <SalesTrendChart
-              points={trend.points}
-              rangeWords={TREND_RANGE_WORDS[view]}
-              measureLabel={label}
-            />
-            <p className="mt-4 text-sm text-muted">
-              {formatPesos(summary.totalCentavos)} {words.moved} over{" "}
-              {TREND_RANGE_WORDS[view]}
-              {summary.best ? (
-                <>
-                  {" "}&middot; {words.best} {unit}: {summary.best.label},{" "}
-                  {formatPesos(summary.best.centavos)}
-                </>
-              ) : null}
-              . {words.note}
-            </p>
+
+            {chart === "money" ? (
+              <>
+                <TrendChart
+                  title={title}
+                  rangeWords={range}
+                  series={[
+                    { label: "Sales", color: "var(--chart-sales)", points: trend.sales },
+                    { label: "Expenses", color: "var(--accent)", points: trend.expenses },
+                  ]}
+                />
+                <p className="mt-4 text-sm text-muted">
+                  Over {range}: {formatPesos(sales.totalCentavos)} taken in and{" "}
+                  {formatPesos(expenses.totalCentavos)} spent. Sales are earnings
+                  only &mdash; borrowed money and owner capital are left out.
+                  Expenses are the shop&apos;s costs &mdash; materials, bills,
+                  wages, loan payments and the rest &mdash; but not owner
+                  withdrawals. Voided entries are taken back from both.
+                </p>
+              </>
+            ) : (
+              <>
+                <TrendChart
+                  title={title}
+                  rangeWords={range}
+                  series={[{ label: "Profit", color: "var(--ink)", points: trend.profit }]}
+                />
+                <p className="mt-4 text-sm text-muted">
+                  {profit.totalCentavos < 0
+                    ? `${formatPesos(-profit.totalCentavos)} more went out than came in`
+                    : `${formatPesos(profit.totalCentavos)} profit`}{" "}
+                  over {range}
+                  {profit.best ? (
+                    <>
+                      {" "}&middot; best {unit}: {profit.best.label},{" "}
+                      {formatPesos(profit.best.centavos)}
+                    </>
+                  ) : null}
+                  . Profit is sales less expenses, the same as Reports. Below
+                  the zero line, more went out than came in.
+                </p>
+              </>
+            )}
           </>
         )}
       </div>

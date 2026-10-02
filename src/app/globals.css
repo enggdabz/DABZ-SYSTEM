@@ -36,6 +36,11 @@
   --accent: #d10a0a;
   --on-accent: #ffffff;
   --success: #187c3c;
+  /* The sales line on the Overview, beside expenses in --accent. Not
+     --success: that is a status colour and sits too close to the red for
+     red-green colour blindness (dE 7.4); this one clears 8 in both themes,
+     checked with the dataviz palette validator. */
+  --chart-sales: #08875d;
 
   /*
     Four tokens the Online Orders module needs and the system did not have
@@ -85,6 +90,7 @@
   --accent: #d10a0a;
   --on-accent: #ffffff;
   --success: #4caf7a;
+  --chart-sales: #22a06b;
 
   --tile: #262626;
   --seg: #2c2c30;
@@ -114,6 +120,7 @@
   --color-accent: var(--accent);
   --color-on-accent: var(--on-accent);
   --color-success: var(--success);
+  --color-chart-sales: var(--chart-sales);
   --color-attention: var(--attention);
   --color-attention-bg: var(--attention-bg);
   --color-topbar: var(--topbar);

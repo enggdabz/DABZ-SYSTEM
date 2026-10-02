@@ -5,7 +5,9 @@ import {
   buildSalesTrend,
   formatAxisPesos,
   niceAxisMax,
+  niceAxisRange,
   overviewTrendHref,
+  profitTrend,
   parseTrendView,
   trendBuckets,
   trendSummary,
@@ -170,6 +172,7 @@ describe("formatAxisPesos", () => {
     expect(formatAxisPesos(parsePesos("500"))).toBe("₱500");
     expect(formatAxisPesos(parsePesos("2500"))).toBe("₱2.5K");
     expect(formatAxisPesos(parsePesos("1250000"))).toBe("₱1.25M");
+    expect(formatAxisPesos(-parsePesos("2000"))).toBe("-₱2K");
   });
 });
 
@@ -201,12 +204,70 @@ describe("expenses", () => {
 });
 
 describe("overviewTrendHref", () => {
-  it("keeps each line's own view and leaves daily out", () => {
-    expect(overviewTrendHref({ sales: "daily", expenses: "daily" })).toBe("/overview");
-    expect(overviewTrendHref({ sales: "weekly", expenses: "daily" })).toBe("/overview?sales=weekly");
-    expect(overviewTrendHref({ sales: "daily", expenses: "yearly" })).toBe("/overview?expenses=yearly");
-    expect(overviewTrendHref({ sales: "monthly", expenses: "weekly" })).toBe(
-      "/overview?sales=monthly&expenses=weekly",
+  it("keeps each graph's own view and leaves daily out", () => {
+    expect(overviewTrendHref({ money: "daily", profit: "daily" })).toBe("/overview");
+    expect(overviewTrendHref({ money: "weekly", profit: "daily" })).toBe("/overview?money=weekly");
+    expect(overviewTrendHref({ money: "daily", profit: "yearly" })).toBe("/overview?profit=yearly");
+    expect(overviewTrendHref({ money: "monthly", profit: "weekly" })).toBe(
+      "/overview?money=monthly&profit=weekly",
     );
+  });
+});
+
+describe("profitTrend", () => {
+  const buckets = trendBuckets("daily", TODAY, "monday");
+  const entries = [
+    entry({ amountCentavos: parsePesos("1000.10") }),
+    entry({ direction: "out", category: "materials_supplies", amountCentavos: parsePesos("250.05") }),
+    entry({ occurredAt: "2026-10-01T02:00:00Z", direction: "out", category: "fixed_bills", amountCentavos: parsePesos("300") }),
+    // Not a shop cost, so it does not come off profit.
+    entry({ direction: "out", category: "owner_withdrawal", amountCentavos: parsePesos("5000") }),
+    // Not earnings, so it does not add to profit.
+    entry({ category: "loan_proceeds", amountCentavos: parsePesos("9000") }),
+  ];
+  const sales = buildSalesTrend(entries, buckets, "sales");
+  const expenses = buildSalesTrend(entries, buckets, "expenses");
+  const profit = profitTrend(sales, expenses);
+
+  it("is sales less expenses, to the centavo", () => {
+    expect(profit[29].centavos).toBe(parsePesos("750.05"));
+  });
+
+  it("goes below zero on a day with costs and no sales", () => {
+    expect(profit[28].centavos).toBe(-parsePesos("300"));
+  });
+
+  it("adds up to total sales less total expenses", () => {
+    expect(trendSummary(profit).totalCentavos).toBe(
+      trendSummary(sales).totalCentavos - trendSummary(expenses).totalCentavos,
+    );
+  });
+
+  it("refuses lists that do not cover the same periods", () => {
+    expect(() => profitTrend(sales, expenses.slice(1))).toThrow();
+  });
+});
+
+describe("niceAxisRange", () => {
+  it("starts at zero when nothing is negative", () => {
+    expect(niceAxisRange([parsePesos("4968"), 0])).toEqual({ min: 0, max: parsePesos("5000") });
+  });
+
+  it("keeps zero on the scale when everything is a loss", () => {
+    expect(niceAxisRange([-parsePesos("300"), -parsePesos("1800")])).toEqual({
+      min: -parsePesos("2000"),
+      max: 0,
+    });
+  });
+
+  it("rounds each end out on its own", () => {
+    expect(niceAxisRange([-parsePesos("300"), parsePesos("4968")])).toEqual({
+      min: -parsePesos("500"),
+      max: parsePesos("5000"),
+    });
+  });
+
+  it("still has a scale when every point is zero", () => {
+    expect(niceAxisRange([0, 0])).toEqual({ min: 0, max: 100 });
   });
 });
